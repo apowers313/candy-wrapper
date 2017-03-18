@@ -1,0 +1,48 @@
+{
+  "name": "candy-wrapper",
+  "version": "0.0.1",
+  "description": "A sinon.js-like wrapper for functions that creates stubs, spys, mocks, etc.",
+  "main": "main.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "grunt default",
+    "testnode": "istanbul cover _mocha",
+    "docs": "jsdoc -c ./.jsdoc-conf.json",
+    "publish": "gh-pages --silent --repo https://$GH_TOKEN@github.com/apowers313/new-project.git --dist docs"
+  },
+  "keywords": [
+    "sinon",
+    "wrapper",
+    "stub",
+    "spy",
+    "mock",
+    "fake",
+    "testing",
+    "candy"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/apowers313/candy-wrapper.git"
+  },
+  "author": "Adam Powers",
+  "license": "UNLICENSED",
+  "bugs": {
+    "url": "https://github.com/apowers313/candy-wrapper/issues",
+    "email": "apowers@ato.ms"
+  },
+  "homepage": "https://github.com/apowers313/candy-wrapper#readme",
+  "devDependencies": {
+    "chai": "^3.5.0",
+    "gh-pages": "^0.12.0",
+    "grunt": "^1.0.1",
+    "grunt-contrib-connect": "^1.0.2",
+    "grunt-saucelabs": "^9.0.0",
+    "ink-docstrap": "^1.3.0",
+    "istanbul": "^0.4.5",
+    "istanbul-coveralls": "^1.0.3",
+    "jsdoc": "^3.4.3",
+    "mocha": "^3.2.0"
+  }
+}
