@@ -7,7 +7,8 @@
     "test": "test"
   },
   "scripts": {
-    "test": "grunt default",
+    "test": "npm run testnode",
+    "testbrowsers": "grunt default",
     "testnode": "istanbul cover _mocha",
     "docs": "jsdoc -c ./.jsdoc-conf.json",
     "publish": "gh-pages --silent --repo https://$GH_TOKEN@github.com/apowers313/new-project.git --dist docs"
