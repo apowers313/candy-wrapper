@@ -10,7 +10,7 @@
         module.exports = factory();
     } else {
         // Browser globals (root is window)
-        root.candyWrapper = factory();
+        root.CandyWrapper = factory();
     }
 }(this, function() {
 
