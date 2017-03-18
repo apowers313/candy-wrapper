@@ -1,0 +1,124 @@
+{
+    "project": {
+        "name": "Candy Wrapper",
+        "description": "A Sinon-like library for spys, stubs, mocks and generally hijacking functions, methods, and attributes.",
+        "version": "0.0.1",
+        "url": "http://ato.ms/"
+    },
+    "files": {
+        "candy-wrapper.js": {
+            "name": "candy-wrapper.js",
+            "modules": {},
+            "classes": {
+                "": 1
+            },
+            "fors": {},
+            "namespaces": {}
+        }
+    },
+    "modules": {},
+    "classes": {
+        "": {
+            "file": "candy-wrapper.js",
+            "line": 81,
+            "description": "Creates a new function wrapper -- a spy, stub, mock, etc."
+        }
+    },
+    "elements": {},
+    "classitems": [
+        {
+            "file": "candy-wrapper.js",
+            "line": 86,
+            "description": "This is a constructor",
+            "return": {
+                "description": "Proxy around a Wrapper object",
+                "type": "Wrapper"
+            },
+            "class": ""
+        },
+        {
+            "file": "candy-wrapper.js",
+            "line": 109,
+            "description": "Wrap all aspects of an object",
+            "params": [
+                {
+                    "name": "obj",
+                    "description": "Object to be wrapped",
+                    "type": "Object"
+                }
+            ],
+            "return": {
+                "description": "Returns an object with all methods and attributes wrapped",
+                "type": "Object"
+            },
+            "lends": "Wrapper",
+            "is_constructor": 1,
+            "class": ""
+        },
+        {
+            "file": "candy-wrapper.js",
+            "line": 121,
+            "description": "Puts a wrapper around a function and returns it",
+            "params": [
+                {
+                    "name": "fn",
+                    "description": "Function to be wrapped",
+                    "type": "Function"
+                }
+            ],
+            "return": {
+                "description": "Returns the a Proxy for a Wrapper around the function",
+                "type": "Wrapper"
+            },
+            "constructs": "",
+            "memberof": "Wrapper",
+            "class": ""
+        },
+        {
+            "file": "candy-wrapper.js",
+            "line": 190,
+            "description": "Resets the wrapper to its default state. Clears out all records of previous calls,\nexpected behaviors, pass / fail results, etc.",
+            "return": {
+                "description": "Returns the Wrapper object so that this call can be chained",
+                "type": "Wrapper"
+            },
+            "class": ""
+        },
+        {
+            "file": "candy-wrapper.js",
+            "line": 477,
+            "description": "helper functions for testing various data types",
+            "class": ""
+        }
+    ],
+    "warnings": [
+        {
+            "message": "unknown tag: lends",
+            "line": " candy-wrapper.js:109"
+        },
+        {
+            "message": "unknown tag: memberof",
+            "line": " candy-wrapper.js:121"
+        },
+        {
+            "message": "Missing item type\nThis is a constructor",
+            "line": " candy-wrapper.js:86"
+        },
+        {
+            "message": "Missing item type\nWrap all aspects of an object",
+            "line": " candy-wrapper.js:109"
+        },
+        {
+            "message": "Missing item type\nPuts a wrapper around a function and returns it",
+            "line": " candy-wrapper.js:121"
+        },
+        {
+            "message": "Missing item type\nResets the wrapper to its default state. Clears out all records of previous calls,\nexpected behaviors, pass / fail results, etc.",
+            "line": " candy-wrapper.js:190"
+        },
+        {
+            "message": "Missing item type\nhelper functions for testing various data types",
+            "line": " candy-wrapper.js:477"
+        }
+    ]
+}
