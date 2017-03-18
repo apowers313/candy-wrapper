@@ -10,7 +10,7 @@
     "test": "npm run testnode",
     "testbrowsers": "grunt default",
     "testnode": "istanbul cover _mocha",
-    "docs": "jsdoc -c ./.jsdoc-conf.json",
+    "docs": "./node_modules/.bin/yuidoc .",
     "publishdocs": "gh-pages --silent --repo https://$GH_TOKEN@github.com/apowers313/candy-wrapper.git --dist docs"
   },
   "keywords": [
@@ -45,6 +45,7 @@
     "istanbul": "^0.4.5",
     "istanbul-coveralls": "^1.0.3",
     "jsdoc": "^3.4.3",
-    "mocha": "^3.2.0"
+    "mocha": "^3.2.0",
+    "yuidocjs": "^0.10.2"
   }
 }
