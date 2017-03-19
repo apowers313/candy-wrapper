@@ -23,7 +23,6 @@
 
     /**
      * Creates a new function wrapper -- a spy, stub, mock, etc.
-     * @class Wrapper
      */
     class Wrapper extends Function {
 
@@ -218,6 +217,9 @@
         }
     }
 
+    /**
+     * Wrapper sub-class for attributes.
+     */
     class WrapperAttr extends Wrapper {
         constructor(obj, attr) {
             super();
@@ -280,7 +282,7 @@
 
         _doSetterGetter(type, val) {
             // create a new single touch instance
-            var st = new SingleTouch(type, this.attrValue, val);
+            var st = new SingleTouch(this, type, this.attrValue, val);
 
             debug(`_doSetterGetter ${type} "${val}"`);
 
@@ -325,6 +327,9 @@
         // expectTouchCountRange
     }
 
+    /**
+     * Wrapper sub-class for attributes.
+     */
     class WrapperCall extends Wrapper {
         constructor(origFn, wrappedFn) {
             super();
@@ -349,7 +354,7 @@
             var funcName = this.wrapped.name || "<<anonymous>>";
             debug(`calling wrapper on "${funcName}"`);
 
-            var si = new SingleCall(thisArg, argList);
+            var si = new SingleCall(this, thisArg, argList);
 
             // run pre-call triggers
             this._runTriggerList("pre", si);
@@ -414,10 +419,37 @@
         // filterByReturn() {}
     }
 
+    /**
+     * A class for expect... calls. Gets mixed in to `Triggers` as well as
+     * `SingleCall` and `SingleTouch`.
+     */
     class Expect {
         constructor() {
-            this.futureMatch = [];
         }
+
+        /* DESIGN PATTERN
+         *
+         * All expect... and action... calls have a similar design pattern.
+         * The template looks something like:
+
+         expectOrFunctionThingy(args) {
+            var curr = getCurrOrDefer("expectOrFunctionThingy", args);
+            if (!curr || !curr.postCall) return this;
+            // do test here
+         }
+
+         * The first line of the function figures out if we have a current context
+         * for the call (either a SingleCall or a SingleTouch, depending on whether
+         * the wrapper is wrapping a function or attribute). If there's a current call
+         * it will return curr. If there is no current context, then the expect or
+         * action will be added to the action list and will be executed when triggered.
+         *
+         * The second line, in addition to checking whether this is the current call,
+         * checks whether this call should be run pre-call or post-call.
+         *
+         * The rest of the funcation is dedicated to the logic of the actual action
+         * or expect.
+         */
 
         addDeferredAction(name, args) {
             var action = {
@@ -441,25 +473,19 @@
             this[this.expectType](si, this.expectParam);
         }
 
-        expectCallArgs(...args /*, siRef */ ) {
-            var passed = false;
-            var newSi = new SingleCall();
-            newSi.argList = args;
-            var siRef;
-
-            if (arguments.length === 2 && arguments[1] instanceof SingleCall) {
-                siRef = arguments[1];
-            } else if (arguments.length !== 1 || !Array.isArray(args)) {
-                throw new TypeError("expectCallArgs: expected a single args array for an argument");
-            }
-
-            var match = new Match(siRef);
-
-            // if future evaluation, save the match
-            this.futureMatch.push(new Match(siRef));
-
-            // if evaluate now, check and return
-            match.compare(siRef);
+        expectCallArgs(...args) {
+            // this call only works for functions
+            this.wrapper._funcOnly();
+            // get the current call, or save the args for when the call is actually run
+            var curr = this.getCurrCallOrDefer("expectCallArgs", ...args);
+            // if there isn't a current call, return 'this' to enable chaining
+            if (!curr || !curr.preCall) return this; // chainable
+            // test the expect
+            var m = new Match({
+                value: [...args]
+            });
+            var passed = m.compare(curr.argList);
+            this.wrapper._softAssert(passed, `expectCallArgs: args did not match`);
 
             return passed;
         }
@@ -471,10 +497,14 @@
         // expectCustom (fn, param)
     }
 
+    /**
+     * A representation of a single `get` or `set` on an attribute.
+     */
     class SingleTouch extends Expect {
-        constructor(type, retVal, setVal, exception) {
+        constructor(wrapper, type, retVal, setVal, exception) {
             super();
 
+            this.wrapper = wrapper;
             this.type = type;
             this.setVal = setVal;
             this.retVal = retVal;
@@ -482,10 +512,15 @@
         }
     }
 
+    /**
+     * A representation of a single function call.
+     */
     class SingleCall extends Expect {
-        constructor(thisArg, argList, retVal, exception) {
+        constructor(wrapper, thisArg, argList, retVal, exception) {
             super();
+
             // this.calledWithNew = thisArg.new && thisArg.new.target;
+            this.wrapper = wrapper;
             this.preCall = false;
             this.postCall = false;
             this.thisArg = thisArg;
@@ -495,6 +530,16 @@
         }
     }
 
+    /**
+     * A `Trigger` determines what `expect` or `action` calls get run on a wrapped
+     * function or attribute. Triggers usally get created by calling a trigger function
+     * on the {@link Wrapper}.
+     * @example
+     * var wrapper = new Wrapper(something);
+     * wrapper.triggerAlways()          // every time the wrapper is called...
+     *     .expectArgs("abc", 123)      // ...error if the wrong args are not `"abc"` and `123`...
+     *     .actionReturn(true);         // ...and always change the return value of the function to `true`
+     */
     class Trigger extends Expect {
         constructor(wrapper, triggerFn) {
             super();
@@ -530,6 +575,9 @@
         }
     }
 
+    /**
+     * A class for matching anything. Really, anything.
+     */
     class Match {
         constructor(opts) {
             // if !opts throw

@@ -20,6 +20,8 @@ function depends(mod) {
     describe("requested new feature list", function() {
         it("can detect when a function has been invoked with 'new()'"); // Proxy.handler.construct()?
         it("can wrap a function generator");
+        it("can add new / custom expect... or action... methods");
+        it("can match by type");
     });
 
     describe("create wrapper", function() {
@@ -255,7 +257,7 @@ function depends(mod) {
             assert.isNotOk(w.expectCallCountRange(0, 2), "expected call count range between 0 and 2 to not be okay");
         });
 
-        it.skip("call args", function() {
+        it("call args", function() {
             var w = new Wrapper();
             w();
             assert.isOk(w.filterOneByCallNumber(0).expectCallArgs());
