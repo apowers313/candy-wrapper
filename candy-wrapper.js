@@ -134,6 +134,21 @@
             return this.expectPassed;
         }
 
+        _runTriggerList(preOrPost, single) {
+            if (preOrPost === "pre") {
+                single.postCall = !(single.preCall = true); // only evalute pre calls
+            } else { // post
+                single.postCall = !(single.preCall = false); // only evaluate post calls
+            }
+
+            debug(`_runTriggerList ${preOrPost}`, this.triggerList);
+
+            for (let idx in this.triggerList) {
+                let trigger = this.triggerList[idx];
+                trigger.run(single);
+            }
+        }
+
         _attrOnly(callerName) {
             if (this.type !== "attribute") {
                 throw new Error(`${callerName} is only supported for ATTRIBUTE wrappers`);
@@ -167,7 +182,7 @@
                 if (typeof obj[key] === "function")
                     return Wrapper.isWrapper(obj[key]);
 
-                if(typeof obj[key] === "object")
+                if (typeof obj[key] === "object")
                     return false;
 
                 let desc = Object.getOwnPropertyDescriptor(obj, key);
@@ -177,7 +192,7 @@
                 return (Wrapper.isWrapper(desc.set) && Wrapper.isWrapper(desc.get));
             }
 
-            throw new TypeError ("isWrapper: unsupported arguments");
+            throw new TypeError("isWrapper: unsupported arguments");
         }
 
         /**
@@ -236,9 +251,12 @@
             this.chainable = new Proxy(this, {
                 apply: (target, thisArg, argList) => {
                     switch (argList.length) {
-                        case 0: return this._doSetterGetter("get");
-                        case 1: return this._doSetterGetter("set", argList[0]);
-                        default: throw new Error("Wrong number of args to setter / getter. (How is that even possible?)");
+                        case 0:
+                            return this._doSetterGetter("get");
+                        case 1:
+                            return this._doSetterGetter("set", argList[0]);
+                        default:
+                            throw new Error("Wrong number of args to setter / getter. (How is that even possible?)");
                     }
                 }
             });
@@ -261,16 +279,30 @@
         }
 
         _doSetterGetter(type, val) {
+            // create a new single touch instance
+            var st = new SingleTouch(type, this.attrValue, val);
+
+            debug(`_doSetterGetter ${type} "${val}"`);
+
+            // run pre-call trigger
+            this._runTriggerList("pre", st);
+
             // if setting, cache the value
             if (type === "set") {
-                this.attrValue = val;
+                st.retVal = st.setVal;
+                this.attrValue = st.setVal;
             }
 
+            // run post-call trigger
+            this._runTriggerList("post", st);
+            debug("final st", st);
+
             // save this touch for future reference
-            this.touchList.push(new SingleTouch(type, this.attrValue, val));
+            this.touchList.push(st);
 
             // always return the value
-            return this.attrValue;
+            debug("settergetter returning", st.retVal);
+            return st.retVal;
         }
 
         filterAttrGet() {
@@ -319,12 +351,8 @@
 
             var si = new SingleCall(thisArg, argList);
 
-            // checkAndRun pre-triggers
-            si.postCall = !(si.preCall = true); // only evalute pre calls
-            for (let idx in this.triggerList) {
-                let trigger = this.triggerList[idx];
-                trigger.run(si);
-            }
+            // run pre-call triggers
+            this._runTriggerList("pre", si);
 
             // run the wrapped function
             var ret, exception;
@@ -336,12 +364,8 @@
             si.retVal = ret;
             si.exception = exception;
 
-            // checkAndRun post-triggers
-            si.postCall = !(si.preCall = false); // only evaluate post calls
-            for (let idx in this.triggerList) {
-                let trigger = this.triggerList[idx];
-                trigger.run(si);
-            }
+            // run post-call triggers
+            this._runTriggerList("post", si);
             debug("final si", si);
 
             // save call
@@ -410,7 +434,7 @@
             if (this instanceof Trigger && this.currentCall) return this.currentCall;
             var argArray = [...args];
             if (typeof this.addDeferredAction === "function") return this.addDeferredAction(name, argArray);
-            throw new Error (`Couldn't figure current or how to defer for: ${name}`);
+            throw new Error(`Couldn't figure current or how to defer for: ${name}`);
         }
 
         expectDoValidation(si) {

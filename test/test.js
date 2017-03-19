@@ -77,7 +77,7 @@ function depends(mod) {
                 called = true;
             }
             var testObj = {
-                goBowling: function(){}
+                goBowling: function() {}
             };
             var ret = new Wrapper(testObj, "goBowling", testFunc);
             assert.isFunction(ret);
@@ -107,7 +107,7 @@ function depends(mod) {
             var w = new Wrapper();
 
             // wrapped function
-            var fn = function(){};
+            var fn = function() {};
             assert.isOk(Wrapper.isWrapper(w), "exepcted a wrapper");
             assert.isNotOk(Wrapper.isWrapper(fn), "exepcted not a wrapper");
 
@@ -165,9 +165,9 @@ function depends(mod) {
             assert.strictEqual(w.touchList.length, 0);
             getList = w.filterAttrGet();
             setList = w.filterAttrSet();
-            assert.isArray (getList);
+            assert.isArray(getList);
             assert.strictEqual(getList.length, 0);
-            assert.isArray (setList);
+            assert.isArray(setList);
             assert.strictEqual(setList.length, 0);
 
             // set #1
@@ -175,9 +175,9 @@ function depends(mod) {
             assert.strictEqual(w.touchList.length, 1);
             getList = w.filterAttrGet();
             setList = w.filterAttrSet();
-            assert.isArray (getList);
+            assert.isArray(getList);
             assert.strictEqual(getList.length, 0);
-            assert.isArray (setList);
+            assert.isArray(setList);
             assert.strictEqual(setList.length, 1);
             assert.strictEqual(setList[0].type, "set");
             assert.strictEqual(setList[0].setVal, "gone");
@@ -186,13 +186,13 @@ function depends(mod) {
 
             // get #1
             var ret = testObj.beer;
-            assert.strictEqual (ret, "gone");
+            assert.strictEqual(ret, "gone");
             assert.strictEqual(w.touchList.length, 2);
             getList = w.filterAttrGet();
             setList = w.filterAttrSet();
-            assert.isArray (getList);
+            assert.isArray(getList);
             assert.strictEqual(getList.length, 1);
-            assert.isArray (setList);
+            assert.isArray(setList);
             assert.strictEqual(setList.length, 1);
             assert.strictEqual(getList[0].type, "get");
             assert.isUndefined(getList[0].setVal);
@@ -204,9 +204,9 @@ function depends(mod) {
             assert.strictEqual(w.touchList.length, 3);
             getList = w.filterAttrGet();
             setList = w.filterAttrSet();
-            assert.isArray (getList);
+            assert.isArray(getList);
             assert.strictEqual(getList.length, 1);
-            assert.isArray (setList);
+            assert.isArray(setList);
             assert.strictEqual(setList.length, 2);
             assert.strictEqual(setList[1].type, "set");
             assert.strictEqual(setList[1].setVal, "more");
@@ -215,13 +215,13 @@ function depends(mod) {
 
             // get #2
             ret = testObj.beer;
-            assert.strictEqual (ret, "more");
+            assert.strictEqual(ret, "more");
             assert.strictEqual(w.touchList.length, 4);
             getList = w.filterAttrGet();
             setList = w.filterAttrSet();
-            assert.isArray (getList);
+            assert.isArray(getList);
             assert.strictEqual(getList.length, 2);
-            assert.isArray (setList);
+            assert.isArray(setList);
             assert.strictEqual(setList.length, 2);
             assert.strictEqual(getList[1].type, "get");
             assert.isUndefined(getList[1].setVal);
@@ -301,8 +301,21 @@ function depends(mod) {
             });
         });
 
-        it("can spoof a attribute return value", function() {
-
+        it("can spoof an attribute return value", function() {
+            var testObj = {
+                beer: "yummy"
+            };
+            var w = new Wrapper(testObj, "beer");
+            var ret = w.triggerAlways().actionReturn("all gone");
+            assert.instanceOf(ret, Trigger);
+            ret = testObj.beer;
+            assert.strictEqual(ret, "all gone");
+            // XXX: intresting -- this doesn't actually get the return value of the setter... it gets "more"
+            // ret = (testObj.beer = "more");
+            testObj.beer = "more";
+            assert.strictEqual(w.attrValue, "more");
+            ret = testObj.beer;
+            assert.strictEqual(ret, "all gone");
         });
     });
 
