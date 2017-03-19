@@ -73,7 +73,7 @@
         },
         {
             "file": "candy-wrapper.js",
-            "line": 183,
+            "line": 198,
             "description": "Resets the wrapper to its default state. Clears out all records of previous calls,\nexpected behaviors, pass / fail results, etc.",
             "return": {
                 "description": "Returns the Wrapper object so that this call can be chained",
@@ -83,7 +83,7 @@
         },
         {
             "file": "candy-wrapper.js",
-            "line": 679,
+            "line": 703,
             "description": "helper functions for testing various data types",
             "class": "Wrapper"
         }
@@ -107,11 +107,11 @@
         },
         {
             "message": "Missing item type\nResets the wrapper to its default state. Clears out all records of previous calls,\nexpected behaviors, pass / fail results, etc.",
-            "line": " candy-wrapper.js:183"
+            "line": " candy-wrapper.js:198"
         },
         {
             "message": "Missing item type\nhelper functions for testing various data types",
-            "line": " candy-wrapper.js:679"
+            "line": " candy-wrapper.js:703"
         }
     ]
 }
