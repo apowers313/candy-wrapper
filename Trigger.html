@@ -4,7 +4,7 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width">
-	<title>Candy Wrapper Class: Wrapper</title>
+	<title>Candy Wrapper Class: Trigger</title>
 
 	<!--[if lt IE 9]>
 	<script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
@@ -65,16 +65,18 @@
 		<div id="main">
 			
 
-	<h1 class="page-title">Class: Wrapper</h1>
+	<h1 class="page-title">Class: Trigger</h1>
 <section>
 
 <header>
     
         <h2>
-        Wrapper
+        Trigger
         </h2>
         
-            <div class="class-description"><p>Creates a new function wrapper -- a spy, stub, mock, etc.</p></div>
+            <div class="class-description"><p>A <code>Trigger</code> determines what <code>expect</code> or <code>action</code> calls get run on a wrapped
+function or attribute. Triggers usally get created by calling a trigger function
+on the <a href="Wrapper.html">Wrapper</a>.</p></div>
         
     
 </header>
@@ -86,7 +88,7 @@
         
 <hr>
 <dt>
-    <h4 class="name" id="Wrapper"><span class="type-signature"></span>new Wrapper()</h4>
+    <h4 class="name" id="Trigger"><span class="type-signature"></span>new Trigger()</h4>
     
     
 </dt>
@@ -154,6 +156,15 @@
     
 
     
+        <h5>Example</h5>
+        
+    <pre class="sunlight-highlight-javascript">var wrapper = new Wrapper(something);
+wrapper.triggerAlways()          // every time the wrapper is called...
+    .expectArgs(&quot;abc&quot;, 123)      // ...error if the wrong args are not &#x60;&quot;abc&quot;&#x60; and &#x60;123&#x60;...
+    .actionReturn(true);         // ...and always change the return value of the function to &#x60;true&#x60;</pre>
+
+
+    
 </dd>
 
     
@@ -171,113 +182,6 @@
 
     
 
-    
-        <h3 class="subsection-title">Methods</h3>
-
-        <dl>
-            
-<hr>
-<dt>
-    <h4 class="name" id="configReset"><span class="type-signature"></span>configReset()</h4>
-    
-    
-</dt>
-<dd>
-
-    
-    <div class="description">
-        <p>Resets the wrapper to its default state. Clears out all records of previous calls,
-expected behaviors, pass / fail results, etc.</p>
-    </div>
-    
-
-    
-
-    
-
-    
-    
-
-    
-<dl class="details">
-    
-
-	
-
-	
-
-	
-
-    
-
-    
-
-    
-
-    
-
-	
-
-	
-
-	
-
-	
-
-	
-
-
-
-	
-
-	
-
-	
-
-	
-</dl>
-
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <h5>Returns:</h5>
-    
-            
-<div class="param-desc">
-    <p>Returns the Wrapper object so that this call can be chained</p>
-</div>
-
-
-
-<dl>
-    <dt>
-        Type
-    </dt>
-    <dd>
-        
-<span class="param-type"><a href="Wrapper.html">Wrapper</a></span>
-
-
-
-    </dd>
-</dl>
-
-
-        
-
-    
-</dd>
-
-        </dl>
     
 
     
