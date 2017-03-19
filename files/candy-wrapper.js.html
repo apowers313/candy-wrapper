@@ -38,7 +38,7 @@
                 
                         <div id="api-tabview-panel">
                             <ul id="api-classes" class="apis classes">
-                                <li><a href="../classes/.html"></a></li>
+                                <li><a href="../classes/Wrapper.html">Wrapper</a></li>
                             </ul>
                 
                 
@@ -97,94 +97,52 @@
 }(this, function() {
 
     function debug(...args) {
-        console.log(...args);
+        // console.log(...args);
     }
 
     var wrapperCookie = &quot;193fe616-09d1-4d5c-a5b9-ff6f3e79714c&quot;;
-
-    class Expect {
-        constructor() {
-            this.futureMatch = [];
-        }
-
-        addDeferredAction(name, args) {
-            var action = {
-                name: name,
-                args: args
-            };
-            console.log (&quot;adding action:&quot;, action);
-            this.actionList.push(action);
-        }
-
-        getCurrCallOrDefer(name, ...args) {
-            console.log (&quot;getCurrCallOrDefer&quot;);
-            if (this instanceof SingleInvocation) return this;
-            console.log (&quot;checking currCall&quot;);
-            if (this instanceof Trigger &amp;&amp; this.currentCall instanceof SingleInvocation) return this.currentCall;
-            console.log (&quot;deferring&quot;);
-            var argArray = [...args];
-            if (typeof this.addDeferredAction === &quot;function&quot;) this.addDeferredAction(name, argArray);
-        }
-
-        expectDoValidation(si) {
-            this[this.expectType](si, this.expectParam);
-        }
-
-        expectCallArgs(...args /*, siRef */ ) {
-            var passed = false;
-            var newSi = new SingleInvocation();
-            newSi.argList = args;
-            var siRef;
-
-            if (arguments.length === 2 &amp;&amp; arguments[1] instanceof SingleInvocation) {
-                siRef = arguments[1];
-            } else if (arguments.length !== 1 || !Array.isArray(args)) {
-                throw new TypeError(&quot;expectCallArgs: expected a single args array for an argument&quot;);
-            }
-
-            var match = new Match(siRef);
-
-            // if future evaluation, save the match
-            this.futureMatch.push(new Match(siRef));
-
-            // if evaluate now, check and return
-            match.compare(siRef);
-
-            return passed;
-        }
-
-        // expectCallArgs(si)
-        // expectContext(si)
-        // expectReturn(si)
-        // expectException(si)
-        // expectCustom (fn, param)
-    }
+    var wrapperCookieKey = &quot;uniquePlaceToKeepAGuidForCandyWrapper&quot;;
 
     /**
      * Creates a new function wrapper -- a spy, stub, mock, etc.
-     * @class
+     * @class Wrapper
      */
     class Wrapper extends Function {
-        /**
-         * This is a constructor
-         * @return {Wrapper} Proxy around a Wrapper object
-         */
+
         constructor() {
             super();
 
+            // if one of our subclasses is calling us, just reset and move on
+            if (this instanceof WrapperCall ||
+                this instanceof WrapperAttr) {
+
+                // set default values
+                this.configReset();
+
+                return this;
+            }
+
+            if (arguments[0] === null) {
+                throw new TypeError(&quot;Wrapper: bad arguments to constructor. RTFM.&quot;);
+            }
+
+            // below are all the different forms of the contructor,
+            // which are basically syntactic sugar for creating wrappers
+            // around lots of different kinds of things
+
             // forms of wrapper:
-            // wrapper()
-            // wrapper(obj)
-            // wrapper(func)
-            // wrapper(obj, method)
-            // wrapper(obj, attribute)
-            // wrapper(obj, method, func)
-            // wrapper(obj, attribute, func)
+            // new Wrapper()
+            // new Wrapper(obj)
+            // new Wrapper(func)
+            // new Wrapper(obj, method)
+            // new Wrapper(obj, attribute)
+            // new Wrapper(obj, method, func)
+            // new Wrapper(obj, attribute, func)
 
             // constructed like: wrapper()
             if (arguments.length === 0) {
                 debug(&quot;creating empty wrapper&quot;);
-                this.wrapped = function() {};
+                return new WrapperCall(function() {});
             }
 
             // constructed like: wrapper(obj)
@@ -197,6 +155,7 @@
              */
             if (arguments.length === 1 &amp;&amp; typeof arguments[0] === &quot;object&quot;) {
                 debug(&quot;wrapping object&quot;);
+                throw new Error(&quot;not implemented&quot;);
             }
 
             // constructed like: wrapper(func)
@@ -208,13 +167,222 @@
              * @memberof Wrapper
              */
             if (arguments.length === 1 &amp;&amp; typeof arguments[0] === &quot;function&quot;) {
-                debug(&quot;wrapping function&quot;);
-                this.wrapped = arguments[0];
+                debug(&quot;wrapping function:&quot;, arguments[0].name);
+                return new WrapperCall(arguments[0]);
             }
 
-            // set default values
-            this.configReset();
+            // wrapper(obj, method)
+            // wrapper(obj, attribute)
+            if (arguments.length === 2 &amp;&amp;
+                typeof arguments[0] === &quot;object&quot; &amp;&amp;
+                typeof arguments[1] === &quot;string&quot;) {
+                let obj = arguments[0];
+                let key = arguments[1];
+                debug(&quot;wrapping method or attribute:&quot;, key);
+                if (typeof obj[key] === &quot;function&quot;) {
+                    obj[key] = new WrapperCall(obj[key]);
+                    return obj[key];
+                } else {
+                    return new WrapperAttr(obj, key);
+                }
+            }
 
+            // wrapper(obj, method, func)
+            // wrapper(obj, attribute, func)
+            if (arguments.length === 3 &amp;&amp;
+                typeof arguments[0] === &quot;object&quot; &amp;&amp;
+                typeof arguments[1] === &quot;string&quot; &amp;&amp;
+                typeof arguments[2] === &quot;function&quot;) {
+                let obj = arguments[0];
+                let key = arguments[1];
+                let fn = arguments[2];
+                debug(&quot;wrapping method or attribute:&quot;, key);
+                if (typeof obj[key] === &quot;function&quot;) {
+                    return new WrapperCall(obj[key], fn);
+                } else {
+                    return new WrapperAttr(obj, key, fn);
+                }
+            }
+
+            throw new TypeError(&quot;Wrapper: bad arguments to constructor. RTFM.&quot;);
+        }
+
+        _softAssert(passed, message) {
+            if (!passed) {
+                this.expectMessageList.push(message);
+            }
+
+            this.expectPassed = this.expectPassed &amp;&amp; passed;
+            return this.expectPassed;
+        }
+
+        _attrOnly(callerName) {
+            if (this.type !== &quot;attribute&quot;) {
+                throw new Error(&#x60;${callerName} is only supported for ATTRIBUTE wrappers&#x60;);
+            }
+        }
+
+        _funcOnly(callerName) {
+            if (this.type !== &quot;function&quot;) {
+                throw new Error(&#x60;${callerName} is only supported for FUNCTION wrappers&#x60;);
+            }
+        }
+
+        static isWrapper() {
+            // called like: isWrapper(fn)
+            // checking to see if a function / method is a wrapper
+            if (arguments.length === 1 &amp;&amp; typeof arguments[0] === &quot;function&quot;) {
+                let w = arguments[0];
+                // console.log (&quot;w&quot;, w);
+                if (w[wrapperCookieKey] === wrapperCookie) return true;
+                return false;
+            }
+
+            // called like: isWrapper(obj, method)
+            if (arguments.length === 2 &amp;&amp;
+                typeof arguments[0] === &quot;object&quot; &amp;&amp;
+                typeof arguments[1] === &quot;string&quot;) {
+                let obj = arguments[0];
+                let key = arguments[1];
+
+                // attribute is a function
+                if (typeof obj[key] === &quot;function&quot;)
+                    return Wrapper.isWrapper(obj[key]);
+
+                if(typeof obj[key] === &quot;object&quot;)
+                    return false;
+
+                let desc = Object.getOwnPropertyDescriptor(obj, key);
+                if (typeof desc.set !== &quot;function&quot; ||
+                    typeof desc.get !== &quot;function&quot;)
+                    return false;
+                return (Wrapper.isWrapper(desc.set) &amp;&amp; Wrapper.isWrapper(desc.get));
+            }
+
+            throw new TypeError (&quot;isWrapper: unsupported arguments&quot;);
+        }
+
+        /**
+         * Resets the wrapper to its default state. Clears out all records of previous calls,
+         * expected behaviors, pass / fail results, etc.
+         * @return {Wrapper} Returns the Wrapper object so that this call can be chained
+         */
+        configReset() {
+            this.triggerList = [];
+            this.expectMessageList = [];
+            this.expectPassed = true;
+            this[wrapperCookieKey] = wrapperCookie;
+
+            return this.chainable;
+        }
+
+        triggerAlways() {
+            var t = new Trigger(this, function() {
+                return true;
+            });
+            this.triggerList.push(t);
+            return t;
+        }
+    }
+
+    class WrapperAttr extends Wrapper {
+        constructor(obj, attr) {
+            super();
+
+            if (typeof obj[attr] === &quot;object&quot;) {
+                throw new TypeError(&quot;can&#x27;t wrap a sub-object: not implemented&quot;);
+            }
+
+            // save the values
+            this.origAttr = Object.getOwnPropertyDescriptor(obj, attr);
+            this.attrValue = this.origAttr.value;
+            this.type = &quot;attribute&quot;;
+
+            // // create a proxy for the setter / getters
+            // this.chainable = new Proxy(this, {
+            //     apply: (target, thisArg, argList) =&gt; {
+            //         if (argList.length &lt; 1 || argList.length &gt; 2) {
+            //             throw new Error(&quot;Wrong number of args to setter / getter. (How is that even possible?)&quot;);
+            //         }
+            //         console.log(&quot;type&quot;, argList[0]);
+            //         console.log(&quot;value&quot;, argList[1]);
+            //         return this._doSetterGetter(argList[0], argList[1]);
+            //     }
+            // });
+
+            // // bind this and the first arg to help identify the call
+            // var setter = this.chainable.bind(this, &quot;set&quot;);
+            // var getter = this.chainable.bind(this, &quot;get&quot;);
+
+            // create a proxy for the setter / getters
+            this.chainable = new Proxy(this, {
+                apply: (target, thisArg, argList) =&gt; {
+                    switch (argList.length) {
+                        case 0: return this._doSetterGetter(&quot;get&quot;);
+                        case 1: return this._doSetterGetter(&quot;set&quot;, argList[0]);
+                        default: throw new Error(&quot;Wrong number of args to setter / getter. (How is that even possible?)&quot;);
+                    }
+                }
+            });
+
+            // define the new property
+            Object.defineProperty(obj, attr, {
+                configurable: this.origAttr.configurable,
+                enumerable: this.origAttr.enumerable,
+                get: this.chainable,
+                set: this.chainable,
+            });
+
+            this.chainable = this;
+            return this.chainable;
+        }
+
+        configReset() {
+            super.configReset();
+            this.touchList = [];
+        }
+
+        _doSetterGetter(type, val) {
+            // if setting, cache the value
+            if (type === &quot;set&quot;) {
+                this.attrValue = val;
+            }
+
+            // save this touch for future reference
+            this.touchList.push(new SingleTouch(type, this.attrValue, val));
+
+            // always return the value
+            return this.attrValue;
+        }
+
+        filterAttrGet() {
+            return this.touchList.filter(function(element) {
+                return element.type === &quot;get&quot;;
+            });
+        }
+
+        filterAttrSet() {
+            return this.touchList.filter(function(element) {
+                return element.type === &quot;set&quot;;
+            });
+        }
+
+        // expectGetCount
+        // expectSetCount
+        // expectTouchCount
+        // expectGetCountRange
+        // expectSetCountRange
+        // expectTouchCountRange
+    }
+
+    class WrapperCall extends Wrapper {
+        constructor(origFn, wrappedFn) {
+            super();
+
+            this.type = &quot;function&quot;;
+            this.orig = origFn;
+            wrappedFn = wrappedFn || origFn;
+            this.wrapped = wrappedFn;
             this.chainable = new Proxy(this, {
                 apply: (target, thisArg, argList) =&gt; this._doCall(target, thisArg, argList)
             });
@@ -222,11 +390,16 @@
             return this.chainable;
         }
 
+        configReset() {
+            super.configReset();
+            this.callList = [];
+        }
+
         _doCall(target, thisArg, argList) {
             var funcName = this.wrapped.name || &quot;&lt;&lt;anonymous&gt;&gt;&quot;;
             debug(&#x60;calling wrapper on &quot;${funcName}&quot;&#x60;);
 
-            var si = new SingleInvocation(thisArg, argList);
+            var si = new SingleCall(thisArg, argList);
 
             // checkAndRun pre-triggers
             si.postCall = !(si.preCall = true); // only evalute pre calls
@@ -251,7 +424,7 @@
                 let trigger = this.triggerList[idx];
                 trigger.run(si);
             }
-            console.log (&quot;final si&quot;, si);
+            debug(&quot;final si&quot;, si);
 
             // save call
             si.postCall = si.preCall = true; // in the future evaulate both pre and post calls
@@ -259,51 +432,6 @@
 
             return si.retVal;
         }
-
-        _softAssert(passed, message) {
-            if (!passed) {
-                this.expectMessageList.push(message);
-            }
-
-            this.expectPassed = this.expectPassed &amp;&amp; passed;
-            return this.expectPassed;
-        }
-
-        /**
-         * Resets the wrapper to its default state. Clears out all records of previous calls,
-         * expected behaviors, pass / fail results, etc.
-         * @return {Wrapper} Returns the Wrapper object so that this call can be chained
-         */
-        configReset() {
-            this.callList = [];
-            this.triggerList = [];
-            this.expectMessageList = [];
-            this.expectPassed = true;
-            this.wrapperCookie = wrapperCookie;
-
-            return this.chainable;
-        }
-
-        selectOneByCallNumber(num) {
-            var callCount = this.callList.length;
-            if (typeof num !== &quot;number&quot; || num &lt; 0) {
-                throw new TypeError(&#x60;selectOneByCallNumber: bad call number argument: ${num}&#x60;);
-            }
-            if (num &gt;= callCount) {
-                throw new RangeError(&#x60;selectOneByCallNumber: ${num} is more than the number of calls made&#x60;);
-            }
-
-            return this.callList[num];
-        }
-
-        // selectOneByArgs() {}
-        // selectOneByContext() {}
-        // selectOneByException() {}
-        // selectOneByReturn() {}
-        // selectByArgs() {}
-        // selectByContext() {}
-        // selectByException() {}
-        // selectByReturn() {}
 
         expectCallCount(count) {
             var passed = (this.callList.length === count);
@@ -322,16 +450,97 @@
             return passed;
         }
 
-        triggerAlways() {
-            var t = new Trigger(this, function() {
-                return true;
-            });
-            this.triggerList.push(t);
-            return t;
+        filterOneByCallNumber(num) {
+            var callCount = this.callList.length;
+            if (typeof num !== &quot;number&quot; || num &lt; 0) {
+                throw new TypeError(&#x60;filterOneByCallNumber: bad call number argument: ${num}&#x60;);
+            }
+            if (num &gt;= callCount) {
+                throw new RangeError(&#x60;filterOneByCallNumber: ${num} is more than the number of calls made&#x60;);
+            }
+
+            return this.callList[num];
+        }
+
+        // filterOneByArgs() {}
+        // filterOneByContext() {}
+        // filterOneByException() {}
+        // filterOneByReturn() {}
+        // filterByArgs() {}
+        // filterByContext() {}
+        // filterByException() {}
+        // filterByReturn() {}
+    }
+
+    class Expect {
+        constructor() {
+            this.futureMatch = [];
+        }
+
+        addDeferredAction(name, args) {
+            var action = {
+                name: name,
+                args: args
+            };
+            debug(&quot;adding action:&quot;, action);
+            this.actionList.push(action);
+        }
+
+        getCurrCallOrDefer(name, ...args) {
+            if (this instanceof SingleCall) return this;
+            if (this instanceof SingleTouch) return this;
+            if (this instanceof Trigger &amp;&amp; this.currentCall) return this.currentCall;
+            var argArray = [...args];
+            if (typeof this.addDeferredAction === &quot;function&quot;) return this.addDeferredAction(name, argArray);
+            throw new Error (&#x60;Couldn&#x27;t figure current or how to defer for: ${name}&#x60;);
+        }
+
+        expectDoValidation(si) {
+            this[this.expectType](si, this.expectParam);
+        }
+
+        expectCallArgs(...args /*, siRef */ ) {
+            var passed = false;
+            var newSi = new SingleCall();
+            newSi.argList = args;
+            var siRef;
+
+            if (arguments.length === 2 &amp;&amp; arguments[1] instanceof SingleCall) {
+                siRef = arguments[1];
+            } else if (arguments.length !== 1 || !Array.isArray(args)) {
+                throw new TypeError(&quot;expectCallArgs: expected a single args array for an argument&quot;);
+            }
+
+            var match = new Match(siRef);
+
+            // if future evaluation, save the match
+            this.futureMatch.push(new Match(siRef));
+
+            // if evaluate now, check and return
+            match.compare(siRef);
+
+            return passed;
+        }
+
+        // expectCallArgs(si)
+        // expectContext(si)
+        // expectReturn(si)
+        // expectException(si)
+        // expectCustom (fn, param)
+    }
+
+    class SingleTouch extends Expect {
+        constructor(type, retVal, setVal, exception) {
+            super();
+
+            this.type = type;
+            this.setVal = setVal;
+            this.retVal = retVal;
+            this.exception = exception;
         }
     }
 
-    class SingleInvocation extends Expect {
+    class SingleCall extends Expect {
         constructor(thisArg, argList, retVal, exception) {
             super();
             // this.calledWithNew = thisArg.new &amp;&amp; thisArg.new.target;
@@ -354,33 +563,26 @@
         }
 
         run(si) {
-            console.log(&quot;run&quot;);
             // check trigger to see if it should run
             if (!this.triggerFn.call(this, si)) return;
 
             // perform actions
             this.currentCall = si;
-            console.log (&quot;actionList&quot;, this.actionList);
+            debug(&quot;actionList&quot;, this.actionList);
             for (let idx in this.actionList) {
                 let action = this.actionList[idx];
-                console.log (&quot;action name&quot;, action.name);
-                console.log (&quot;action args&quot;, action.args);
                 this[action.name](...action.args);
             }
             this.currentCall = null;
         }
 
         actionReturn(retVal) {
-            console.log (&quot;actionReturn:&quot;, retVal);
             // get the current call, or save the args for when the call is actually run
             var curr = this.getCurrCallOrDefer(&quot;actionReturn&quot;, retVal);
-            console.log (&quot;curr&quot;, curr);
             // if there isn&#x27;t a current call, return &#x27;this&#x27; to enable chaining
             if (!curr || !curr.postCall) return this; // chainable
             // run the action
-            console.log (&quot;!!! SET RETVAL&quot;);
             curr.retVal = retVal;
-            console.log (&quot;set curr&quot;, curr);
 
             return this;
         }
@@ -411,7 +613,7 @@
             this.extend(&quot;undefined&quot;, null, testUndef, diffUndef);
             this.extend(&quot;date&quot;, &quot;object&quot;, testDate, diffDate);
             this.extend(&quot;regexp&quot;, &quot;object&quot;, testRegex, diffRegex);
-            this.extend(&quot;singleinvocation&quot;, &quot;object&quot;, testSingleInvocation, diffSingleInvocation);
+            this.extend(&quot;SingleCall&quot;, &quot;object&quot;, testSingleCall, diffSingleCall);
         }
 
         compare(any) {
@@ -426,9 +628,9 @@
 
         diff(v1, v2) {
             var matcher = this.findCommonType(v1, v2);
-            console.log(&quot;diff: matcher:&quot;, matcher);
+            debug(&quot;diff: matcher:&quot;, matcher);
             if (!matcher) {
-                console.log(&quot;common type not found, returning diff&quot;);
+                debug(&quot;common type not found, returning diff&quot;);
                 // throw new TypeError(&quot;diff: can&#x27;t compare uncommon values&quot;);
                 return newDiff(v1, v2);
             }
@@ -445,13 +647,13 @@
             for (let i = 0; i &lt; matcherList.length; i++) {
                 let matcher = matcherList[i];
                 if (matcher.test(any)) {
-                    console.log(&quot;matcher found:&quot;, matcher.name);
+                    debug(&quot;matcher found:&quot;, matcher.name);
                     // recursively check any children for the type
                     let nextType = this.getType(any, matcher.children);
-                    console.log(&quot;next type:&quot;, nextType);
+                    debug(&quot;next type:&quot;, nextType);
                     return (nextType ? nextType : matcher);
                 } else {
-                    console.log(&quot;didn&#x27;t match:&quot;, matcher.name);
+                    debug(&quot;didn&#x27;t match:&quot;, matcher.name);
                 }
             }
 
@@ -463,12 +665,12 @@
             if (!this.isMatcher(matcher1)) {
                 debug(&quot;findCommonType: converting matcher1 value to matcher:&quot;, matcher1);
                 matcher1 = this.getType(matcher1);
-                console.log(&quot;matcher1:&quot;, matcher1);
+                debug(&quot;matcher1:&quot;, matcher1);
             }
             if (!this.isMatcher(matcher2)) {
                 debug(&quot;findCommonType: converting matcher2 value to matcher:&quot;, matcher2);
                 matcher2 = this.getType(matcher2);
-                console.log(&quot;matcher2:&quot;, matcher2);
+                debug(&quot;matcher2:&quot;, matcher2);
             }
 
             if (!matcher1 || !matcher2) {
@@ -503,7 +705,7 @@
                     break;
                 }
             }
-            console.log(&quot;commonType:&quot;, commonType);
+            debug(&quot;commonType:&quot;, commonType);
 
             // resolve common type name to matcher object
             if (commonType) {
@@ -514,7 +716,7 @@
         }
 
         isMatcher(matcher) {
-            console.log(&quot;isMatcher:&quot;, matcher);
+            debug(&quot;isMatcher:&quot;, matcher);
             return (typeof matcher === &quot;object&quot; &amp;&amp;
                 matcher !== null &amp;&amp;
                 typeof matcher.name === &quot;string&quot; &amp;&amp;
@@ -634,7 +836,7 @@
             }
         }
 
-        console.log(&quot;returning diff:&quot;, diff);
+        debug(&quot;returning diff:&quot;, diff);
         return diff;
     }
 
@@ -679,7 +881,6 @@
     }
 
     function diffBoolean(b1, b2) {
-        console.log(&quot;diff boolean:&quot;, b1, &quot;,&quot;, b2);
         if (b1 !== b2) return newDiff(b1, b2);
         return [];
     }
@@ -694,8 +895,8 @@
         return [];
     }
 
-    function testSingleInvocation(si) {
-        if (si instanceof SingleInvocation) return true;
+    function testSingleCall(si) {
+        if (si instanceof SingleCall) return true;
         return false;
     }
 
@@ -715,13 +916,11 @@
     }
 
     function diffRegex(rex1, rex2) {
-        if (rex1.toString !== rex2.toString) return newDiff(rex1.toString, rex2.toString);
+        if (rex1.toString() !== rex2.toString()) return newDiff(rex1.toString(), rex2.toString());
         return [];
     }
 
-    function diffSingleInvocation(si1, si2) {
-        console.log(&quot;si1.argList&quot;, si1.argList);
-        console.log(&quot;si2.argList&quot;, si2.argList);
+    function diffSingleCall(si1, si2) {
         var argDiff = addKeyToDiff(this.diff(si1.argList, si2.argList), &quot;argList&quot;);
         var thisDiff = addKeyToDiff(this.diff(si1.thisArg, si2.thisArg), &quot;thisArg&quot;);
         var retDiff = addKeyToDiff(this.diff(si1.retVal, si2.retVal), &quot;retVal&quot;);
@@ -735,7 +934,7 @@
     // can return a function as the exported value.
     return {
         Wrapper: Wrapper,
-        SingleInvocation: SingleInvocation,
+        SingleCall: SingleCall,
         Match: Match,
         Trigger: Trigger
     };

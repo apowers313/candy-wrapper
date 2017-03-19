@@ -10,7 +10,7 @@
             "name": "candy-wrapper.js",
             "modules": {},
             "classes": {
-                "": 1
+                "Wrapper": 1
             },
             "fors": {},
             "namespaces": {}
@@ -18,9 +18,16 @@
     },
     "modules": {},
     "classes": {
-        "": {
+        "Wrapper": {
+            "name": "Wrapper",
+            "shortname": "Wrapper",
+            "classitems": [],
+            "plugins": [],
+            "extensions": [],
+            "plugin_for": [],
+            "extension_for": [],
             "file": "candy-wrapper.js",
-            "line": 81,
+            "line": 24,
             "description": "Creates a new function wrapper -- a spy, stub, mock, etc."
         }
     },
@@ -28,17 +35,7 @@
     "classitems": [
         {
             "file": "candy-wrapper.js",
-            "line": 86,
-            "description": "This is a constructor",
-            "return": {
-                "description": "Proxy around a Wrapper object",
-                "type": "Wrapper"
-            },
-            "class": ""
-        },
-        {
-            "file": "candy-wrapper.js",
-            "line": 109,
+            "line": 67,
             "description": "Wrap all aspects of an object",
             "params": [
                 {
@@ -53,11 +50,11 @@
             },
             "lends": "Wrapper",
             "is_constructor": 1,
-            "class": ""
+            "class": "Wrapper"
         },
         {
             "file": "candy-wrapper.js",
-            "line": 121,
+            "line": 80,
             "description": "Puts a wrapper around a function and returns it",
             "params": [
                 {
@@ -72,53 +69,49 @@
             },
             "constructs": "",
             "memberof": "Wrapper",
-            "class": ""
+            "class": "Wrapper"
         },
         {
             "file": "candy-wrapper.js",
-            "line": 190,
+            "line": 183,
             "description": "Resets the wrapper to its default state. Clears out all records of previous calls,\nexpected behaviors, pass / fail results, etc.",
             "return": {
                 "description": "Returns the Wrapper object so that this call can be chained",
                 "type": "Wrapper"
             },
-            "class": ""
+            "class": "Wrapper"
         },
         {
             "file": "candy-wrapper.js",
-            "line": 477,
+            "line": 679,
             "description": "helper functions for testing various data types",
-            "class": ""
+            "class": "Wrapper"
         }
     ],
     "warnings": [
         {
             "message": "unknown tag: lends",
-            "line": " candy-wrapper.js:109"
+            "line": " candy-wrapper.js:67"
         },
         {
             "message": "unknown tag: memberof",
-            "line": " candy-wrapper.js:121"
-        },
-        {
-            "message": "Missing item type\nThis is a constructor",
-            "line": " candy-wrapper.js:86"
+            "line": " candy-wrapper.js:80"
         },
         {
             "message": "Missing item type\nWrap all aspects of an object",
-            "line": " candy-wrapper.js:109"
+            "line": " candy-wrapper.js:67"
         },
         {
             "message": "Missing item type\nPuts a wrapper around a function and returns it",
-            "line": " candy-wrapper.js:121"
+            "line": " candy-wrapper.js:80"
         },
         {
             "message": "Missing item type\nResets the wrapper to its default state. Clears out all records of previous calls,\nexpected behaviors, pass / fail results, etc.",
-            "line": " candy-wrapper.js:190"
+            "line": " candy-wrapper.js:183"
         },
         {
             "message": "Missing item type\nhelper functions for testing various data types",
-            "line": " candy-wrapper.js:477"
+            "line": " candy-wrapper.js:679"
         }
     ]
 }
