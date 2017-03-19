@@ -15,10 +15,11 @@ function depends(mod) {
     var Wrapper = CandyWrapper.Wrapper;
     var Match = CandyWrapper.Match;
     var Trigger = CandyWrapper.Trigger;
-    var SingleInvocation = CandyWrapper.SingleInvocation;
+    var SingleCall = CandyWrapper.SingleCall;
 
     describe("requested new feature list", function() {
-        it("can detect when a function has been invoked with 'new()'");
+        it("can detect when a function has been invoked with 'new()'"); // Proxy.handler.construct()?
+        it("can wrap a function generator");
     });
 
     describe("create wrapper", function() {
@@ -36,45 +37,198 @@ function depends(mod) {
             }
             var ret = new Wrapper(testFunc);
             assert.isFunction(ret);
+            assert.strictEqual(ret.type, "function");
             ret();
             assert.strictEqual(called, true, "expected wrapped function to get called");
         });
 
-        it("can wrap a method");
-        it("can wrap an attribute");
+        it("can wrap a method", function() {
+            var testObj = {
+                goBowling: function() {}
+            };
+            var w = new Wrapper(testObj, "goBowling");
+            assert.isFunction(w);
+            assert.instanceOf(w, Wrapper);
+            assert.strictEqual(w.type, "function");
+        });
+
+        it("can wrap an attribute", function() {
+            var testObj = {
+                beer: "yummy"
+            };
+            var w = new Wrapper(testObj, "beer");
+            assert.isFunction(w);
+            assert.instanceOf(w, Wrapper);
+            assert.strictEqual(w.type, "attribute");
+            assert.strictEqual(w.attrValue, "yummy");
+            testObj.beer = "all gone";
+            assert.strictEqual(w.attrValue, "all gone");
+            var ret = testObj.beer;
+            assert.strictEqual(ret, "all gone");
+        });
+
         it("can wrap an object");
-        it("can wrap a method with a custom function");
+        it("can wrap a nested object");
+
+        it("can wrap a method with a custom function", function() {
+            var called = false;
+
+            function testFunc() {
+                called = true;
+            }
+            var testObj = {
+                goBowling: function(){}
+            };
+            var ret = new Wrapper(testObj, "goBowling", testFunc);
+            assert.isFunction(ret);
+            assert.strictEqual(ret.type, "function");
+            ret();
+            assert.strictEqual(called, true, "expected wrapped function to get called");
+        });
+
         it("can wrap an attribute with a custom function");
+        it("throws error when called with bad arguments", function() {
+            assert.throws(function() {
+                var w = new Wrapper("foo");
+            }, TypeError, /Wrapper: bad arguments/);
+            assert.throws(function() {
+                var w = new Wrapper(true);
+            }, TypeError, /Wrapper: bad arguments/);
+            assert.throws(function() {
+                var w = new Wrapper(null);
+            }, TypeError, /Wrapper: bad arguments/);
+        });
         it("mirrors defineProperty values");
         it("mirrors function name, argument length, and argument list");
     });
 
     describe("config", function() {
+        it("can identify a wrapper", function() {
+            var w = new Wrapper();
+
+            // wrapped function
+            var fn = function(){};
+            assert.isOk(Wrapper.isWrapper(w), "exepcted a wrapper");
+            assert.isNotOk(Wrapper.isWrapper(fn), "exepcted not a wrapper");
+
+            // wrapped method
+            var testObj = {
+                goBowling: function() {},
+                notBowling: function() {}
+            };
+            w = new Wrapper(testObj, "goBowling");
+            assert.isOk(Wrapper.isWrapper(testObj, "goBowling"), "exepcted a wrapper");
+            assert.isNotOk(Wrapper.isWrapper(testObj, "notBowling"), "exepcted not a wrapper");
+
+            // wrapped attribute
+            var testAttrs = {
+                iAmWrapped: "whee",
+                iAmSam: "SAM."
+            };
+            w = new Wrapper(testAttrs, "iAmWrapped");
+            assert.isOk(Wrapper.isWrapper(testAttrs, "iAmWrapped"), "exepcted a wrapper");
+            assert.isNotOk(Wrapper.isWrapper(testAttrs, "iAmSam"), "exepcted not a wrapper");
+        });
         it("can restore wrapped function");
         it("can reset wrapper");
     });
 
-    describe("select", function() {
+    describe("filter", function() {
         it("can get by call number", function() {
             var ret;
             var w = new Wrapper();
             assert.throws(function() {
-                w.selectOneByCallNumber(0);
+                w.filterOneByCallNumber(0);
             }, RangeError);
             w();
             w();
             w();
-            ret = w.selectOneByCallNumber(0);
-            assert.instanceOf(ret, SingleInvocation);
-            w.selectOneByCallNumber(1);
-            w.selectOneByCallNumber(2);
+            ret = w.filterOneByCallNumber(0);
+            assert.instanceOf(ret, SingleCall);
+            w.filterOneByCallNumber(1);
+            w.filterOneByCallNumber(2);
             assert.throws(function() {
-                w.selectOneByCallNumber(3);
+                w.filterOneByCallNumber(3);
             }, RangeError);
             w();
-            ret = w.selectOneByCallNumber(3);
-            assert.instanceOf(ret, SingleInvocation);
+            ret = w.filterOneByCallNumber(3);
+            assert.instanceOf(ret, SingleCall);
         });
+
+        it("can select only attribute gets", function() {
+            var testObj = {
+                beer: "yummy"
+            };
+            var getList, setList;
+            var w = new Wrapper(testObj, "beer");
+            assert.isArray(w.touchList);
+            assert.strictEqual(w.touchList.length, 0);
+            getList = w.filterAttrGet();
+            setList = w.filterAttrSet();
+            assert.isArray (getList);
+            assert.strictEqual(getList.length, 0);
+            assert.isArray (setList);
+            assert.strictEqual(setList.length, 0);
+
+            // set #1
+            testObj.beer = "gone";
+            assert.strictEqual(w.touchList.length, 1);
+            getList = w.filterAttrGet();
+            setList = w.filterAttrSet();
+            assert.isArray (getList);
+            assert.strictEqual(getList.length, 0);
+            assert.isArray (setList);
+            assert.strictEqual(setList.length, 1);
+            assert.strictEqual(setList[0].type, "set");
+            assert.strictEqual(setList[0].setVal, "gone");
+            assert.strictEqual(setList[0].retVal, "gone");
+            assert.isUndefined(setList[0].exception);
+
+            // get #1
+            var ret = testObj.beer;
+            assert.strictEqual (ret, "gone");
+            assert.strictEqual(w.touchList.length, 2);
+            getList = w.filterAttrGet();
+            setList = w.filterAttrSet();
+            assert.isArray (getList);
+            assert.strictEqual(getList.length, 1);
+            assert.isArray (setList);
+            assert.strictEqual(setList.length, 1);
+            assert.strictEqual(getList[0].type, "get");
+            assert.isUndefined(getList[0].setVal);
+            assert.strictEqual(getList[0].retVal, "gone");
+            assert.isUndefined(getList[0].exception);
+
+            // set #2
+            testObj.beer = "more";
+            assert.strictEqual(w.touchList.length, 3);
+            getList = w.filterAttrGet();
+            setList = w.filterAttrSet();
+            assert.isArray (getList);
+            assert.strictEqual(getList.length, 1);
+            assert.isArray (setList);
+            assert.strictEqual(setList.length, 2);
+            assert.strictEqual(setList[1].type, "set");
+            assert.strictEqual(setList[1].setVal, "more");
+            assert.strictEqual(setList[1].retVal, "more");
+            assert.isUndefined(setList[1].exception);
+
+            // get #2
+            ret = testObj.beer;
+            assert.strictEqual (ret, "more");
+            assert.strictEqual(w.touchList.length, 4);
+            getList = w.filterAttrGet();
+            setList = w.filterAttrSet();
+            assert.isArray (getList);
+            assert.strictEqual(getList.length, 2);
+            assert.isArray (setList);
+            assert.strictEqual(setList.length, 2);
+            assert.strictEqual(getList[1].type, "get");
+            assert.isUndefined(getList[1].setVal);
+            assert.strictEqual(getList[1].retVal, "more");
+            assert.isUndefined(getList[1].exception);
+        });
+        it("can select only attribute sets");
     });
 
     describe("expect", function() {
@@ -104,23 +258,23 @@ function depends(mod) {
         it.skip("call args", function() {
             var w = new Wrapper();
             w();
-            assert.isOk(w.selectOneByCallNumber(0).expectCallArgs());
-            assert.isNotOk(w.selectOneByCallNumber(0).expectCallArgs("foo"));
+            assert.isOk(w.filterOneByCallNumber(0).expectCallArgs());
+            assert.isNotOk(w.filterOneByCallNumber(0).expectCallArgs("foo"));
             w("beer");
-            assert.isOk(w.selectOneByCallNumber(1).expectCallArgs("beer"));
-            assert.isNotOk(w.selectOneByCallNumber(1).expectCallArgs("foo"));
+            assert.isOk(w.filterOneByCallNumber(1).expectCallArgs("beer"));
+            assert.isNotOk(w.filterOneByCallNumber(1).expectCallArgs("foo"));
             w(true);
-            assert.isOk(w.selectOneByCallNumber(2).expectCallArgs(true));
-            assert.isNotOk(w.selectOneByCallNumber(2).expectCallArgs("foo"));
+            assert.isOk(w.filterOneByCallNumber(2).expectCallArgs(true));
+            assert.isNotOk(w.filterOneByCallNumber(2).expectCallArgs("foo"));
             w(false);
-            assert.isOk(w.selectOneByCallNumber(3).expectCallArgs(false));
-            assert.isNotOk(w.selectOneByCallNumber(3).expectCallArgs("foo"));
+            assert.isOk(w.filterOneByCallNumber(3).expectCallArgs(false));
+            assert.isNotOk(w.filterOneByCallNumber(3).expectCallArgs("foo"));
             // w({});
-            // assert.isOk (w.selectOneByCallNumber(4).expectCallArgs({}));
-            // assert.isNotOk (w.selectOneByCallNumber(4).expectCallArgs("foo"));
+            // assert.isOk (w.filterOneByCallNumber(4).expectCallArgs({}));
+            // assert.isNotOk (w.filterOneByCallNumber(4).expectCallArgs("foo"));
             // w([]);
-            // assert.isOk (w.selectOneByCallNumber(5).expectCallArgs([]));
-            // assert.isNotOk (w.selectOneByCallNumber(5).expectCallArgs("foo"));
+            // assert.isOk (w.filterOneByCallNumber(5).expectCallArgs([]));
+            // assert.isNotOk (w.filterOneByCallNumber(5).expectCallArgs("foo"));
         });
 
         it("call args deep equal");
@@ -135,14 +289,20 @@ function depends(mod) {
             assert.instanceOf(ret, Trigger);
         });
 
-        it("can spoof a return value", function() {
+        it("can spoof a call return value", function() {
             var w = new Wrapper();
-            console.log ("--- SETUP --- ");
-            var ret = w.triggerAlways().actionReturn({foo: "bar"});
+            var ret = w.triggerAlways().actionReturn({
+                foo: "bar"
+            });
             assert.instanceOf(ret, Trigger);
-            console.log ("--- RUN ---");
             ret = w();
-            assert.deepEqual(ret, {foo: "bar"});
+            assert.deepEqual(ret, {
+                foo: "bar"
+            });
+        });
+
+        it("can spoof a attribute return value", function() {
+
         });
     });
 
@@ -381,24 +541,49 @@ function depends(mod) {
             }]);
         });
 
+        it("can diff regexps", function() {
+            var m = new Match({
+                value: /a/
+            });
+
+            // same
+            var ret;
+            ret = m.diff(m.value, /a/);
+            assert.isArray(ret);
+            assert.strictEqual(ret.length, 0);
+            assert.deepEqual(ret, []);
+
+            // different
+            ret = m.diff(m.value, /b/);
+            assert.isArray(ret);
+            assert.strictEqual(ret.length, 1);
+            assert.deepEqual(ret, [{
+                src: "/a/",
+                dst: "/b/"
+            }]);
+        });
+
         it("can diff single invocations", function() {
             // constructor(thisArg, argList, retVal, exception)
-            var si = new SingleInvocation({}, [1, 2, 3]);
+            var si = new SingleCall({}, [1, 2, 3]);
             var m = new Match({
                 value: si
             });
 
             // same
             var ret;
-            var si2 = new SingleInvocation({}, [1, 2, 3]);
+            var si2 = new SingleCall({}, [1, 2, 3]);
             ret = m.diff(m.value, si2);
-            console.log("ret", ret);
             assert.isArray(ret);
             assert.strictEqual(ret.length, 0);
             assert.deepEqual(ret, []);
         });
 
+        it("can diff undefined");
+        it("can diff null");
+
         it("can diff two complex objects");
         it("can diff two complex arrays");
+        it("can convert a diff to a string");
     });
 })();
