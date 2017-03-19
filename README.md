@@ -10,7 +10,7 @@ Docs: https://apowers313.github.io/candy-wrapper
 This library is similar to the wonderful [Sinon](http://sinonjs.org/) and can be used for creating stubs, spys, and mocks for testing. The API has been re-invented to be consistent and re-use code across all those functionalities.
 
 The primary interfaces are Wrapper, Expect, Trigger, and Action.
-* Wrappers wrap a function or attribute, so that when the Wrapper is called, so is the underlying function or attribute.
-* You can use Expect to examine what happened with a Wrapper, such as seeing what args were passed to it or what the return value was.
-* Triggers get called just before or just after a function call, providing the opportunity validate Expects or perform Actions.
+* [Wrappers](https://apowers313.github.io/candy-wrapper/Wrapper.html) wrap a function or attribute, so that when the Wrapper is called, so is the underlying function or attribute.
+* You can use [Expect](https://apowers313.github.io/candy-wrapper/Expect.html) to examine what happened with a Wrapper, such as seeing what args were passed to it or what the return value was.
+* [Triggers](https://apowers313.github.io/candy-wrapper/Trigger.html) get called just before or just after a function call, providing the opportunity validate Expects or perform Actions.
 * Actions can do things like change arguments recieved by the wrapped function or change the value returned to the caller.
