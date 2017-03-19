@@ -10,8 +10,8 @@
     "test": "npm run testnode",
     "testbrowsers": "grunt default",
     "testnode": "istanbul cover _mocha",
-    "docs": "./node_modules/.bin/yuidoc .",
-    "publishdocs": "gh-pages --silent --repo https://$GH_TOKEN@github.com/apowers313/candy-wrapper.git --dist docs"
+    "docs:create": "jsdoc -c ./.jsdoc-conf.json",
+    "docs:publish": "gh-pages --silent --repo https://$GH_TOKEN@github.com/apowers313/candy-wrapper.git --dist docs"
   },
   "keywords": [
     "sinon",
