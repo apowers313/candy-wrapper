@@ -1,72 +1,38 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
-	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width">
-	<title>Candy Wrapper Index</title>
+    <meta charset="utf-8">
+    <title>Home - Documentation</title>
 
-	<!--[if lt IE 9]>
-	<script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
-	<![endif]-->
-	<link type="text/css" rel="stylesheet" href="styles/sunlight.default.css">
-
-	<link type="text/css" rel="stylesheet" href="styles/site.yeti.css">
-
+    <script src="scripts/prettify/prettify.js"></script>
+    <script src="scripts/prettify/lang-css.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc.css">
 </head>
-
 <body>
 
-<div class="navbar navbar-default navbar-fixed-top ">
-<div class="container">
-	<div class="navbar-header">
-		<a class="navbar-brand" href="index.html">Candy Wrapper</a>
-		<button class="navbar-toggle" type="button" data-toggle="collapse" data-target="#topNavigation">
-			<span class="icon-bar"></span>
-			<span class="icon-bar"></span>
-			<span class="icon-bar"></span>
-        </button>
-	</div>
-	<div class="navbar-collapse collapse" id="topNavigation">
-		<ul class="nav navbar-nav">
-			
-			<li class="dropdown">
-				<a href="classes.list.html" class="dropdown-toggle" data-toggle="dropdown">Classes<b class="caret"></b></a>
-				<ul class="dropdown-menu ">
-					<li><a href="Expect.html">Expect</a></li><li><a href="Match.html">Match</a></li><li><a href="SingleCall.html">SingleCall</a></li><li><a href="SingleTouch.html">SingleTouch</a></li><li><a href="Trigger.html">Trigger</a></li><li><a href="Wrapper.html">Wrapper</a></li><li><a href="WrapperAttr.html">WrapperAttr</a></li><li><a href="WrapperCall.html">WrapperCall</a></li>
-				</ul>
-			</li>
-			
-		</ul>
-        
-            <div class="col-sm-3 col-md-3">
-                <form class="navbar-form" role="search">
-                    <div class="input-group">
-                        <input type="text" class="form-control" placeholder="Search" name="q" id="search-input">
-                        <div class="input-group-btn">
-                            <button class="btn btn-default" id="search-submit"><i class="glyphicon glyphicon-search"></i></button>
-                        </div>
-                    </div>
-                </form>
-            </div>
-        
-	</div>
+<input type="checkbox" id="nav-trigger" class="nav-trigger" />
+<label for="nav-trigger" class="navicon-button x">
+  <div class="navicon"></div>
+</label>
 
-</div>
-</div>
+<label for="nav-trigger" class="overlay"></label>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Expect.html">Expect</a></li><li><a href="Match.html">Match</a></li><li><a href="SingleCall.html">SingleCall</a></li><li><a href="SingleTouch.html">SingleTouch</a></li><li><a href="Trigger.html">Trigger</a></li><li><a href="Wrapper.html">Wrapper</a><ul class='methods'><li data-type='method'><a href="Wrapper.html#.isWrapper">isWrapper</a></li><li data-type='method'><a href="Wrapper.html#configReset">configReset</a></li></ul></li><li><a href="WrapperAttr.html">WrapperAttr</a></li><li><a href="WrapperCall.html">WrapperCall</a><ul class='methods'><li data-type='method'><a href="WrapperCall.html#configReset">configReset</a></li><li data-type='method'><a href="WrapperCall.html#expectCallOnce">expectCallOnce</a></li><li data-type='method'><a href="WrapperCall.html#expectCallThrice">expectCallThrice</a></li><li data-type='method'><a href="WrapperCall.html#expectCallTwice">expectCallTwice</a></li></ul></li></ul>
+</nav>
+
+<div id="main">
+    
+
+    
 
 
-<div class="container" id="toc-content">
-<div class="row">
 
-	
-	<div class="col-md-8">
-	
-		<div id="main">
-			
-
-	
-	
+    
 
 
 
@@ -76,18 +42,12 @@
 
 
 
+    
 
 
-	
-	
-
-
-
-
-
-    <section class="readme-section">
+    <section class="readme">
         <article><p>Work in progress. Please don't use.</p>
-<p><a href="https://travis-ci.org/apowers313/candy-wrapper"><img src="https://travis-ci.org/apowers313/candy-wrapper.svg?branch=master" alt="Build Status"></a>
+<h2>Candy Wrapper</h2><p><a href="https://travis-ci.org/apowers313/candy-wrapper"><img src="https://travis-ci.org/apowers313/candy-wrapper.svg?branch=master" alt="Build Status"></a>
 <a href="https://coveralls.io/github/apowers313/candy-wrapper?branch=master"><img src="https://coveralls.io/repos/github/apowers313/candy-wrapper/badge.svg?branch=master" alt="Coverage Status"></a></p>
 <!-- [![Sauce Test Status](https://saucelabs.com/browser-matrix/apowers313.svg)](https://saucelabs.com/u/apowers313) -->
 <p>Docs: https://apowers313.github.io/candy-wrapper</p>
@@ -98,7 +58,219 @@
 <li>You can use <a href="https://apowers313.github.io/candy-wrapper/Expect.html">Expect</a> to examine what happened with a Wrapper, such as seeing what args were passed to it or what the return value was.</li>
 <li><a href="https://apowers313.github.io/candy-wrapper/Trigger.html">Triggers</a> get called just before or just after a function call, providing the opportunity validate Expects or perform Actions.</li>
 <li>Actions can do things like change arguments recieved by the wrapped function or change the value returned to the caller.</li>
-</ul></article>
+</ul>
+<h2>ES6</h2><p>Note that this library currently makes exensive use of the features of JavaScript ES6, notably <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy">Proxies</a>, <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Classes">classes</a>, <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals">temlate literals</a>, and the <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Spread_operator">spread operator</a>. For information about which platforms currently support ES6, see the <a href="https://kangax.github.io/compat-table/es6/">ES6 compatibility table</a>. It has been tested against Node 6 and seems to run on the latest versions of Chrome and Firefox.</p>
+<p>Presumably it could be back-ported to ES5.1, perhaps drawing on the work of Sinon. The biggest challenge would be removing the use of Proxies. A <a href="https://github.com/apowers313/candy-wrapper">pull request</a> would be more than welcome if anyone wants to take that challenge on.</p>
+<h2>Examples</h2><h2>API Overview</h2><h4>Wrapper</h4><h4>Config</h4><table>
+<thead>
+<tr>
+<th>Function Name</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>configReset</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>configPassThrough</li>
+<li>configObserveWaitForValidate</li>
+<li>configObserveThrows</li>
+<li>configRestore</li>
+</ul>
+<h4>Wrapper Expect</h4><p>Function</p>
+<table>
+<thead>
+<tr>
+<th>Function Name</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>expectCallCount</td>
+<td></td>
+</tr>
+<tr>
+<td>expectCallCountMax</td>
+<td></td>
+</tr>
+<tr>
+<td>expectCallCountMin</td>
+<td></td>
+</tr>
+<tr>
+<td>expectCallCountRange</td>
+<td></td>
+</tr>
+<tr>
+<td>expectCallNever</td>
+<td></td>
+</tr>
+<tr>
+<td>expectCallOnce</td>
+<td></td>
+</tr>
+<tr>
+<td>expectCallTwice</td>
+<td></td>
+</tr>
+<tr>
+<td>expectCallThrice</td>
+</tr>
+</tbody>
+</table>
+<p>Attribute</p>
+<ul>
+<li>expectSetCount</li>
+<li>expectGetCount</li>
+<li>expectTouchCount</li>
+<li>expectSetCountMax</li>
+<li>expectGetCountMax</li>
+<li>expectTouchCountMax</li>
+<li>expectSetCountMin</li>
+<li>expectGetCountMin</li>
+<li>expectTouchCountMin</li>
+<li>expectSetCountRange</li>
+<li>expectGetCountRange</li>
+<li>expectTouchCountRange</li>
+<li>expectSetNever</li>
+<li>expectGetNever</li>
+<li>expectTouchNever</li>
+<li>expectSetOnce</li>
+<li>expectGetOnce</li>
+<li>expectTouchOnce</li>
+<li>expectSetTwice</li>
+<li>expectGetTwice</li>
+<li>expectTouchTwice</li>
+<li>expectSetThrice</li>
+<li>expectGetThrice</li>
+<li>expectTouchThrice</li>
+</ul>
+<p>...All...</p>
+<p>...Sometimes...</p>
+<p>...Never...</p>
+<h4>Filter API</h4><table>
+<thead>
+<tr>
+<th>Function Name</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>filterSet</li>
+<li><p>filterGet</p>
+</li>
+<li><p>filterCallByArgs</p>
+</li>
+<li>filterCallByContext</li>
+<li>filterByException</li>
+<li>filterByReturn</li>
+<li><p>filterSetByVal</p>
+</li>
+<li><p>All</p>
+</li>
+<li>Some</li>
+<li><p>None</p>
+</li>
+<li><p>filterFirst</p>
+</li>
+<li>filterLast</li>
+<li>filterOnly</li>
+<li>filterByNumber</li>
+</ul>
+<h4>Get API</h4><p>Function</p>
+<ul>
+<li>_get</li>
+<li>getAllContexts</li>
+<li>getAllArgs</li>
+<li>getAllExceptions</li>
+<li>getAllReturns</li>
+<li>getAllTriggers</li>
+</ul>
+<p>Attribute</p>
+<ul>
+<li>getAllExceptions</li>
+<li>getAllReturns</li>
+<li>getAllSetVals</li>
+</ul>
+<h4>Single Expect</h4><p>General</p>
+<ul>
+<li>expectValidate</li>
+<li>_expect (name, trigger)</li>
+</ul>
+<p>Function</p>
+<ul>
+<li>expectCallArgs</li>
+<li>expectCallContext</li>
+<li>expectReturn</li>
+<li>expectException</li>
+<li>expectCustom (fn, param)</li>
+</ul>
+<p>Attribute</p>
+<ul>
+<li>expectSetVal</li>
+<li>expectReturn</li>
+<li>expectException</li>
+</ul>
+<h4>Trigger</h4><ul>
+<li>_trigger (name, function)</li>
+<li>triggerOnAll</li>
+<li>triggerOnArgs</li>
+<li>triggerOnContext</li>
+<li>triggerOnCallNumber</li>
+<li>triggerOnException</li>
+<li>triggerOnReturn</li>
+<li>triggerOnCallLike (SingleCall)</li>
+<li>triggerOnTouchLike (SingleTouch)</li>
+<li><p>triggerOnCustom (fn, single, param)</p>
+</li>
+<li><p>...OnSet</p>
+</li>
+<li>...OnSetVal</li>
+<li>...OnSetNumber</li>
+<li>...OnGet</li>
+<li>...OnGetNumber</li>
+<li>...OnTouch</li>
+<li>...OnTouchNumber</li>
+</ul>
+<h4>Actions</h4><p>Function</p>
+<p>Attribute</p>
+<ul>
+<li>_action (name, function)</li>
+<li>actionCallbackToArg(arg#)</li>
+<li>actionCallbackFunction(function)</li>
+<li>actionCallbackContext(thisVal)</li>
+<li>actionCallbackArgs(any)</li>
+<li>actionCallbackAsync()</li>
+<li>actionCallbackAttribute(attrName) // returns object.attrName</li>
+<li>actionReturn(any)</li>
+<li>actionReturnFromArg(arg#)</li>
+<li>actionReturnFromContext() // returns ‘this’</li>
+<li>actionThrowException</li>
+<li>actionReturnPromise</li>
+<li>actionRejectPromise</li>
+<li>actionCustom (fn, param)</li>
+<li>actionSetVal</li>
+</ul>
+<h4>Match</h4><ul>
+<li>compare</li>
+<li>diff</li>
+<li>extend</li>
+<li>getType</li>
+<li>findCommonType</li>
+<li>getLastDiff</li>
+<li>getDiffMessage</li>
+</ul>
+<h4>Sandbox</h4></article>
     </section>
 
 
@@ -106,137 +278,15 @@
 
 
 
-
-		</div>
-	</div>
-
-	<div class="clearfix"></div>
-
-	
-		<div class="col-md-3">
-			<div id="toc" class="col-md-3 hidden-xs hidden-sm hidden-md"></div>
-		</div>
-	
-
-</div>
 </div>
 
-
-    <div class="modal fade" id="searchResults">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-            <h4 class="modal-title">Search results</h4>
-          </div>
-          <div class="modal-body"></div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-          </div>
-        </div><!-- /.modal-content -->
-      </div><!-- /.modal-dialog -->
-    </div>
-
+<br class="clear">
 
 <footer>
-
-
-	<span class="copyright">
-	Copyright 2017, Adam Powers
-	</span>
-
-<span class="jsdoc-message">
-	Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.3</a>
-	
-		on 2017-03-19T23:25:25+00:00
-	
-	using the <a href="https://github.com/docstrap/docstrap">DocStrap template</a>.
-</span>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.3</a> on Wed Mar 22 2017 02:52:40 GMT+0000 (UTC) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
-<script src="scripts/docstrap.lib.js"></script>
-<script src="scripts/toc.js"></script>
-
-    <script type="text/javascript" src="scripts/fulltext-search-ui.js"></script>
-
-
-<script>
-$( function () {
-	$( "[id*='$']" ).each( function () {
-		var $this = $( this );
-
-		$this.attr( "id", $this.attr( "id" ).replace( "$", "__" ) );
-	} );
-
-	$( ".tutorial-section pre, .readme-section pre, pre.prettyprint.source" ).each( function () {
-		var $this = $( this );
-
-		var example = $this.find( "code" );
-		exampleText = example.html();
-		var lang = /{@lang (.*?)}/.exec( exampleText );
-		if ( lang && lang[1] ) {
-			exampleText = exampleText.replace( lang[0], "" );
-			example.html( exampleText );
-			lang = lang[1];
-		} else {
-			var langClassMatch = example.parent()[0].className.match(/lang\-(\S+)/);
-			lang = langClassMatch ? langClassMatch[1] : "javascript";
-		}
-
-		if ( lang ) {
-
-			$this
-			.addClass( "sunlight-highlight-" + lang )
-			.addClass( "linenums" )
-			.html( example.html() );
-
-		}
-	} );
-
-	Sunlight.highlightAll( {
-		lineNumbers : true,
-		showMenu : true,
-		enableDoclinks : true
-	} );
-
-	$.catchAnchorLinks( {
-        navbarOffset: 10
-	} );
-	$( "#toc" ).toc( {
-		anchorName  : function ( i, heading, prefix ) {
-			return $( heading ).attr( "id" ) || ( prefix + i );
-		},
-		selectors   : "#toc-content h1,#toc-content h2,#toc-content h3,#toc-content h4",
-		showAndHide : false,
-		smoothScrolling: true
-	} );
-
-	$( "#main span[id^='toc']" ).addClass( "toc-shim" );
-	$( '.dropdown-toggle' ).dropdown();
-
-    $( "table" ).each( function () {
-      var $this = $( this );
-      $this.addClass('table');
-    } );
-
-} );
-</script>
-
-
-
-<!--Navigation and Symbol Display-->
-
-
-<!--Google Analytics-->
-
-
-
-    <script type="text/javascript">
-        $(document).ready(function() {
-            SearcherDisplay.init();
-        });
-    </script>
-
-
+<script>prettyPrint();</script>
+<script src="scripts/linenumber.js"></script>
 </body>
 </html>
