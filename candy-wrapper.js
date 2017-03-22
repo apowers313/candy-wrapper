@@ -18,11 +18,23 @@
         // console.log(...args);
     }
 
+    /**
+     * Creates an alias method for an already existing method
+     * @param  {Object}    ctx       The `this` object that the function will be called on.
+     * @param  {String}    aliasName The name of the new alias.
+     * @param  {Function}  fn        The name of the function that the alias will call
+     * @param  {...Any} args         The arguments to bind to the function.
+     * @private
+     */
+    function alias(ctx, aliasName, fn, ...args) {
+        ctx[aliasName] = fn.bind(ctx, ...args);
+    }
+
     var wrapperCookie = "193fe616-09d1-4d5c-a5b9-ff6f3e79714c";
     var wrapperCookieKey = "uniquePlaceToKeepAGuidForCandyWrapper";
 
     /**
-     * Creates a new function wrapper -- a spy, stub, mock, etc.
+     * Creates a new function or attribute wrapper -- a spy, stub, mock, etc.
      */
     class Wrapper extends Function {
 
@@ -34,8 +46,6 @@
                 this instanceof WrapperAttr) {
 
                 // set default values
-                this.configReset();
-
                 return this;
             }
 
@@ -148,18 +158,164 @@
             }
         }
 
+        /**
+         * Asserts that the current Wrapper is wrapping an attribute.
+         * @param  {String} callerName The name of the calling function, to be included in
+         * the error message if the assertion fails.
+         * @throws {Error} If Current Wrapper is not wrapping an attribute.
+         * @private
+         */
         _attrOnly(callerName) {
             if (this.type !== "attribute") {
                 throw new Error(`${callerName} is only supported for ATTRIBUTE wrappers`);
             }
         }
 
+        /**
+         * Asserts that the current Wrapper is wrapping a function.
+         * @param  {String} callerName The name of the calling function, to be included in
+         * the error message if the assertion fails.
+         * @throws {Error} If Current Wrapper is not wrapping a function.
+         * @private
+         */
         _funcOnly(callerName) {
             if (this.type !== "function") {
                 throw new Error(`${callerName} is only supported for FUNCTION wrappers`);
             }
         }
 
+        /**
+         * Expects that `arr` has `count` members. Serves as the basis of
+         * {@link expectCallCount}, {@link expectTouchCount} and similar Expect functions.
+         * @param  {String} name  Name of the calling function, for any errors that are thrown.
+         * @param  {Array} arr    The array to count the members of.
+         * @param  {Number} count  How many members are expected to be in the `arr`
+         * @return {Boolean}      Returns `true` if `arr` has `count` members, `false` otherwise
+         * @private
+         */
+        _Count(name, arr, count) {
+            if (typeof name !== "string") {
+                throw new TypeError("_Count: expected 'name' to be string");
+            }
+
+            if (!Array.isArray(arr)) {
+                throw new TypeError(`${name}: expected 'arr' to be of type Array`);
+            }
+
+            if (typeof count !== "number") {
+                throw new TypeError(`${name}: expected 'count' to be of type Number`);
+            }
+
+            return (arr.length === count);
+        }
+
+        /**
+         * Expects that `arr` has `count` members. Serves as the basis of
+         * {@link expectCallCountRange}, {@link expectTouchCountRange} and similar Expect functions.
+         * @param  {String} name  Name of the calling function, for any errors that are thrown.
+         * @param  {Array} arr    The array to count the members of.
+         * @param  {Number} min   How the miniumum number of members expected to be in the `arr`
+         * @param  {Number} max   The maximum number of members expected to be in the `arr`
+         * @return {Boolean}      Returns `true` if `arr` has `count` members, `false` otherwise
+         * @private
+         */
+        _CountRange(name, arr, min, max) {
+            if (typeof name !== "string") {
+                throw new TypeError("_CountRange: expected 'name' to be string");
+            }
+
+            if (!Array.isArray(arr)) {
+                throw new TypeError(`${name}: expected 'arr' to be of type Array`);
+            }
+
+            if (typeof min !== "number") {
+                throw new TypeError(`${name}: expected 'min' to be of type Number`);
+            }
+
+            if (typeof max !== "number") {
+                throw new TypeError(`${name}: expected 'max' to be of type Number`);
+            }
+
+            return ((arr.length >= min) && (arr.length <= max));
+        }
+
+        /**
+         * Expects that `arr` has at least `count` members. Serves as the basis of
+         * {@link expectCallCountMin}, {@link expectTouchCountMin} and similar Expect functions.
+         * @param  {String} name  Name of the calling function, for any errors that are thrown.
+         * @param  {Array} arr    The array to count the members of.
+         * @param  {Number} min   How least number of members that are expected to be in the `arr`
+         * @return {Boolean}      Returns `true` if `arr` has at least `count` members, `false` otherwise
+         * @private
+         */
+        _CountMin(name, arr, min) {
+            if (typeof name !== "string") {
+                throw new TypeError("_CountMin: expected 'name' to be string");
+            }
+
+            if (!Array.isArray(arr)) {
+                throw new TypeError(`${name}: expected 'arr' to be of type Array`);
+            }
+
+            if (typeof min !== "number") {
+                throw new TypeError(`${name}: expected 'min' to be of type Number`);
+            }
+
+            return (arr.length >= min);
+        }
+
+        /**
+         * Expects that `arr` has at most`count` members. Serves as the basis of
+         * {@link expectCallCountMax}, {@link expectTouchCountMax} and similar Expect functions.
+         * @param  {String} name  Name of the calling function, for any errors that are thrown.
+         * @param  {Array} arr    The array to count the members of.
+         * @param  {Number} max   The maximum number of members that are expected to be in the `arr`
+         * @return {Boolean}      Returns `true` if `arr` has less than `count` members, `false` otherwise
+         * @private
+         */
+        _CountMax(name, arr, max) {
+            if (typeof name !== "string") {
+                throw new TypeError("_CountMax: expected 'name' to be string");
+            }
+
+            if (!Array.isArray(arr)) {
+                throw new TypeError(`${name}: expected 'arr' to be of type Array`);
+            }
+
+            if (typeof max !== "number") {
+                throw new TypeError(`${name}: expected 'max' to be of type Number`);
+            }
+
+            return (arr.length <= max);
+        }
+
+        /**
+         * This static method checks whether something is a Wrapper or not, similar to `Array.isArray`.
+         * Works on functions, methods, and attributes. This function has multiple signatures as illustrated
+         * below.
+         * @example
+         *
+         * var testFunction = function(){};
+         *
+         * var testObject {
+         *    attr: 1,
+         *    meth: function() {}
+         * }
+         *
+         * Wrapper.isWrapper(testFunction); // false
+         * testFunction = new Wrapper(testFunction);
+         * Wrapper.isWrapper(testFunction); // true
+         *
+         * Wrapper.isWrapper(testObject, "attr"); // false
+         * new Wrapper(testObject, "attr");
+         * Wrapper.isWrapper(testObject, "attr"); // true
+         *
+         * Wrapper.isWrapper(testObject, "meth"); // false
+         * new Wrapper(testObject, "meth");
+         * Wrapper.isWrapper(testObject, "meth"); // true
+         *
+         * @return {Boolean} Returns `true` if the arguments are a Wrapper, `false` otherwise
+         */
         static isWrapper() {
             // called like: isWrapper(fn)
             // checking to see if a function / method is a wrapper
@@ -221,7 +377,7 @@
      * Wrapper sub-class for attributes.
      */
     class WrapperAttr extends Wrapper {
-        constructor(obj, attr) {
+        constructor(obj, attr, fn) {
             super();
 
             if (typeof obj[attr] === "object") {
@@ -231,7 +387,9 @@
             // save the values
             this.origAttr = Object.getOwnPropertyDescriptor(obj, attr);
             this.attrValue = this.origAttr.value;
+            this.setterGetterFn = fn;
             this.type = "attribute";
+            this.touchList = new Filter(this);
 
             // // create a proxy for the setter / getters
             // this.chainable = new Proxy(this, {
@@ -271,13 +429,14 @@
                 set: this.chainable,
             });
 
+            this.configReset();
             this.chainable = this;
             return this.chainable;
         }
 
         configReset() {
             super.configReset();
-            this.touchList = [];
+            this.touchList.length = 0;
         }
 
         _doSetterGetter(type, val) {
@@ -289,8 +448,13 @@
             // run pre-call trigger
             this._runTriggerList("pre", st);
 
-            // if setting, cache the value
-            if (type === "set") {
+            // do the set or get
+            if (type === "get" && this.setterGetterFn) {
+                st.retVal = this.setterGetterFn(type);
+            } else if (type === "set" && this.setterGetterFn) {
+                st.retVal = this.setterGetterFn(type, st.setVal);
+            } else if (type === "set") {
+                // if no setter / getter function, just used the cached attrValue
                 st.retVal = st.setVal;
                 this.attrValue = st.setVal;
             }
@@ -306,35 +470,18 @@
             debug("settergetter returning", st.retVal);
             return st.retVal;
         }
-
-        filterAttrGet() {
-            return this.touchList.filter(function(element) {
-                return element.type === "get";
-            });
-        }
-
-        filterAttrSet() {
-            return this.touchList.filter(function(element) {
-                return element.type === "set";
-            });
-        }
-
-        // expectGetCount
-        // expectSetCount
-        // expectTouchCount
-        // expectGetCountRange
-        // expectSetCountRange
-        // expectTouchCountRange
     }
 
     /**
-     * Wrapper sub-class for attributes.
+     * Wrapper sub-class for function.
+     * @extends {Wrapper}
      */
     class WrapperCall extends Wrapper {
         constructor(origFn, wrappedFn) {
             super();
 
             this.type = "function";
+            this.callList = new Filter(this);
             this.orig = origFn;
             wrappedFn = wrappedFn || origFn;
             this.wrapped = wrappedFn;
@@ -342,12 +489,50 @@
                 apply: (target, thisArg, argList) => this._doCall(target, thisArg, argList)
             });
 
+            /**
+             * Validates that the Wrapper was called `count` times.
+             * @param   {Number} count  The number of times the Wrapper should have been called.
+             * @returns {Boolean}       Returns `true` if  Wrapper was called `count` times, `false` otherwise.
+             * @memberOf WrapperCall
+             * @instance
+             */
+            alias(this, "expectCallCount", this._Count, "expectCallCount", this.callList);
+            alias(this, "expectCallCountRange", this._CountRange, "expectCallCountRange", this.callList);
+            alias(this, "expectCallCountMin", this._CountMin, "expectCallCountMin", this.callList);
+            alias(this, "expectCallCountMax", this._CountMax, "expectCallCountMax", this.callList);
+            alias(this, "expectCallNever", this.expectCallCount, 0);
+            /**
+             * Expects Wrapper to be called exactly once. Same as {@link expectCallCount} (1)
+             * @method expectCallOnce
+             * @returns {Boolean} Returns `true` if the wrapper was called exactly once, `false` otherwise.
+             * @memberOf WrapperCall
+             * @instance
+             */
+            alias(this, "expectCallOnce", this.expectCallCount, 1);
+            /**
+             * Expects Wrapper to be called exactly once. Same as expectCallCount(2)
+             * @method expectCallTwice
+             * @returns {Boolean} Returns `true` if the wrapper was called exactly twice, `false` otherwise.
+             * @memberOf WrapperCall
+             * @instance
+             */
+            alias(this, "expectCallTwice", this.expectCallCount, 2);
+            /**
+             * Expects Wrapper to be called exactly once. Same as expectCallCount(3)
+             * @method expectCallThrice
+             * @returns {Boolean} Returns `true` if the wrapper was called exactly three times, `false` otherwise.
+             * @memberOf WrapperCall
+             * @instance
+             */
+            alias(this, "expectCallThrice", this.expectCallCount, 3);
+
+            this.configReset();
             return this.chainable;
         }
 
         configReset() {
             super.configReset();
-            this.callList = [];
+            this.callList.length = 0;
         }
 
         _doCall(target, thisArg, argList) {
@@ -380,23 +565,6 @@
             return si.retVal;
         }
 
-        expectCallCount(count) {
-            var passed = (this.callList.length === count);
-
-            this._softAssert(passed, `expected to be called ${count} times`);
-
-            return passed;
-        }
-
-        expectCallCountRange(min, max) {
-            var callCount = this.callList.length;
-            var passed = (callCount >= min) && (callCount <= max);
-
-            this._softAssert(passed, `expected to be called between ${min} and ${max} times, was called ${callCount} times`);
-
-            return passed;
-        }
-
         filterOneByCallNumber(num) {
             var callCount = this.callList.length;
             if (typeof num !== "number" || num < 0) {
@@ -409,10 +577,14 @@
             return this.callList[num];
         }
 
-        // filterOneByArgs() {}
-        // filterOneByContext() {}
-        // filterOneByException() {}
-        // filterOneByReturn() {}
+        // filterFirstCallByArgs() {}
+        // filterFirstCallByContext() {}
+        // filterFirstCallByException() {}
+        // filterFirstCallByReturn() {}
+        // filterLastCallByArgs() {}
+        // filterLastCallByContext() {}
+        // filterLastCallByException() {}
+        // filterLastCallByReturn() {}
         // filterByArgs() {}
         // filterByContext() {}
         // filterByException() {}
@@ -424,20 +596,19 @@
      * `SingleCall` and `SingleTouch`.
      */
     class Expect {
-        constructor() {
-        }
+        constructor() {}
 
         /* DESIGN PATTERN
          *
          * All expect... and action... calls have a similar design pattern.
          * The template looks something like:
-
-         expectOrFunctionThingy(args) {
-            var curr = getCurrOrDefer("expectOrFunctionThingy", args);
-            if (!curr || !curr.postCall) return this;
-            // do test here
-         }
-
+         *
+         * expectOrFunctionThingy(args) {
+         *    var curr = getCurrOrDefer("expectOrFunctionThingy", args);
+         *    if (!curr || !curr.postCall) return this;
+         *    // do test here
+         * }
+         *
          * The first line of the function figures out if we have a current context
          * for the call (either a SingleCall or a SingleTouch, depending on whether
          * the wrapper is wrapping a function or attribute). If there's a current call
@@ -469,9 +640,9 @@
             throw new Error(`Couldn't figure current or how to defer for: ${name}`);
         }
 
-        expectDoValidation(si) {
-            this[this.expectType](si, this.expectParam);
-        }
+        // expectDoValidation(si) {
+        //     this[this.expectType](si, this.expectParam);
+        // }
 
         expectCallArgs(...args) {
             // this call only works for functions
@@ -495,6 +666,115 @@
         // expectReturn(si)
         // expectException(si)
         // expectCustom (fn, param)
+    }
+
+    class Filter extends Array {
+        constructor(wrapper, ...args) {
+            super(...args);
+            this.wrapper = wrapper;
+
+            alias(this, "filterAttrSet", this._filter, "filterSet", "attribute",
+                function(element) {
+                    if (element.type === "set") return true;
+                });
+
+            alias(this, "filterAttrGet", this._filter, "filterGet", "attribute",
+                function(element) {
+                    if (element.type === "get") return true;
+                });
+
+            alias(this, "filterAttrSetByVal", this._filter, "filterAttrSetByVal", "attribute",
+                function(element, index, array, ...args) {
+                    var argList = [...args];
+                    if (argList.length !== 1) {
+                        throw new TypeError("filterAttrSetByVal: expected one argument");
+                    }
+                    var setVal = argList[0];
+
+                    var m = Match.Value(setVal);
+                    return m.compare(element.setVal);
+                });
+
+            alias(this, "filterCallByArgs", this._filter, "filterCallByArgs", "function",
+                function(element, index, array, ...args) {
+                    var m = Match.Value([...args]);
+                    return m.compare(element.argList);
+                });
+
+            alias(this, "filterCallByContext", this._filter, "filterCallByContext", "function",
+                function(element, index, array, ...args) {
+                    var argList = [...args];
+                    if (argList.length !== 1) {
+                        throw new TypeError("filterCallByContext: expected one argument");
+                    }
+                    var context = argList[0];
+
+                    var m = Match.Value(context);
+                    return m.compare(element.thisArg);
+                });
+
+            alias(this, "filterByException", this._filter, "filterByException", "both",
+                function(element, index, array, ...args) {
+                    var argList = [...args];
+                    if (argList.length !== 1) {
+                        throw new TypeError("filterByException: expected one argument");
+                    }
+                    var exception = argList[0];
+
+                    var m = Match.Value(exception);
+                    return m.compare(element.exception);
+                });
+
+            alias(this, "filterByReturn", this._filter, "filterByReturn", "both",
+                function(element, index, array, ...args) {
+                    var argList = [...args];
+                    if (argList.length !== 1) {
+                        throw new TypeError("filterByReturn: expected one argument");
+                    }
+                    var retVal = argList[0];
+
+                    var m = Match.Value(retVal);
+                    return m.compare(element.retVal);
+                });
+
+            alias(this, "getAllCallArgs", this._get, "getAllCallArgs", "function", "argList");
+            alias(this, "getAllCallContexts", this._get, "getAllCallContexts", "function", "thisArg");
+            alias(this, "getAllExceptions", this._get, "getAllExceptions", "both", "exception");
+            alias(this, "getAllReturns", this._get, "getAllReturns", "both", "retVal");
+            alias(this, "getAllSetVals", this._get, "getAllSetVals", "attribute", "setVal");
+        }
+
+        _filter(name, type, fn, ...args) {
+            if (type === "attribute") this.wrapper._attrOnly(name);
+            if (type === "function") this.wrapper._funcOnly(name);
+
+            return this.filter(function(element, index, array) {
+                return fn(element, index, array, ...args);
+            });
+        }
+
+        _get(name, type, idx) {
+            if (type === "attribute") this.wrapper._attrOnly(name);
+            if (type === "function") this.wrapper._funcOnly(name);
+
+            return this.map(function(element) {
+                return element[idx];
+            });
+        }
+
+        // All(expectName, ...args) {
+        //     var ret = true;
+        //     this.forEach(() => {
+        //         ret = ret && this.wrapper[expectName](...args);
+        //     });
+        //     return ret;
+        // }
+
+        // Some(expectName, ...args) {
+        // }
+
+        // None(expectName, ...args) {
+        // }
     }
 
     /**
@@ -603,7 +883,14 @@
             this.extend("undefined", null, testUndef, diffUndef);
             this.extend("date", "object", testDate, diffDate);
             this.extend("regexp", "object", testRegex, diffRegex);
+            this.extend("error", "object", testError, diffError);
             this.extend("SingleCall", "object", testSingleCall, diffSingleCall);
+        }
+
+        static Value(arg) {
+            return new Match({
+                value: arg
+            });
         }
 
         compare(any) {
@@ -743,9 +1030,9 @@
             }
         }
 
-        getLastDiff() {
-            return this.lastDiff;
-        }
+        // getLastDiff() {
+        //     return this.lastDiff;
+        // }
     }
 
     /***************************************************
@@ -908,6 +1195,17 @@
     function diffRegex(rex1, rex2) {
         if (rex1.toString() !== rex2.toString()) return newDiff(rex1.toString(), rex2.toString());
         return [];
+    }
+
+    function testError(e) {
+        if (e instanceof Error) return true;
+    }
+
+    function diffError(e1, e2) {
+        var ret = [];
+        if (e1.name !== e2.name) ret = ret.concat(addKeyToDiff(newDiff(e1.name, e2.name), "name"));
+        if (e1.message !== e2.message) ret = ret.concat(addKeyToDiff(newDiff(e1.message, e2.message), "message"));
+        return ret;
     }
 
     function diffSingleCall(si1, si2) {

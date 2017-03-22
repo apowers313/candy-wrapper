@@ -22,13 +22,16 @@ function depends(mod) {
         it("can wrap a function generator");
         it("can add new / custom expect... or action... methods");
         it("can match by type");
+        it("has a Spy class");
+        it("has a Stub class");
+        it("has a Mock class");
     });
 
     describe("create wrapper", function() {
         it("can create an empty wrapper", function() {
-            var ret = new Wrapper();
-            assert.isFunction(ret);
-            ret();
+            var w = new Wrapper();
+            assert.isFunction(w);
+            w();
         });
 
         it("can wrap a function", function() {
@@ -88,7 +91,30 @@ function depends(mod) {
             assert.strictEqual(called, true, "expected wrapped function to get called");
         });
 
-        it("can wrap an attribute with a custom function");
+        it("can wrap an attribute with a custom function", function() {
+            var testObj = {
+                beer: "yummy"
+            };
+
+            var called = false;
+            var setVal = null;
+
+            function testFunc(type, sv) {
+                called = true;
+                setVal = sv;
+                return "gulp";
+            }
+
+            new Wrapper(testObj, "beer", testFunc);
+            var ret = testObj.beer;
+            assert.strictEqual(ret, "gulp");
+            assert.isUndefined(setVal);
+            assert.isOk(called);
+
+            testObj.beer = "gone";
+            assert.strictEqual(setVal, "gone");
+        });
+
         it("throws error when called with bad arguments", function() {
             assert.throws(function() {
                 var w = new Wrapper("foo");
@@ -161,12 +187,14 @@ function depends(mod) {
             var testObj = {
                 beer: "yummy"
             };
-            var getList, setList;
             var w = new Wrapper(testObj, "beer");
+
+            // initial
+            var getList, setList;
             assert.isArray(w.touchList);
             assert.strictEqual(w.touchList.length, 0);
-            getList = w.filterAttrGet();
-            setList = w.filterAttrSet();
+            getList = w.touchList.filterAttrGet();
+            setList = w.touchList.filterAttrSet();
             assert.isArray(getList);
             assert.strictEqual(getList.length, 0);
             assert.isArray(setList);
@@ -175,8 +203,8 @@ function depends(mod) {
             // set #1
             testObj.beer = "gone";
             assert.strictEqual(w.touchList.length, 1);
-            getList = w.filterAttrGet();
-            setList = w.filterAttrSet();
+            getList = w.touchList.filterAttrGet();
+            setList = w.touchList.filterAttrSet();
             assert.isArray(getList);
             assert.strictEqual(getList.length, 0);
             assert.isArray(setList);
@@ -190,8 +218,8 @@ function depends(mod) {
             var ret = testObj.beer;
             assert.strictEqual(ret, "gone");
             assert.strictEqual(w.touchList.length, 2);
-            getList = w.filterAttrGet();
-            setList = w.filterAttrSet();
+            getList = w.touchList.filterAttrGet();
+            setList = w.touchList.filterAttrSet();
             assert.isArray(getList);
             assert.strictEqual(getList.length, 1);
             assert.isArray(setList);
@@ -204,8 +232,8 @@ function depends(mod) {
             // set #2
             testObj.beer = "more";
             assert.strictEqual(w.touchList.length, 3);
-            getList = w.filterAttrGet();
-            setList = w.filterAttrSet();
+            getList = w.touchList.filterAttrGet();
+            setList = w.touchList.filterAttrSet();
             assert.isArray(getList);
             assert.strictEqual(getList.length, 1);
             assert.isArray(setList);
@@ -219,8 +247,8 @@ function depends(mod) {
             ret = testObj.beer;
             assert.strictEqual(ret, "more");
             assert.strictEqual(w.touchList.length, 4);
-            getList = w.filterAttrGet();
-            setList = w.filterAttrSet();
+            getList = w.touchList.filterAttrGet();
+            setList = w.touchList.filterAttrSet();
             assert.isArray(getList);
             assert.strictEqual(getList.length, 2);
             assert.isArray(setList);
@@ -230,7 +258,353 @@ function depends(mod) {
             assert.strictEqual(getList[1].retVal, "more");
             assert.isUndefined(getList[1].exception);
         });
-        it("can select only attribute sets");
+
+        it("can filter function calls by argument list", function() {
+            var w = new Wrapper();
+            w("beer");
+            w("wine");
+            w("beer");
+            w(1, 2, 3);
+            w("beer", "wine", "martini");
+            w("martini");
+            assert.isArray(w.callList);
+            assert.strictEqual(w.callList.length, 6);
+
+            // match by "beer" args
+            var list;
+            list = w.callList.filterCallByArgs("beer");
+            assert.strictEqual(list.length, 2);
+            assert.deepEqual(list[0].argList, ["beer"]);
+            assert.deepEqual(list[1].argList, ["beer"]);
+
+            // match by 1, 2, 3 args
+            list = w.callList.filterCallByArgs(1, 2, 3);
+            assert.strictEqual(list.length, 1);
+            assert.deepEqual(list[0].argList, [1, 2, 3]);
+
+            // match by "beer", "wine", "martini" args
+            list = w.callList.filterCallByArgs("beer", "wine", "martini");
+            assert.strictEqual(list.length, 1);
+            assert.deepEqual(list[0].argList, ["beer", "wine", "martini"]);
+
+            // non-match
+            list = w.callList.filterCallByArgs("nothing");
+            assert.strictEqual(list.length, 0);
+        });
+
+        it("can filter function calls by return value", function() {
+            var count = 0;
+            var testFunc = function() {
+                count++;
+                switch (count) {
+                    case 1:
+                        return "beer";
+                    case 2:
+                        return {
+                            a: 1
+                        };
+                    case 3:
+                        return "beer";
+                    case 4:
+                        return [1, 2, 3];
+                    case 5:
+                        return "wine";
+                }
+            };
+            testFunc = new Wrapper(testFunc);
+            testFunc();
+            testFunc();
+            testFunc();
+            testFunc();
+            testFunc();
+
+            assert.isArray(testFunc.callList);
+            assert.strictEqual(testFunc.callList.length, 5);
+
+            // match by "beer" return value
+            var list;
+            list = testFunc.callList.filterByReturn("beer");
+            assert.strictEqual(list.length, 2);
+            assert.deepEqual(list[0].retVal, "beer");
+            assert.deepEqual(list[1].retVal, "beer");
+
+            // match by {a: 1} return value
+            list = testFunc.callList.filterByReturn({
+                a: 1
+            });
+            assert.strictEqual(list.length, 1);
+            assert.deepEqual(list[0].retVal, {
+                a: 1
+            });
+
+            // non-match
+            list = testFunc.callList.filterByReturn(false);
+            assert.strictEqual(list.length, 0);
+        });
+
+        it("can filter function calls by context", function() {
+            var w = new Wrapper();
+            w.call({
+                prop: "beer"
+            });
+            w.call({
+                test: [1, 2, 3]
+            });
+            w.call({
+                prop: "beer"
+            });
+
+            assert.isArray(w.callList);
+            assert.strictEqual(w.callList.length, 3);
+
+            // match context by {prop: "beer"}
+            var list;
+            list = w.callList.filterCallByContext({
+                prop: "beer"
+            });
+            assert.strictEqual(list.length, 2);
+            assert.deepEqual(list[0].thisArg, {
+                prop: "beer"
+            });
+            assert.deepEqual(list[1].thisArg, {
+                prop: "beer"
+            });
+
+            // match context by {test: [1, 2, 3]}
+            list = w.callList.filterCallByContext({
+                test: [1, 2, 3]
+            });
+            assert.strictEqual(list.length, 1);
+            assert.deepEqual(list[0].thisArg, {
+                test: [1, 2, 3]
+            });
+
+            // non-match
+            list = w.callList.filterCallByContext({
+                val: false
+            });
+            assert.strictEqual(list.length, 0);
+        });
+
+        it("can filter function calls by exception", function() {
+            var count = 0;
+            var testFunc = function() {
+                count++;
+                switch (count) {
+                    case 1:
+                        throw new Error("out of beer");
+                    case 2:
+                        throw new TypeError("wine");
+                    case 3:
+                        throw new Error("out of beer");
+                    case 4:
+                        throw new RangeError("missed target");
+                    case 5:
+                        throw new Error("out of beer");
+                }
+            };
+            testFunc = new Wrapper(testFunc);
+            try {
+                testFunc();
+            } catch (e) {}
+            try {
+                testFunc();
+            } catch (e) {}
+            try {
+                testFunc();
+            } catch (e) {}
+            try {
+                testFunc();
+            } catch (e) {}
+            try {
+                testFunc();
+            } catch (e) {}
+
+            assert.isArray(testFunc.callList);
+            assert.strictEqual(testFunc.callList.length, 5);
+
+            // filter by "out of beer" exceptions
+            var list;
+            list = testFunc.callList.filterByException(new Error("out of beer"));
+            assert.strictEqual(list.length, 3);
+            assert.strictEqual(list[0].exception.name, "Error");
+            assert.strictEqual(list[0].exception.message, "out of beer");
+            assert.strictEqual(list[1].exception.name, "Error");
+            assert.strictEqual(list[1].exception.message, "out of beer");
+            assert.strictEqual(list[2].exception.name, "Error");
+            assert.strictEqual(list[2].exception.message, "out of beer");
+
+            // non-match
+            list = testFunc.callList.filterByException(new Error("wine")); // XXX: wrong error type
+            assert.strictEqual(list.length, 0);
+        });
+
+
+        it("can filter set touches by set value", function() {
+            var testObj = {
+                beer: "yummy"
+            };
+            var w = new Wrapper(testObj, "beer");
+
+            testObj.beer = "good";
+            testObj.beer = "yummy";
+            testObj.beer = "good";
+            testObj.beer = [1, 2, 3];
+
+            assert.isArray(w.touchList);
+            assert.strictEqual(w.touchList.length, 4);
+
+            // match set value by "good"
+            var list;
+            list = w.touchList.filterAttrSetByVal("good");
+            assert.strictEqual(list.length, 2);
+            assert.strictEqual(list[0].setVal, "good");
+            assert.strictEqual(list[1].setVal, "good");
+
+            // non-match
+            list = w.touchList.filterAttrSetByVal("nothing");
+            assert.strictEqual(list.length, 0);
+        });
+
+        it("throws when filtering attributes by call filters");
+        it("throws when filtering calls by attribute filters");
+
+        it("can chain filters", function() {
+            var count = 0;
+            var testFunc = function() {
+                count++;
+                switch (count) {
+                    case 1:
+                        return "beer";
+                    case 2:
+                        return {
+                            a: 1
+                        };
+                    case 3:
+                        return "beer";
+                    case 4:
+                        return [1, 2, 3];
+                    case 5:
+                        return "beer";
+                }
+            };
+            testFunc = new Wrapper(testFunc);
+            testFunc("yum");
+            testFunc("two");
+            testFunc("yum");
+            testFunc("yum");
+            testFunc("five");
+
+            assert.isArray(testFunc.callList);
+            assert.strictEqual(testFunc.callList.length, 5);
+            var list = testFunc.callList.filterCallByArgs("yum")
+                .filterByReturn("beer");
+            assert.isArray(list);
+            assert.strictEqual(list.length, 2);
+            assert.strictEqual(list[0].retVal, "beer");
+            assert.deepEqual(list[0].argList, ["yum"]);
+            assert.strictEqual(list[1].retVal, "beer");
+            assert.deepEqual(list[1].argList, ["yum"]);
+        });
+    });
+
+    describe("get from filter", function() {
+        it("can get all arguments", function() {
+            var w = new Wrapper();
+            w("beer");
+            w("wine");
+            w("beer");
+            w([1, 2, 3]);
+            w("beer", "wine", "martini");
+            w("martini");
+
+            assert.isArray(w.callList);
+            assert.strictEqual(w.callList.length, 6);
+            var list = w.callList.getAllCallArgs();
+            assert.isArray(list);
+            assert.strictEqual(list.length, 6);
+            assert.deepEqual(list[0], ["beer"]);
+            assert.deepEqual(list[1], ["wine"]);
+            assert.deepEqual(list[2], ["beer"]);
+            assert.deepEqual(list[3], [
+                [1, 2, 3]
+            ]);
+            assert.deepEqual(list[4], ["beer", "wine", "martini"]);
+            assert.deepEqual(list[5], ["martini"]);
+        });
+
+        it("get get all this values", function() {
+            var w = new Wrapper();
+            w.call({
+                prop: "beer"
+            });
+            w.call({
+                test: [1, 2, 3]
+            });
+            w.call({
+                prop: "beer"
+            });
+
+            assert.isArray(w.callList);
+            assert.strictEqual(w.callList.length, 3);
+            var list = w.callList.getAllCallContexts();
+            assert.isArray(list);
+            assert.strictEqual(list.length, 3);
+            assert.deepEqual(list[0], {
+                prop: "beer"
+            });
+            assert.deepEqual(list[1], {
+                test: [1, 2, 3]
+            });
+            assert.deepEqual(list[2], {
+                prop: "beer"
+            });
+        });
+
+        it("can get all return values with a function", function() {
+            var count = 0;
+            var testFunc = function() {
+                count++;
+                switch (count) {
+                    case 1:
+                        return "beer";
+                    case 2:
+                        return {
+                            a: 1
+                        };
+                    case 3:
+                        return "beer";
+                    case 4:
+                        return [1, 2, 3];
+                    case 5:
+                        return "wine";
+                }
+            };
+            testFunc = new Wrapper(testFunc);
+            testFunc();
+            testFunc();
+            testFunc();
+            testFunc();
+            testFunc();
+
+            assert.isArray(testFunc.callList);
+            assert.strictEqual(testFunc.callList.length, 5);
+            var list = testFunc.callList.getAllReturns();
+            assert.isArray(list);
+            assert.strictEqual(list.length, 5);
+            assert.deepEqual(list[0], "beer");
+            assert.deepEqual(list[1], {
+                a: 1
+            });
+            assert.deepEqual(list[2], "beer");
+            assert.deepEqual(list[3], [1, 2, 3]);
+            assert.deepEqual(list[4], "wine");
+        });
+
+        it("can get all return values with an attribute");
+        it("can get all exceptions with a function");
+        it("can get all exceptions with an attribute");
+        it("can get all set values");
     });
 
     describe("expect", function() {
@@ -255,6 +629,24 @@ function depends(mod) {
             w();
             assert.isOk(w.expectCallCountRange(1, 5), "expected call count range between 1 and 5 to be okay");
             assert.isNotOk(w.expectCallCountRange(0, 2), "expected call count range between 0 and 2 to not be okay");
+        });
+
+        it("call min", function() {
+            var w = new Wrapper();
+            w();
+            w();
+            assert.isOk(w.expectCallCountMin(1), "called at least once");
+            assert.isOk(w.expectCallCountMin(2), "called at least twice");
+            assert.isNotOk(w.expectCallCountMin(3), "called at least three times");
+        });
+
+        it("call max", function() {
+            var w = new Wrapper();
+            w();
+            w();
+            assert.isNotOk(w.expectCallCountMax(1), "called at most once");
+            assert.isOk(w.expectCallCountMax(2), "called at most twice");
+            assert.isOk(w.expectCallCountMax(3), "called at most three times");
         });
 
         it("call args", function() {
@@ -282,6 +674,49 @@ function depends(mod) {
         it("call args deep equal");
         // object, array, array buffer
         it("check bad arguments to functions");
+        it("throws TypeError if expectCallCount called with bad arg", function() {
+            var w = new Wrapper();
+            w();
+            assert.throws(function() {
+                w.expectCallCount("foo");
+            }, TypeError);
+        });
+        it("throws TypeError if expectCallCountRange called with bad min");
+        it("throws TypeError if expectCallCountRange called with bad max");
+        it("throws TypeError if expectCallCountMin called with bad min");
+        it("throws TypeError if expectCallCountMax called with bad max");
+    });
+
+    describe("aliases", function() {
+        it("includes expectCallOnce", function() {
+            var w = new Wrapper();
+            w();
+            assert.isOk(w.expectCallOnce(), "only called once");
+            w();
+            assert.isNotOk(w.expectCallOnce(), "called more than once");
+        });
+
+        it("includes expectCallTwice", function() {
+            var w = new Wrapper();
+            w();
+            assert.isNotOk(w.expectCallTwice(), "called twice");
+            w();
+            assert.isOk(w.expectCallTwice(), "called twice");
+            w();
+            assert.isNotOk(w.expectCallTwice(), "called twice");
+        });
+
+        it("includes expectCallThrice", function() {
+            var w = new Wrapper();
+            w();
+            assert.isNotOk(w.expectCallThrice(), "called thrice");
+            w();
+            assert.isNotOk(w.expectCallThrice(), "called thrice");
+            w();
+            assert.isOk(w.expectCallThrice(), "called thrice");
+            w();
+            assert.isNotOk(w.expectCallThrice(), "called thrice");
+        });
     });
 
     describe("trigger", function() {
@@ -575,6 +1010,53 @@ function depends(mod) {
             assert.deepEqual(ret, [{
                 src: "/a/",
                 dst: "/b/"
+            }]);
+        });
+
+        it("can diff errors", function() {
+            var m = new Match({
+                value: new Error("this is a new error")
+            });
+
+            // same
+            var ret;
+            ret = m.diff(m.value, new Error("this is a new error"));
+            assert.isArray(ret);
+            assert.strictEqual(ret.length, 0);
+            assert.deepEqual(ret, []);
+
+            // different type
+            ret = m.diff(m.value, new Error("different error message"));
+            assert.isArray(ret);
+            assert.strictEqual(ret.length, 1);
+            assert.deepEqual(ret, [{
+                key: "message",
+                src: "this is a new error",
+                dst: "different error message"
+            }]);
+
+            // different message
+            ret = m.diff(m.value, new TypeError("this is a new error"));
+            assert.isArray(ret);
+            assert.strictEqual(ret.length, 1);
+            assert.deepEqual(ret, [{
+                key: "name",
+                src: "Error",
+                dst: "TypeError"
+            }]);
+
+            // completely different
+            ret = m.diff(m.value, new RangeError("blurp"));
+            assert.isArray(ret);
+            assert.strictEqual(ret.length, 2);
+            assert.deepEqual(ret, [{
+                key: "name",
+                src: "Error",
+                dst: "RangeError"
+            }, {
+                key: "message",
+                src: "this is a new error",
+                dst: "blurp"
             }]);
         });
 
