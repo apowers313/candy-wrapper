@@ -1,22 +1,20 @@
 {
+    "tags": {
+        "allowUnknownTags": false
+    },
     "opts": {
-        "template": "./node_modules/ink-docstrap/template",
+        "template": "./node_modules/docdash",
         "readme": "README.md",
         "encoding": "utf8",
         "destination": "./docs",
         "recurse": true
     },
     "source": {
-        "include": ".",
-        "includePattern": "\\.js$",
-        "excludePattern": "node_modules"
+        "include": "./candy-wrapper.js"
     },
-    "templates": {
-        "systemName": "Candy Wrapper",
-        "copyright": "Copyright 2017, Adam Powers",
-        "linenums": true,
-        "theme": "yeti",
-        "navType": "vertical"
+    "docdash": {
+        "static": true,
+        "sort": true
     },
     "plugins": [
         "plugins/markdown"
