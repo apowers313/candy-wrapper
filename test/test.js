@@ -130,6 +130,95 @@ function depends(mod) {
         it("mirrors function name, argument length, and argument list");
     });
 
+    describe("helpers", function() {
+        it("_attrOnly throws", function() {
+            var w = new Wrapper();
+
+            assert.throws(function() {
+                w._attrOnly("test");
+            }, Error, "test is only supported for ATTRIBUTE wrappers");
+        });
+
+        it("_funcOnly throws", function() {
+            var testObj = {
+                beer: "yummy"
+            };
+            var w = new Wrapper(testObj, "beer");
+
+            assert.throws(function() {
+                w._funcOnly("test");
+            }, Error, "test is only supported for FUNCTION wrappers");
+        });
+
+        it("_Count with bad args", function() {
+            var w = new Wrapper();
+
+            assert.throws(function() {
+                w._Count();
+            }, TypeError, "_Count: expected 'name' to be string");
+
+            assert.throws(function() {
+                w._Count("name");
+            }, TypeError, "name: expected 'arr' to be of type Array");
+
+            assert.throws(function() {
+                w._Count("name", []);
+            }, TypeError, "name: expected 'count' to be of type Number");
+        });
+
+        it("_CountRange with bad args", function() {
+            var w = new Wrapper();
+
+            assert.throws(function() {
+                w._CountRange();
+            }, TypeError, "_CountRange: expected 'name' to be string");
+
+            assert.throws(function() {
+                w._CountRange("name");
+            }, TypeError, "name: expected 'arr' to be of type Array");
+
+            assert.throws(function() {
+                w._CountRange("name", []);
+            }, TypeError, "name: expected 'min' to be of type Number");
+
+            assert.throws(function() {
+                w._CountRange("name", [], 1);
+            }, TypeError, "name: expected 'max' to be of type Number");
+        });
+
+        it("_CountMin with bad args", function() {
+            var w = new Wrapper();
+
+            assert.throws(function() {
+                w._CountMin();
+            }, TypeError, "_CountMin: expected 'name' to be string");
+
+            assert.throws(function() {
+                w._CountMin("name");
+            }, TypeError, "name: expected 'arr' to be of type Array");
+
+            assert.throws(function() {
+                w._CountMin("name", []);
+            }, TypeError, "name: expected 'min' to be of type Number");
+        });
+
+        it("_CountMax with bad args", function() {
+            var w = new Wrapper();
+
+            assert.throws(function() {
+                w._CountMax();
+            }, TypeError, "_CountMax: expected 'name' to be string");
+
+            assert.throws(function() {
+                w._CountMax("name");
+            }, TypeError, "name: expected 'arr' to be of type Array");
+
+            assert.throws(function() {
+                w._CountMax("name", []);
+            }, TypeError, "name: expected 'max' to be of type Number");
+        });
+    });
+
     describe("config", function() {
         it("can identify a wrapper", function() {
             var w = new Wrapper();
@@ -151,11 +240,21 @@ function depends(mod) {
             // wrapped attribute
             var testAttrs = {
                 iAmWrapped: "whee",
-                iAmSam: "SAM."
+                iAmSam: "SAM.",
+                deeperDownTheHole: {
+                    name: "Alice"
+                },
+                groceryList: ["egg", "ham", "green"]
             };
             w = new Wrapper(testAttrs, "iAmWrapped");
             assert.isOk(Wrapper.isWrapper(testAttrs, "iAmWrapped"), "exepcted a wrapper");
             assert.isNotOk(Wrapper.isWrapper(testAttrs, "iAmSam"), "exepcted not a wrapper");
+            assert.isNotOk(Wrapper.isWrapper(testAttrs, "deeperDownTheHole"), "exepcted not a wrapper");
+            assert.isNotOk(Wrapper.isWrapper(testAttrs, "groceryList"), "exepcted not a wrapper");
+
+            assert.throws(function() {
+                Wrapper.isWrapper();
+            }, TypeError, "isWrapper: unsupported arguments");
         });
         it("can restore wrapped function");
         it("can reset wrapper");
@@ -506,6 +605,32 @@ function depends(mod) {
             assert.strictEqual(list[1].retVal, "beer");
             assert.deepEqual(list[1].argList, ["yum"]);
         });
+
+        it("throws on bad args", function() {
+            var w = new Wrapper();
+            w();
+
+            assert.throws(function() {
+                w.callList.filterCallByContext();
+            }, TypeError, "filterCallByContext: expected one argument");
+
+            assert.throws(function() {
+                w.callList.filterByException();
+            }, TypeError, "filterByException: expected one argument");
+
+            assert.throws(function() {
+                w.callList.filterByReturn();
+            }, TypeError, "filterByReturn: expected one argument");
+
+            var testObj = {
+                beer: "yummy"
+            };
+            w = new Wrapper(testObj, "beer");
+            testObj.beer = "gulp";
+            assert.throws(function() {
+                w.touchList.filterAttrSetByVal();
+            }, TypeError, "filterAttrSetByVal: expected one argument");
+        });
     });
 
     describe("get from filter", function() {
@@ -757,6 +882,12 @@ function depends(mod) {
     });
 
     describe("match", function() {
+        it("throws with no args", function() {
+            assert.throws(function() {
+                new Match();
+            }, TypeError, "Match: requires a value or type to match");
+        });
+
         it("can get type of number", function() {
             var m = new Match({
                 value: 5
@@ -1076,11 +1207,62 @@ function depends(mod) {
             assert.deepEqual(ret, []);
         });
 
-        it("can diff undefined");
-        it("can diff null");
+        it("can diff undefined", function() {
+            var m = Match.Value(undefined);
+
+            // matches
+            var ret;
+            ret = m.diff(m.value, undefined);
+            assert.isArray(ret);
+            assert.strictEqual(ret.length, 0);
+            assert.deepEqual(ret, []);
+
+            // doesn't match
+            ret = m.diff(m.value, "bob");
+            assert.isArray(ret);
+            assert.strictEqual(ret.length, 1);
+            assert.deepEqual(ret, [{
+                src: undefined,
+                dst: "bob"
+            }]);
+        });
+
+        it.only("can diff null", function() {
+            var m = Match.Value(null);
+
+            // matches
+            var ret;
+            ret = m.diff(m.value, null);
+            assert.isArray(ret);
+            assert.strictEqual(ret.length, 0);
+            assert.deepEqual(ret, []);
+
+            // doesn't match
+            ret = m.diff(m.value, "bob");
+            assert.isArray(ret);
+            assert.strictEqual(ret.length, 1);
+            assert.deepEqual(ret, [{
+                src: null,
+                dst: "bob"
+            }]);
+        });
 
         it("can diff two complex objects");
         it("can diff two complex arrays");
         it("can convert a diff to a string");
+
+        it("cannot extend an existing name", function() {
+            var m = Match.Value("10");
+
+            // missing name
+            assert.throws(function() {
+                m.extend();
+            }, TypeError, "Match.extend: 'name' should be string");
+
+            // duplicate name
+            assert.throws(function() {
+                m.extend("string");
+            }, TypeError, "Match.extend: 'string' already exists");
+        });
     });
 })();
