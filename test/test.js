@@ -1227,7 +1227,7 @@ function depends(mod) {
             }]);
         });
 
-        it.only("can diff null", function() {
+        it("can diff null", function() {
             var m = Match.Value(null);
 
             // matches
