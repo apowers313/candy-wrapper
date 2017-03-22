@@ -20,7 +20,12 @@
     "spy",
     "mock",
     "fake",
+    "test",
     "testing",
+    "monkey",
+    "duck",
+    "patch",
+    "patching",
     "candy"
   ],
   "repository": {
