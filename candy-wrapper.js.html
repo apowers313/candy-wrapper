@@ -22,7 +22,7 @@
 <label for="nav-trigger" class="overlay"></label>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Expect.html">Expect</a></li><li><a href="Match.html">Match</a></li><li><a href="SingleCall.html">SingleCall</a></li><li><a href="SingleTouch.html">SingleTouch</a></li><li><a href="Trigger.html">Trigger</a></li><li><a href="Wrapper.html">Wrapper</a><ul class='methods'><li data-type='method'><a href="Wrapper.html#.isWrapper">isWrapper</a></li><li data-type='method'><a href="Wrapper.html#configReset">configReset</a></li></ul></li><li><a href="WrapperAttr.html">WrapperAttr</a></li><li><a href="WrapperCall.html">WrapperCall</a><ul class='methods'><li data-type='method'><a href="WrapperCall.html#configReset">configReset</a></li><li data-type='method'><a href="WrapperCall.html#expectCallOnce">expectCallOnce</a></li><li data-type='method'><a href="WrapperCall.html#expectCallThrice">expectCallThrice</a></li><li data-type='method'><a href="WrapperCall.html#expectCallTwice">expectCallTwice</a></li></ul></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Expect.html">Expect</a></li><li><a href="Match.html">Match</a></li><li><a href="SingleCall.html">SingleCall</a></li><li><a href="SingleTouch.html">SingleTouch</a></li><li><a href="Trigger.html">Trigger</a></li><li><a href="Wrapper.html">Wrapper</a><ul class='methods'><li data-type='method'><a href="Wrapper.html#.isWrapper">isWrapper</a></li><li data-type='method'><a href="Wrapper.html#configReset">configReset</a></li></ul></li></ul>
 </nav>
 
 <div id="main">
@@ -80,14 +80,6 @@
         constructor() {
             super();
 
-            // if one of our subclasses is calling us, just reset and move on
-            if (this instanceof WrapperCall ||
-                this instanceof WrapperAttr) {
-
-                // set default values
-                return this;
-            }
-
             if (arguments[0] === null) {
                 throw new TypeError("Wrapper: bad arguments to constructor. RTFM.");
             }
@@ -108,7 +100,7 @@
             // constructed like: wrapper()
             if (arguments.length === 0) {
                 debug("creating empty wrapper");
-                return new WrapperCall(function() {});
+                return this._callConstructor(function() {});
             }
 
             // constructed like: wrapper(obj)
@@ -134,7 +126,7 @@
              */
             if (arguments.length === 1 &amp;&amp; typeof arguments[0] === "function") {
                 debug("wrapping function:", arguments[0].name);
-                return new WrapperCall(arguments[0]);
+                return this._callConstructor(arguments[0]);
             }
 
             // wrapper(obj, method)
@@ -146,10 +138,10 @@
                 let key = arguments[1];
                 debug("wrapping method or attribute:", key);
                 if (typeof obj[key] === "function") {
-                    obj[key] = new WrapperCall(obj[key]);
+                    obj[key] = this._callConstructor(obj[key]);
                     return obj[key];
                 } else {
-                    return new WrapperAttr(obj, key);
+                    return this._attrConstructor(obj, key);
                 }
             }
 
@@ -164,13 +156,165 @@
                 let fn = arguments[2];
                 debug("wrapping method or attribute:", key);
                 if (typeof obj[key] === "function") {
-                    return new WrapperCall(obj[key], fn);
+                    return this._callConstructor(obj[key], fn);
                 } else {
-                    return new WrapperAttr(obj, key, fn);
+                    return this._attrConstructor(obj, key, fn);
                 }
             }
 
             throw new TypeError("Wrapper: bad arguments to constructor. RTFM.");
+        }
+
+        _callConstructor(origFn, wrappedFn) {
+            this.type = "function";
+            this.callList = new Filter(this);
+            this.orig = origFn;
+            wrappedFn = wrappedFn || origFn;
+            this.wrapped = wrappedFn;
+            this.chainable = new Proxy(this, {
+                apply: (target, thisArg, argList) => this._doCall(target, thisArg, argList)
+            });
+
+            /**
+             * Validates that the Wrapper was called `count` times.
+             * @param   {Number} count  The number of times the Wrapper should have been called.
+             * @returns {Boolean}       Returns `true` if  Wrapper was called `count` times, `false` otherwise.
+             * @memberOf WrapperCall
+             * @instance
+             */
+            alias(this, "expectCallCount", this._Count, "expectCallCount", this.callList);
+            alias(this, "expectCallCountRange", this._CountRange, "expectCallCountRange", this.callList);
+            alias(this, "expectCallCountMin", this._CountMin, "expectCallCountMin", this.callList);
+            alias(this, "expectCallCountMax", this._CountMax, "expectCallCountMax", this.callList);
+            alias(this, "expectCallNever", this.expectCallCount, 0);
+            /**
+             * Expects Wrapper to be called exactly once. Same as {@link expectCallCount} (1)
+             * @method expectCallOnce
+             * @returns {Boolean} Returns `true` if the wrapper was called exactly once, `false` otherwise.
+             * @memberOf WrapperCall
+             * @instance
+             */
+            alias(this, "expectCallOnce", this.expectCallCount, 1);
+            /**
+             * Expects Wrapper to be called exactly once. Same as expectCallCount(2)
+             * @method expectCallTwice
+             * @returns {Boolean} Returns `true` if the wrapper was called exactly twice, `false` otherwise.
+             * @memberOf WrapperCall
+             * @instance
+             */
+            alias(this, "expectCallTwice", this.expectCallCount, 2);
+            /**
+             * Expects Wrapper to be called exactly once. Same as expectCallCount(3)
+             * @method expectCallThrice
+             * @returns {Boolean} Returns `true` if the wrapper was called exactly three times, `false` otherwise.
+             * @memberOf WrapperCall
+             * @instance
+             */
+            alias(this, "expectCallThrice", this.expectCallCount, 3);
+
+            this.configReset();
+            return this.chainable;
+        }
+
+        _doCall(target, thisArg, argList) {
+            var funcName = this.wrapped.name || "&lt;&lt;anonymous>>";
+            debug(`calling wrapper on "${funcName}"`);
+
+            var si = new SingleCall(this, thisArg, argList);
+
+            // run pre-call triggers
+            this._runTriggerList("pre", si);
+
+            // run the wrapped function
+            var ret, exception;
+            try {
+                ret = this.wrapped.apply(thisArg, argList);
+            } catch (ex) {
+                exception = ex;
+            }
+            si.retVal = ret;
+            si.exception = exception;
+
+            // run post-call triggers
+            this._runTriggerList("post", si);
+            debug("final si", si);
+
+            // save call
+            si.postCall = si.preCall = true; // in the future evaulate both pre and post calls
+            this.callList.push(si);
+
+            return si.retVal;
+        }
+
+        _attrConstructor(obj, attr, fn) {
+            if (typeof obj[attr] === "object") {
+                throw new TypeError("can't wrap a sub-object: not implemented");
+            }
+
+            // save the values
+            this.origAttr = Object.getOwnPropertyDescriptor(obj, attr);
+            this.attrValue = this.origAttr.value;
+            this.setterGetterFn = fn;
+            this.type = "attribute";
+            this.touchList = new Filter(this);
+
+            // create a proxy for the setter / getters
+            this.chainable = new Proxy(this, {
+                apply: (target, thisArg, argList) => {
+                    switch (argList.length) {
+                        case 0:
+                            return this._doSetterGetter("get");
+                        case 1:
+                            return this._doSetterGetter("set", argList[0]);
+                        default:
+                            throw new Error("Wrong number of args to setter / getter. (How is that even possible?)");
+                    }
+                }
+            });
+
+            // define the new property
+            Object.defineProperty(obj, attr, {
+                configurable: this.origAttr.configurable,
+                enumerable: this.origAttr.enumerable,
+                get: this.chainable,
+                set: this.chainable,
+            });
+
+            this.configReset();
+            this.chainable = this;
+            return this.chainable;
+        }
+
+        _doSetterGetter(type, val) {
+            // create a new single touch instance
+            var st = new SingleTouch(this, type, this.attrValue, val);
+
+            debug(`_doSetterGetter ${type} "${val}"`);
+
+            // run pre-call trigger
+            this._runTriggerList("pre", st);
+
+            // do the set or get
+            if (type === "get" &amp;&amp; this.setterGetterFn) {
+                st.retVal = this.setterGetterFn(type);
+            } else if (type === "set" &amp;&amp; this.setterGetterFn) {
+                st.retVal = this.setterGetterFn(type, st.setVal);
+            } else if (type === "set") {
+                // if no setter / getter function, just used the cached attrValue
+                st.retVal = st.setVal;
+                this.attrValue = st.setVal;
+            }
+
+            // run post-call trigger
+            this._runTriggerList("post", st);
+            debug("final st", st);
+
+            // save this touch for future reference
+            this.touchList.push(st);
+
+            // always return the value
+            debug("settergetter returning", st.retVal);
+            return st.retVal;
         }
 
         _softAssert(passed, message) {
@@ -400,208 +544,23 @@
             this.expectPassed = true;
             this[wrapperCookieKey] = wrapperCookie;
 
-            return this.chainable;
-        }
-
-        triggerAlways() {
-            var t = new Trigger(this, function() {
-                return true;
-            });
-            this.triggerList.push(t);
-            return t;
-        }
-    }
-
-    /**
-     * Wrapper sub-class for attributes.
-     */
-    class WrapperAttr extends Wrapper {
-        constructor(obj, attr, fn) {
-            super();
-
-            if (typeof obj[attr] === "object") {
-                throw new TypeError("can't wrap a sub-object: not implemented");
+            if (this.type === "function") {
+                this._configCallReset();
             }
 
-            // save the values
-            this.origAttr = Object.getOwnPropertyDescriptor(obj, attr);
-            this.attrValue = this.origAttr.value;
-            this.setterGetterFn = fn;
-            this.type = "attribute";
-            this.touchList = new Filter(this);
-
-            // // create a proxy for the setter / getters
-            // this.chainable = new Proxy(this, {
-            //     apply: (target, thisArg, argList) => {
-            //         if (argList.length &lt; 1 || argList.length > 2) {
-            //             throw new Error("Wrong number of args to setter / getter. (How is that even possible?)");
-            //         }
-            //         console.log("type", argList[0]);
-            //         console.log("value", argList[1]);
-            //         return this._doSetterGetter(argList[0], argList[1]);
-            //     }
-            // });
-
-            // // bind this and the first arg to help identify the call
-            // var setter = this.chainable.bind(this, "set");
-            // var getter = this.chainable.bind(this, "get");
-
-            // create a proxy for the setter / getters
-            this.chainable = new Proxy(this, {
-                apply: (target, thisArg, argList) => {
-                    switch (argList.length) {
-                        case 0:
-                            return this._doSetterGetter("get");
-                        case 1:
-                            return this._doSetterGetter("set", argList[0]);
-                        default:
-                            throw new Error("Wrong number of args to setter / getter. (How is that even possible?)");
-                    }
-                }
-            });
-
-            // define the new property
-            Object.defineProperty(obj, attr, {
-                configurable: this.origAttr.configurable,
-                enumerable: this.origAttr.enumerable,
-                get: this.chainable,
-                set: this.chainable,
-            });
-
-            this.configReset();
-            this.chainable = this;
-            return this.chainable;
-        }
-
-        configReset() {
-            super.configReset();
-            this.touchList.length = 0;
-        }
-
-        _doSetterGetter(type, val) {
-            // create a new single touch instance
-            var st = new SingleTouch(this, type, this.attrValue, val);
-
-            debug(`_doSetterGetter ${type} "${val}"`);
-
-            // run pre-call trigger
-            this._runTriggerList("pre", st);
-
-            // do the set or get
-            if (type === "get" &amp;&amp; this.setterGetterFn) {
-                st.retVal = this.setterGetterFn(type);
-            } else if (type === "set" &amp;&amp; this.setterGetterFn) {
-                st.retVal = this.setterGetterFn(type, st.setVal);
-            } else if (type === "set") {
-                // if no setter / getter function, just used the cached attrValue
-                st.retVal = st.setVal;
-                this.attrValue = st.setVal;
+            if (this.type === "attribute") {
+                this._configAttrReset();
             }
 
-            // run post-call trigger
-            this._runTriggerList("post", st);
-            debug("final st", st);
-
-            // save this touch for future reference
-            this.touchList.push(st);
-
-            // always return the value
-            debug("settergetter returning", st.retVal);
-            return st.retVal;
-        }
-    }
-
-    /**
-     * Wrapper sub-class for function.
-     * @extends {Wrapper}
-     */
-    class WrapperCall extends Wrapper {
-        constructor(origFn, wrappedFn) {
-            super();
-
-            this.type = "function";
-            this.callList = new Filter(this);
-            this.orig = origFn;
-            wrappedFn = wrappedFn || origFn;
-            this.wrapped = wrappedFn;
-            this.chainable = new Proxy(this, {
-                apply: (target, thisArg, argList) => this._doCall(target, thisArg, argList)
-            });
-
-            /**
-             * Validates that the Wrapper was called `count` times.
-             * @param   {Number} count  The number of times the Wrapper should have been called.
-             * @returns {Boolean}       Returns `true` if  Wrapper was called `count` times, `false` otherwise.
-             * @memberOf WrapperCall
-             * @instance
-             */
-            alias(this, "expectCallCount", this._Count, "expectCallCount", this.callList);
-            alias(this, "expectCallCountRange", this._CountRange, "expectCallCountRange", this.callList);
-            alias(this, "expectCallCountMin", this._CountMin, "expectCallCountMin", this.callList);
-            alias(this, "expectCallCountMax", this._CountMax, "expectCallCountMax", this.callList);
-            alias(this, "expectCallNever", this.expectCallCount, 0);
-            /**
-             * Expects Wrapper to be called exactly once. Same as {@link expectCallCount} (1)
-             * @method expectCallOnce
-             * @returns {Boolean} Returns `true` if the wrapper was called exactly once, `false` otherwise.
-             * @memberOf WrapperCall
-             * @instance
-             */
-            alias(this, "expectCallOnce", this.expectCallCount, 1);
-            /**
-             * Expects Wrapper to be called exactly once. Same as expectCallCount(2)
-             * @method expectCallTwice
-             * @returns {Boolean} Returns `true` if the wrapper was called exactly twice, `false` otherwise.
-             * @memberOf WrapperCall
-             * @instance
-             */
-            alias(this, "expectCallTwice", this.expectCallCount, 2);
-            /**
-             * Expects Wrapper to be called exactly once. Same as expectCallCount(3)
-             * @method expectCallThrice
-             * @returns {Boolean} Returns `true` if the wrapper was called exactly three times, `false` otherwise.
-             * @memberOf WrapperCall
-             * @instance
-             */
-            alias(this, "expectCallThrice", this.expectCallCount, 3);
-
-            this.configReset();
             return this.chainable;
         }
 
-        configReset() {
-            super.configReset();
+        _configCallReset() {
             this.callList.length = 0;
         }
 
-        _doCall(target, thisArg, argList) {
-            var funcName = this.wrapped.name || "&lt;&lt;anonymous>>";
-            debug(`calling wrapper on "${funcName}"`);
-
-            var si = new SingleCall(this, thisArg, argList);
-
-            // run pre-call triggers
-            this._runTriggerList("pre", si);
-
-            // run the wrapped function
-            var ret, exception;
-            try {
-                ret = this.wrapped.apply(thisArg, argList);
-            } catch (ex) {
-                exception = ex;
-            }
-            si.retVal = ret;
-            si.exception = exception;
-
-            // run post-call triggers
-            this._runTriggerList("post", si);
-            debug("final si", si);
-
-            // save call
-            si.postCall = si.preCall = true; // in the future evaulate both pre and post calls
-            this.callList.push(si);
-
-            return si.retVal;
+        _configAttrReset() {
+            this.touchList.length = 0;
         }
 
         filterOneByCallNumber(num) {
@@ -616,18 +575,13 @@
             return this.callList[num];
         }
 
-        // filterFirstCallByArgs() {}
-        // filterFirstCallByContext() {}
-        // filterFirstCallByException() {}
-        // filterFirstCallByReturn() {}
-        // filterLastCallByArgs() {}
-        // filterLastCallByContext() {}
-        // filterLastCallByException() {}
-        // filterLastCallByReturn() {}
-        // filterByArgs() {}
-        // filterByContext() {}
-        // filterByException() {}
-        // filterByReturn() {}
+        triggerAlways() {
+            var t = new Trigger(this, function() {
+                return true;
+            });
+            this.triggerList.push(t);
+            return t;
+        }
     }
 
     /**
@@ -1279,7 +1233,7 @@
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.3</a> on Wed Mar 22 2017 02:52:40 GMT+0000 (UTC) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.3</a> on Wed Mar 22 2017 03:55:21 GMT+0000 (UTC) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>
