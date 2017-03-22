@@ -814,8 +814,9 @@
      */
     class Match {
         constructor(opts) {
+            opts = opts || {};
             // if !opts throw
-            if (opts.value !== undefined) {
+            if (opts.hasOwnProperty("value")) {
                 this.value = opts.value;
                 // } else if (opts.type) {
                 //     this.type = opts.type;
@@ -961,8 +962,12 @@
         }
 
         extend(name, parentName, testFn, diffFn) {
+            if (typeof name !== "string") {
+                throw new TypeError(`Match.extend: 'name' should be string`);
+            }
+
             if (this.matcherList.has(name)) {
-                throw new TypeError(`Match.extend: ${name} already exists`);
+                throw new TypeError(`Match.extend: '${name}' already exists`);
             }
 
             var parentMatcher = this.matcherList.get(parentName);
