@@ -22,7 +22,7 @@
 <label for="nav-trigger" class="overlay"></label>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Expect.html">Expect</a></li><li><a href="Match.html">Match</a></li><li><a href="SingleCall.html">SingleCall</a></li><li><a href="SingleTouch.html">SingleTouch</a></li><li><a href="Trigger.html">Trigger</a></li><li><a href="Wrapper.html">Wrapper</a><ul class='methods'><li data-type='method'><a href="Wrapper.html#.isWrapper">isWrapper</a></li><li data-type='method'><a href="Wrapper.html#configReset">configReset</a></li></ul></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Expect.html">Expect</a></li><li><a href="Match.html">Match</a></li><li><a href="SingleCall.html">SingleCall</a></li><li><a href="SingleTouch.html">SingleTouch</a></li><li><a href="Trigger.html">Trigger</a></li><li><a href="Wrapper.html">Wrapper</a><ul class='methods'><li data-type='method'><a href="Wrapper.html#.isWrapper">isWrapper</a></li><li data-type='method'><a href="Wrapper.html#configDefault">configDefault</a></li><li data-type='method'><a href="Wrapper.html#configReset">configReset</a></li></ul></li></ul>
 </nav>
 
 <div id="main">
@@ -146,6 +146,307 @@
     
 
     
+        <h3 class="subsection-title">Members</h3>
+
+        
+            
+<h4 class="name" id="expectMessageList"><span class="type-signature"></span>expectMessageList<span class="type-signature"> :Array.&lt;String></span></h4>
+
+
+
+
+
+<dl class="details">
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="candy-wrapper.js.html">candy-wrapper.js</a>, <a href="candy-wrapper.js.html#line513">line 513</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+<div class="description">
+    <p>List of messages from failed <code>expect</code> calls.</p>
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Array.&lt;String></span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="expectPassed"><span class="type-signature"></span>expectPassed<span class="type-signature"> :Boolean</span></h4>
+
+
+
+
+
+<dl class="details">
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="candy-wrapper.js.html">candy-wrapper.js</a>, <a href="candy-wrapper.js.html#line515">line 515</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+<div class="description">
+    <p>Whether or not all expectations have passed on this wrapper.</p>
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Boolean</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="triggerList"><span class="type-signature"></span>triggerList<span class="type-signature"> :Array.&lt;<a href="Trigger.html">Trigger</a>></span></h4>
+
+
+
+
+
+<dl class="details">
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="candy-wrapper.js.html">candy-wrapper.js</a>, <a href="candy-wrapper.js.html#line511">line 511</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+<div class="description">
+    <p>A list of <a href="Trigger.html">Trigger</a>s to be run whenever this Wrapper is called.</p>
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Array.&lt;<a href="Trigger.html">Trigger</a>></span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="uniquePlaceToKeepAGuidForCandyWrapper"><span class="type-signature"></span>uniquePlaceToKeepAGuidForCandyWrapper<span class="type-signature"> :String</span></h4>
+
+
+
+
+
+<dl class="details">
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="candy-wrapper.js.html">candy-wrapper.js</a>, <a href="candy-wrapper.js.html#line516">line 516</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-default">Default Value:</dt>
+    <dd class="tag-default"><ul class="dummy">
+            <li>"193fe616-09d1-4d5c-a5b9-ff6f3e79714c"</li>
+        </ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+<div class="description">
+    <p>A nonsensical key and value used to identify if this object is a Wrapper</p>
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">String</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+
+        
+    
 
     
         <h3 class="subsection-title">Methods</h3>
@@ -167,7 +468,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="candy-wrapper.js.html">candy-wrapper.js</a>, <a href="candy-wrapper.js.html#line463">line 463</a>
+        <a href="candy-wrapper.js.html">candy-wrapper.js</a>, <a href="candy-wrapper.js.html#line457">line 457</a>
     </li></ul></dd>
     
 
@@ -285,6 +586,90 @@ Wrapper.isWrapper(testObject, "meth"); // true</code></pre>
 
     
 
+    <h4 class="name" id="configDefault"><span class="type-signature"></span>configDefault<span class="signature">()</span><span class="type-signature"></span></h4>
+
+    
+
+
+
+
+<dl class="details">
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="candy-wrapper.js.html">candy-wrapper.js</a>, <a href="candy-wrapper.js.html#line495">line 495</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+<div class="description">
+    <p>Resets the wrapper to the default configuration, undoing the effects of any <code>config</code> calls.</p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
     <h4 class="name" id="configReset"><span class="type-signature"></span>configReset<span class="signature">()</span><span class="type-signature"> &rarr; {<a href="Wrapper.html">Wrapper</a>}</span></h4>
 
     
@@ -297,7 +682,7 @@ Wrapper.isWrapper(testObject, "meth"); // true</code></pre>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="candy-wrapper.js.html">candy-wrapper.js</a>, <a href="candy-wrapper.js.html#line502">line 502</a>
+        <a href="candy-wrapper.js.html">candy-wrapper.js</a>, <a href="candy-wrapper.js.html#line508">line 508</a>
     </li></ul></dd>
     
 
@@ -338,7 +723,8 @@ Wrapper.isWrapper(testObject, "meth"); // true</code></pre>
 
 <div class="description">
     <p>Resets the wrapper to its default state. Clears out all records of previous calls,
-expected behaviors, pass / fail results, etc.</p>
+expected behaviors, pass / fail results, etc. This does not reset any configuration options,
+which configDefault can be used for.</p>
 </div>
 
 
@@ -405,7 +791,7 @@ expected behaviors, pass / fail results, etc.</p>
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.3</a> on Wed Mar 22 2017 04:49:01 GMT+0000 (UTC) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.3</a> on Fri Mar 24 2017 07:17:38 GMT+0000 (UTC) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>
