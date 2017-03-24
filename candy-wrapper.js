@@ -133,7 +133,7 @@
             wrappedFn = wrappedFn || origFn;
             this.wrapped = wrappedFn;
             this.chainable = new Proxy(this, {
-                apply: (target, thisArg, argList) => this._doCall(target, thisArg, argList)
+                apply: (target, context, argList) => this._doCall(target, context, argList)
             });
 
             /**
@@ -173,15 +173,16 @@
              */
             alias(this, "expectCallThrice", this.expectCallCount, 3);
 
+            this.configDefault();
             this.configReset();
             return this.chainable;
         }
 
-        _doCall(target, thisArg, argList) {
+        _doCall(target, context, argList) {
             var funcName = this.wrapped.name || "<<anonymous>>";
             debug(`calling wrapper on "${funcName}"`);
 
-            var si = new SingleCall(this, thisArg, argList);
+            var si = new SingleCall(this, context, argList);
 
             // run pre-call triggers
             this._runTriggerList("pre", si);
@@ -189,7 +190,7 @@
             // run the wrapped function
             var ret, exception;
             try {
-                ret = this.wrapped.apply(thisArg, argList);
+                ret = this.wrapped.apply(context, argList);
             } catch (ex) {
                 exception = ex;
             }
@@ -204,6 +205,7 @@
             si.postCall = si.preCall = true; // in the future evaulate both pre and post calls
             this.callList.push(si);
 
+            if (si.exception) throw si.exception;
             return si.retVal;
         }
 
@@ -221,7 +223,7 @@
 
             // create a proxy for the setter / getters
             this.chainable = new Proxy(this, {
-                apply: (target, thisArg, argList) => {
+                apply: (target, context, argList) => {
                     switch (argList.length) {
                         case 0:
                             return this._doSetterGetter("get");
@@ -275,16 +277,8 @@
 
             // always return the value
             debug("settergetter returning", st.retVal);
+            if (st.exception) throw st.exception;
             return st.retVal;
-        }
-
-        _softAssert(passed, message) {
-            if (!passed) {
-                this.expectMessageList.push(message);
-            }
-
-            this.expectPassed = this.expectPassed && passed;
-            return this.expectPassed;
         }
 
         _runTriggerList(preOrPost, single) {
@@ -417,7 +411,7 @@
          * @return {Boolean}      Returns `true` if `arr` has less than `count` members, `false` otherwise
          * @private
          */
-        _CountMax(name, arr, max) {
+         _CountMax(name, arr, max) {
             if (typeof name !== "string") {
                 throw new TypeError("_CountMax: expected 'name' to be string");
             }
@@ -495,14 +489,38 @@
         }
 
         /**
+         * Resets the wrapper to the default configuration, undoing the effects of any `config` calls.
+         * @public
+         */
+        configDefault() {
+            this.config = {
+                expectThrowOnTrigger: true,
+                expectThrow: false
+            };
+        }
+
+        /**
          * Resets the wrapper to its default state. Clears out all records of previous calls,
-         * expected behaviors, pass / fail results, etc.
+         * expected behaviors, pass / fail results, etc. This does not reset any configuration options,
+         * which {@link configDefault} can be used for.
          * @return {Wrapper} Returns the Wrapper object so that this call can be chained
          */
         configReset() {
+            /** @lends Wrapper# */
+            /** @type {Array<Trigger>} A list of {@link Trigger}s to be run whenever this Wrapper is called. */
             this.triggerList = [];
+            /** @type {Array<String>} List of messages from failed `expect` calls. */
             this.expectMessageList = [];
+            /** @type {Boolean} Whether or not all expectations have passed on this wrapper. */
             this.expectPassed = true;
+            /**
+             * A nonsensical key and value used to identify if this object is a Wrapper
+             * @name uniquePlaceToKeepAGuidForCandyWrapper
+             * @type {String}
+             * @default "193fe616-09d1-4d5c-a5b9-ff6f3e79714c"
+             * @memberof  Wrapper
+             * @instance
+             */
             this[wrapperCookieKey] = wrapperCookie;
 
             if (this.type === "function") {
@@ -524,6 +542,7 @@
             this.touchList.length = 0;
         }
 
+        // TODO: remove
         filterOneByCallNumber(num) {
             var callCount = this.callList.length;
             if (typeof num !== "number" || num < 0) {
@@ -543,6 +562,143 @@
             this.triggerList.push(t);
             return t;
         }
+
+        triggerOnArgs(...args) {
+            this._funcOnly();
+            var m = Match.Value([...args]);
+            var t = new Trigger(this, function(single) {
+                return m.compare(single.argList);
+            });
+            this.triggerList.push(t);
+            return t;
+        }
+
+        triggerOnContext(ctx) {
+            this._funcOnly();
+            var m = Match.Value(ctx);
+            var t = new Trigger(this, function(single) {
+                var ret = m.compare(single.context);
+                return ret;
+            });
+            this.triggerList.push(t);
+            return t;
+        }
+
+        triggerOnCallNumber(num) {
+            this._funcOnly();
+            var count = 0;
+            var t = new Trigger(this, function(single) {
+                var ret = (count === num);
+                if (single.postCall) count++;
+                return ret;
+            });
+            this.triggerList.push(t);
+            return t;
+        }
+
+        triggerOnException(e) {
+            var m = Match.Value(e);
+            var t = new Trigger(this, function(single) {
+                var ret = m.compare(single.exception);
+                return ret;
+            });
+            this.triggerList.push(t);
+            return t;
+        }
+
+        triggerOnReturn(retVal) {
+            var m = Match.Value(retVal);
+            var t = new Trigger(this, function(single) {
+                var ret = m.compare(single.retVal);
+                return ret;
+            });
+            this.triggerList.push(t);
+            return t;
+        }
+
+        // Every trigger gets called twice, once before and once after the actual call / touch,
+        // ostensibly so that it can modify arguments or context before the call or so that it can
+        // modify the return value or exceptions thrown after a call.
+        // The `single` value passed in to the `callback` contains two properties for identifying
+        // and controlling behavior pre- and post- call / touch. `single.preCall` will be `true` before
+        // the call, and `false` afterwards; and `single.postCall` will be `true` after the call and
+        // `false` before.
+        // Throwing an exception in a custom trigger is not advised since it may adversely effect the
+        // behavior of the wrapper. If you want the wrapper to throw an exception, set `single.exception`
+        // to a `new Error()`; however, this is best done through an action anyway.
+        triggerOnCustom(fn) {
+            var t = new Trigger(this, fn);
+            this.triggerList.push(t);
+            return t;
+        }
+
+        triggerOnSet() {
+            this._attrOnly();
+            var t = new Trigger(this, function(single) {
+                if (single.type === "set") return true;
+                return false;
+            });
+            this.triggerList.push(t);
+            return t;
+        }
+
+        triggerOnSetVal(setVal) {
+            this._attrOnly();
+            var m = Match.Value(setVal);
+            var t = new Trigger(this, function(single) {
+                return m.compare(single.setVal);
+            });
+            this.triggerList.push(t);
+            return t;
+        }
+
+        triggerOnSetNumber(num) {
+            this._attrOnly();
+            var count = 0;
+            var t = new Trigger(this, function(single) {
+                if (single.type !== "set") return false;
+                var ret = (count === num);
+                if (single.postCall) count++;
+                return ret;
+            });
+            this.triggerList.push(t);
+            return t;
+        }
+
+        triggerOnGet() {
+            this._attrOnly();
+            var t = new Trigger(this, function(single) {
+                if (single.type === "get") return true;
+                return false;
+            });
+            this.triggerList.push(t);
+            return t;
+        }
+
+        triggerOnGetNumber(num) {
+            this._attrOnly();
+            var count = 0;
+            var t = new Trigger(this, function(single) {
+                if (single.type !== "get") return false;
+                var ret = (count === num);
+                if (single.postCall) count++;
+                return ret;
+            });
+            this.triggerList.push(t);
+            return t;
+        }
+
+        triggerOnTouchNumber(num) {
+            this._attrOnly();
+            var count = 0;
+            var t = new Trigger(this, function(single) {
+                var ret = (count === num);
+                if (single.postCall) count++;
+                return ret;
+            });
+            this.triggerList.push(t);
+            return t;
+        }
     }
 
     /**
@@ -550,7 +706,34 @@
      * `SingleCall` and `SingleTouch`.
      */
     class Expect {
-        constructor() {}
+        constructor() {
+            alias(this, "expectReturn",
+                this._expect, "expectReturn", "post",
+                function(single, retVal) {
+                    if (single.retVal === retVal) return null;
+                    return "expectReturn: expectation failed for:" + retVal;
+                });
+
+            alias(this, "expectException",
+                this._expect, "expectException", "post",
+                function(single, exception) {
+                    var m = Match.Value(exception);
+                    if (m.compare(single.exception)) {
+                        return null;
+                    }
+                    return "expectException: expectation failed for:" + exception;
+                });
+
+            alias(this, "expectCallArgs",
+                this._expect, "expectCallArgs", "pre",
+                function(single, ...args) {
+                    var m = Match.Value(args);
+                    if (m.compare(single.argList)) {
+                        return null;
+                    }
+                    return "expectException: expectation failed for:" + args;
+                });
+        }
 
         /* DESIGN PATTERN
          *
@@ -576,10 +759,10 @@
          * or expect.
          */
 
-        addDeferredAction(name, args) {
+        addDeferredAction(name, argList) {
             var action = {
                 name: name,
-                args: args
+                argList: argList
             };
             debug("adding action:", action);
             this.actionList.push(action);
@@ -598,19 +781,39 @@
         //     this[this.expectType](si, this.expectParam);
         // }
 
-        expectCallArgs(...args) {
+        _softAssert(message) {
+            var passed = (message === null) ? true : false;
+
+            if (!passed) {
+                // see if the config says we should throw
+                if ((this instanceof Trigger && this.wrapper.config.expectThrowOnTrigger) ||
+                    this.wrapper.config.exepctThrow) {
+                    throw new ExpectError(message);
+                }
+
+                // otherwise store the message for future reference
+                this.wrapper.expectMessageList.push(message);
+            }
+
+            this.wrapper.expectPassed = this.wrapper.expectPassed && passed;
+            return passed;
+        }
+
+        _expect(name, timing, fn, ...args) {
             // this call only works for functions
             this.wrapper._funcOnly();
             // get the current call, or save the args for when the call is actually run
-            var curr = this.getCurrCallOrDefer("expectCallArgs", ...args);
+            var curr = this.getCurrCallOrDefer(name, ...args);
             // if there isn't a current call, return 'this' to enable chaining
-            if (!curr || !curr.preCall) return this; // chainable
+            if (!curr) return this; // chainable
+            // check if this is the right time to run
+            var runNow = (timing === "both") ||
+                (curr.postCall && timing === "post") ||
+                (curr.preCall && timing === "pre");
+            if (!runNow) return this;
             // test the expect
-            var m = new Match({
-                value: [...args]
-            });
-            var passed = m.compare(curr.argList);
-            this.wrapper._softAssert(passed, `expectCallArgs: args did not match`);
+            var msg = fn.call(this, curr, ...args);
+            var passed = this._softAssert(msg);
 
             return passed;
         }
@@ -622,80 +825,97 @@
         // expectCustom (fn, param)
     }
 
+    class ExpectError extends Error {
+        constructor(message) {
+            super(message);
+            this.name = "ExpectError";
+        }
+    }
+
     class Filter extends Array {
         constructor(wrapper, ...args) {
             super(...args);
             this.wrapper = wrapper;
 
-            alias(this, "filterAttrSet", this._filter, "filterSet", "attribute",
+            alias(this, "filterAttrSet",
+                this._filter, "filterSet", "attribute",
                 function(element) {
                     if (element.type === "set") return true;
                 });
 
-            alias(this, "filterAttrGet", this._filter, "filterGet", "attribute",
+            alias(this, "filterAttrGet",
+                this._filter, "filterGet", "attribute",
                 function(element) {
                     if (element.type === "get") return true;
                 });
 
-            alias(this, "filterAttrSetByVal", this._filter, "filterAttrSetByVal", "attribute",
+            alias(this, "filterAttrSetByVal",
+                this._filter, "filterAttrSetByVal", "attribute",
                 function(element, index, array, ...args) {
-                    var argList = [...args];
-                    if (argList.length !== 1) {
+                    if (args.length !== 1) {
                         throw new TypeError("filterAttrSetByVal: expected one argument");
                     }
-                    var setVal = argList[0];
+                    var setVal = args[0];
 
                     var m = Match.Value(setVal);
                     return m.compare(element.setVal);
                 });
 
-            alias(this, "filterCallByArgs", this._filter, "filterCallByArgs", "function",
+            alias(this, "filterCallByArgs",
+                this._filter, "filterCallByArgs", "function",
                 function(element, index, array, ...args) {
                     var m = Match.Value([...args]);
                     return m.compare(element.argList);
                 });
 
-            alias(this, "filterCallByContext", this._filter, "filterCallByContext", "function",
+            alias(this, "filterCallByContext",
+                this._filter, "filterCallByContext", "function",
                 function(element, index, array, ...args) {
-                    var argList = [...args];
-                    if (argList.length !== 1) {
+                    if (args.length !== 1) {
                         throw new TypeError("filterCallByContext: expected one argument");
                     }
-                    var context = argList[0];
+                    var context = args[0];
 
                     var m = Match.Value(context);
-                    return m.compare(element.thisArg);
+                    return m.compare(element.context);
                 });
 
-            alias(this, "filterByException", this._filter, "filterByException", "both",
+            alias(this, "filterByException",
+                this._filter, "filterByException", "both",
                 function(element, index, array, ...args) {
-                    var argList = [...args];
-                    if (argList.length !== 1) {
+                    if (args.length !== 1) {
                         throw new TypeError("filterByException: expected one argument");
                     }
-                    var exception = argList[0];
+                    var exception = args[0];
 
                     var m = Match.Value(exception);
                     return m.compare(element.exception);
                 });
 
-            alias(this, "filterByReturn", this._filter, "filterByReturn", "both",
+            alias(this, "filterByReturn",
+                this._filter, "filterByReturn", "both",
                 function(element, index, array, ...args) {
-                    var argList = [...args];
-                    if (argList.length !== 1) {
+                    if (args.length !== 1) {
                         throw new TypeError("filterByReturn: expected one argument");
                     }
-                    var retVal = argList[0];
+                    var retVal = args[0];
 
                     var m = Match.Value(retVal);
                     return m.compare(element.retVal);
                 });
 
-            alias(this, "getAllCallArgs", this._get, "getAllCallArgs", "function", "argList");
-            alias(this, "getAllCallContexts", this._get, "getAllCallContexts", "function", "thisArg");
-            alias(this, "getAllExceptions", this._get, "getAllExceptions", "both", "exception");
-            alias(this, "getAllReturns", this._get, "getAllReturns", "both", "retVal");
-            alias(this, "getAllSetVals", this._get, "getAllSetVals", "attribute", "setVal");
+            alias(this, "getAllCallArgs",
+                this._get, "getAllCallArgs", "function", "argList");
+            alias(this, "getAllCallContexts",
+                this._get, "getAllCallContexts", "function", "context");
+            alias(this, "getAllExceptions",
+                this._get, "getAllExceptions", "both", "exception");
+            alias(this, "getAllReturns",
+                this._get, "getAllReturns", "both", "retVal");
+            alias(this, "getAllSetVals",
+                this._get, "getAllSetVals", "attribute", "setVal");
+
+            alias(this, "filterFirst", this.filterByNumber, 0);
         }
 
         _filter(name, type, fn, ...args) {
@@ -714,6 +934,37 @@
             return this.map(function(element) {
                 return element[idx];
             });
+        }
+
+        filterOnly() {
+            if (this.length !== 1) {
+                throw new TypeError("filterOnly: expected exactly one value");
+            }
+
+            return this[0];
+        }
+
+        filterByNumber(num) {
+            if (typeof num !== "number") {
+                throw new TypeError("expected 'num' to be number");
+            }
+
+            if (this.length === 0) {
+                throw new RangeError("empty list");
+            }
+
+            if (num < 0 || num >= this.length) {
+                throw new RangeError("'num' out of bounds");
+            }
+
+            return this[num];
+        }
+
+        filterLast() {
+            if (this.length === 0) {
+                throw new RangeError("filterlast: empty list");
+            }
+            return this[this.length - 1];
         }
 
         // All(expectName, ...args) {
@@ -750,14 +1001,14 @@
      * A representation of a single function call.
      */
     class SingleCall extends Expect {
-        constructor(wrapper, thisArg, argList, retVal, exception) {
+        constructor(wrapper, context, argList, retVal, exception) {
             super();
 
-            // this.calledWithNew = thisArg.new && thisArg.new.target;
+            // this.calledWithNew = context.new && context.new.target;
             this.wrapper = wrapper;
             this.preCall = false;
             this.postCall = false;
-            this.thisArg = thisArg;
+            this.context = context;
             this.argList = argList;
             this.retVal = retVal;
             this.exception = exception;
@@ -781,6 +1032,69 @@
             this.triggerFn = triggerFn;
             this.currentCall = null;
             this.actionList = [];
+
+            alias(this, "actionReturn",
+                this._action, "actionReturn", "post",
+                function(curr, retVal) {
+                    curr.retVal = retVal;
+                });
+
+            alias(this, "actionCustom",
+                this._action, "actionCustom", "both",
+                function(curr, fn, ...args) {
+                    return fn.call(this, curr, ...args);
+                });
+
+            alias(this, "actionReturnFromArg",
+                this._action, "actionReturnFromArg", "post",
+                function(curr, num) {
+                    curr.retVal = curr.argList[num];
+                });
+
+            alias(this, "actionReturnContext",
+                this._action, "actionReturnContext", "post",
+                function(curr) {
+                    curr.retVal = curr.context;
+                });
+
+            alias(this, "actionReturnFromContext",
+                this._action, "actionReturnFromContext", "post",
+                function(curr, prop) {
+                    if (typeof curr.context !== "object") {
+                        throw new TypeError("actionReturnFromContext: expected context to be object");
+                    }
+                    curr.retVal = curr.context[prop];
+                });
+
+            alias(this, "actionThrowException",
+                this._action, "actionThrowException", "post",
+                function(curr, err) {
+                    if (!(err instanceof Error)) {
+                        throw new Error("actionThrowException: expected 'err' argument to be error");
+                    }
+                    curr.exception = err;
+                });
+
+            alias(this, "actionSetVal",
+                this._action, "actionSetVal", "pre",
+                function(curr, setVal) {
+                    curr.setVal = setVal;
+                });
+
+            alias(this, "actionReturnPromise",
+                this._action, "actionReturnPromise", "post",
+                function(curr, retVal) {
+                    retVal = retVal || curr.retVal;
+                    curr.retVal = Promise.resolve(retVal);
+                });
+
+            alias(this, "actionRejectPromise",
+                this._action, "actionRejectPromise", "post",
+                function(curr, e) {
+                    e = e || curr.exception;
+                    curr.exception = null;
+                    curr.retVal = Promise.reject(e);
+                });
         }
 
         run(si) {
@@ -789,21 +1103,33 @@
 
             // perform actions
             this.currentCall = si;
-            debug("actionList", this.actionList);
             for (let idx in this.actionList) {
                 let action = this.actionList[idx];
-                this[action.name](...action.args);
+                this[action.name](...action.argList);
             }
             this.currentCall = null;
         }
 
-        actionReturn(retVal) {
+        _action(name, timing, fn, ...args) {
+            if (typeof name !== "string") {
+                throw new TypeError("_action: expected 'name' argument");
+            }
+
+            if (typeof fn !== "function") {
+                throw new TypeError(`${name}: expected function argument`);
+            }
+
             // get the current call, or save the args for when the call is actually run
-            var curr = this.getCurrCallOrDefer("actionReturn", retVal);
+            var curr = this.getCurrCallOrDefer(name, ...args);
             // if there isn't a current call, return 'this' to enable chaining
-            if (!curr || !curr.postCall) return this; // chainable
-            // run the action
-            curr.retVal = retVal;
+            if (!curr) return this; // chainable
+            // check if this is the right time to run
+            var runNow = (timing === "both") ||
+                (curr.postCall && timing === "post") ||
+                (curr.preCall && timing === "pre");
+            if (!runNow) return this;
+            // call the callback
+            fn.call(this, curr, ...args);
 
             return this;
         }
@@ -1169,7 +1495,7 @@
 
     function diffSingleCall(si1, si2) {
         var argDiff = addKeyToDiff(this.diff(si1.argList, si2.argList), "argList");
-        var thisDiff = addKeyToDiff(this.diff(si1.thisArg, si2.thisArg), "thisArg");
+        var thisDiff = addKeyToDiff(this.diff(si1.context, si2.context), "context");
         var retDiff = addKeyToDiff(this.diff(si1.retVal, si2.retVal), "retVal");
         var exDiff = addKeyToDiff(this.diff(si1.exception, si2.exception), "exception");
 
@@ -1183,7 +1509,8 @@
         Wrapper: Wrapper,
         SingleCall: SingleCall,
         Match: Match,
-        Trigger: Trigger
+        Trigger: Trigger,
+        ExpectError: ExpectError
     };
 }));
 

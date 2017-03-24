@@ -462,10 +462,10 @@ function depends(mod) {
                 prop: "beer"
             });
             assert.strictEqual(list.length, 2);
-            assert.deepEqual(list[0].thisArg, {
+            assert.deepEqual(list[0].context, {
                 prop: "beer"
             });
-            assert.deepEqual(list[1].thisArg, {
+            assert.deepEqual(list[1].context, {
                 prop: "beer"
             });
 
@@ -474,7 +474,7 @@ function depends(mod) {
                 test: [1, 2, 3]
             });
             assert.strictEqual(list.length, 1);
-            assert.deepEqual(list[0].thisArg, {
+            assert.deepEqual(list[0].context, {
                 test: [1, 2, 3]
             });
 
@@ -631,6 +631,99 @@ function depends(mod) {
                 w.touchList.filterAttrSetByVal();
             }, TypeError, "filterAttrSetByVal: expected one argument");
         });
+
+        it("can get only value", function() {
+            var w = new Wrapper();
+
+            // no values
+            assert.throws(function() {
+                w.callList.filterOnly();
+            }, TypeError, "filterOnly: expected exactly one value");
+
+            // one value
+            w();
+            assert.doesNotThrow(function() {
+                w.callList.filterOnly();
+            }, TypeError, "filterOnly: expected exactly one value");
+
+            // two values
+            w();
+            assert.throws(function() {
+                w.callList.filterOnly();
+            }, TypeError, "filterOnly: expected exactly one value");
+        });
+
+        it("can filter by number", function() {
+            var w = new Wrapper();
+
+            // missing arg
+            assert.throws(function() {
+                w.callList.filterByNumber();
+            }, TypeError, "expected 'num' to be number");
+            // arg wrong type
+            assert.throws(function() {
+                w.callList.filterByNumber("foo");
+            }, TypeError, "expected 'num' to be number");
+
+            // nothing to get
+            assert.throws(function() {
+                w.callList.filterByNumber(1);
+            }, RangeError, "empty list");
+
+            w("beer");
+            // only 0, can't get 1
+            assert.throws(function() {
+                w.callList.filterByNumber(1);
+            }, RangeError, "'num' out of bounds");
+            // no negative indexes please
+            assert.throws(function() {
+                w.callList.filterByNumber(-1);
+            }, RangeError, "'num' out of bounds");
+
+            // success
+            var ret = w.callList.filterByNumber(0);
+            assert.instanceOf(ret, SingleCall);
+        });
+
+        it("can filter attribute by number");
+
+        it("can filter first", function() {
+            var w = new Wrapper();
+
+            // empty list
+            assert.throws(function() {
+                w.callList.filterFirst();
+            }, RangeError, "empty list");
+
+            w("beer");
+            var ret = w.callList.filterFirst();
+            assert.instanceOf(ret, SingleCall);
+            assert.deepEqual(ret.argList, ["beer"]);
+
+            w("wine");
+            ret = w.callList.filterFirst();
+            assert.instanceOf(ret, SingleCall);
+            assert.deepEqual(ret.argList, ["beer"]);
+        });
+
+        it("can filter last", function() {
+            var w = new Wrapper();
+
+            // empty list
+            assert.throws(function() {
+                w.callList.filterLast();
+            }, RangeError, "filterlast: empty list");
+
+            w("beer");
+            var ret = w.callList.filterLast();
+            assert.instanceOf(ret, SingleCall);
+            assert.deepEqual(ret.argList, ["beer"]);
+
+            w("wine");
+            ret = w.callList.filterLast();
+            assert.instanceOf(ret, SingleCall);
+            assert.deepEqual(ret.argList, ["wine"]);
+        });
     });
 
     describe("get from filter", function() {
@@ -732,7 +825,7 @@ function depends(mod) {
         it("can get all set values");
     });
 
-    describe("expect", function() {
+    describe("expect on filter", function() {
         it("call count", function() {
             var w = new Wrapper();
             assert.isNotOk(w.expectCallCount(1), "expected call count to be zero");
@@ -812,6 +905,74 @@ function depends(mod) {
         it("throws TypeError if expectCallCountMax called with bad max");
     });
 
+    describe("expect on single", function() {
+        it("does args", function() {
+            var testFunc = function() {
+                return "beer";
+            };
+            testFunc = new Wrapper(testFunc);
+            testFunc();
+
+            // passed expect
+            var ret = testFunc.callList
+                .filterFirst()
+                .expectReturn("beer");
+            assert.isBoolean(ret);
+            assert.isOk(ret);
+
+            // failed expect
+            ret = testFunc.callList
+                .filterFirst()
+                .expectReturn("wine");
+            assert.isBoolean(ret);
+            assert.isNotOk(ret);
+        });
+
+        it("does exception", function() {
+            var testFunc = function() {
+                throw new Error("test");
+            };
+            testFunc = new Wrapper(testFunc);
+
+            try {
+                testFunc();
+            } catch (e) {}
+
+            // passed expect
+            var ret = testFunc.callList
+                .filterFirst()
+                .expectException(new Error("test"));
+            assert.isBoolean(ret);
+            assert.isOk(ret);
+
+            // failed expect
+            ret = testFunc.callList
+                .filterFirst()
+                .expectException(new TypeError("beer"));
+            assert.isBoolean(ret);
+            assert.isNotOk(ret);
+        });
+    });
+
+    describe("expect on trigger", function() {
+        it("does args", function() {
+            var w = new Wrapper();
+
+            w.triggerAlways()
+                .expectCallArgs("beer");
+
+            // pass
+            assert.doesNotThrow(function() {
+                w("beer");
+            });
+
+            // fail
+            assert.throws(function() {
+                w("foo");
+            });
+        });
+    });
+
     describe("aliases", function() {
         it("includes expectCallOnce", function() {
             var w = new Wrapper();
@@ -851,6 +1012,368 @@ function depends(mod) {
             assert.instanceOf(ret, Trigger);
         });
 
+        it("can trigger on args", function() {
+            var w = new Wrapper();
+
+            w.triggerOnArgs("beer")
+                .actionReturn("yum!");
+            w.triggerOnArgs("water")
+                .actionReturn("refreshing!");
+            w.triggerOnArgs()
+                .actionReturn("all gone");
+
+            // triggers
+            var ret;
+            ret = w("beer");
+            assert.strictEqual(ret, "yum!");
+            ret = w("water");
+            assert.strictEqual(ret, "refreshing!");
+            ret = w("beer");
+            assert.strictEqual(ret, "yum!");
+            ret = w();
+            assert.strictEqual(ret, "all gone");
+
+            // trigger
+            ret = w("nothing");
+            assert.isUndefined(ret);
+        });
+
+        it("can trigger on context", function() {
+            var w = new Wrapper();
+
+            w.triggerOnContext({
+                    special: true
+                })
+                .actionReturn("I feel special");
+
+            // trigger
+            var ret;
+            ret = w.call({
+                special: true
+            });
+            assert.strictEqual(ret, "I feel special");
+
+            // no trigger
+            ret = w.call({});
+            assert.isUndefined(ret);
+        });
+
+        it("can trigger on call number", function() {
+            var w = new Wrapper();
+
+            w.triggerOnCallNumber(1)
+                .actionReturn("boo!");
+
+            var ret;
+            ret = w();
+            assert.isUndefined(ret);
+
+            ret = w();
+            assert.strictEqual(ret, "boo!");
+
+            ret = w();
+            assert.isUndefined(ret);
+        });
+
+        it("can trigger on exception", function() {
+            var count = 0;
+            var testFunc = function() {
+                count++;
+                switch (count) {
+                    case 1:
+                        return;
+                    case 2:
+                        throw new TypeError("wine");
+                    case 3:
+                        return;
+                }
+            };
+            testFunc = new Wrapper(testFunc);
+            var run = false;
+            testFunc.triggerOnException(new TypeError("wine"))
+                .actionCustom(function foo() {
+                    run = true;
+                });
+
+            run = false;
+            assert.doesNotThrow(function() {
+                testFunc();
+            });
+            assert.isNotOk(run);
+
+            run = false;
+            assert.throws(function() {
+                testFunc();
+            }, TypeError, "wine");
+            assert.isOk(run);
+
+            run = false;
+            assert.doesNotThrow(function() {
+                testFunc();
+            });
+            assert.isNotOk(run);
+        });
+
+        it("can trigger on return", function() {
+            var count = 0;
+            var testFunc = function() {
+                count++;
+                switch (count) {
+                    case 1:
+                        return "beer";
+                    case 2:
+                        return {
+                            a: 1
+                        };
+                    case 3:
+                        return "beer";
+                    case 4:
+                        return [1, 2, 3];
+                }
+            };
+            testFunc = new Wrapper(testFunc);
+
+            var run;
+            testFunc.triggerOnReturn("beer")
+                .actionCustom(function foo() {
+                    run = true;
+                });
+
+            run = false;
+            testFunc();
+            assert.isOk(run);
+
+            run = false;
+            testFunc();
+            assert.isNotOk(run);
+
+            run = false;
+            testFunc();
+            assert.isOk(run);
+
+            run = false;
+            testFunc();
+            assert.isNotOk(run);
+        });
+
+        it("can trigger on custom function", function() {
+            var count = 0;
+
+            function custom(single) {
+                count++;
+                if (!(count % 4)) { // runs every 4th time
+                    return true;
+                }
+                return false;
+            }
+            var w = new Wrapper();
+
+            w.triggerOnCustom(custom)
+                .actionReturn("boom");
+
+            var ret;
+            ret = w();
+            assert.isUndefined(ret);
+
+            ret = w();
+            assert.strictEqual(ret, "boom");
+
+            ret = w();
+            assert.isUndefined(ret);
+
+            ret = w();
+            assert.strictEqual(ret, "boom");
+        });
+
+        it("can trigger on set", function() {
+            var testObj = {
+                beer: "yummy"
+            };
+            var w = new Wrapper(testObj, "beer");
+
+            w.triggerOnSet()
+                .actionCustom(function(curr) {
+                    curr.exception = new Error("surprise!");
+                });
+
+            assert.throws(function() {
+                testObj.beer = "more?";
+            }, Error, "surprise!");
+
+            assert.doesNotThrow(function(ret) {
+                ret = testObj.beer;
+            });
+        });
+
+        it("can trigger on get", function() {
+            var testObj = {
+                beer: "yummy"
+            };
+            var w = new Wrapper(testObj, "beer");
+
+            w.triggerOnGet()
+                .actionCustom(function(curr) {
+                    curr.exception = new Error("surprise!");
+                });
+
+            assert.doesNotThrow(function() {
+                testObj.beer = "more?";
+            });
+
+            assert.throws(function(ret) {
+                ret = testObj.beer;
+            }, Error, "surprise!");
+        });
+
+        it("can trigger on set value", function() {
+            var testObj = {
+                beer: "yummy"
+            };
+            var w = new Wrapper(testObj, "beer");
+
+            w.triggerOnSetVal("boo")
+                .actionCustom(function(curr) {
+                    curr.exception = new Error("surprise!");
+                });
+
+            assert.doesNotThrow(function() {
+                testObj.beer = "more?";
+            });
+
+            assert.throws(function() {
+                testObj.beer = "boo";
+            }, Error, "surprise!");
+        });
+
+        it("can trigger on set number", function() {
+            var testObj = {
+                beer: "yummy"
+            };
+            var w = new Wrapper(testObj, "beer");
+
+            w.triggerOnSetNumber(1)
+                .actionCustom(function(curr) {
+                    curr.exception = new Error("surprise!");
+                });
+
+            assert.doesNotThrow(function() {
+                testObj.beer = "boo";
+            });
+
+            var ret = testObj.beer;
+            ret = ret; // make linter happy
+
+            assert.throws(function() {
+                testObj.beer = "boo";
+            }, Error, "surprise!");
+
+            assert.doesNotThrow(function() {
+                testObj.beer = "bar";
+            });
+        });
+
+        it("can trigger on get number", function() {
+            var testObj = {
+                beer: "yummy"
+            };
+            var w = new Wrapper(testObj, "beer");
+
+            w.triggerOnGetNumber(1)
+                .actionCustom(function(curr) {
+                    curr.exception = new Error("surprise!");
+                });
+
+            var ret;
+
+            assert.doesNotThrow(function() {
+                ret = testObj.beer;
+            });
+
+            assert.throws(function() {
+                ret = testObj.beer;
+            }, Error, "surprise!");
+
+            assert.doesNotThrow(function() {
+                ret = testObj.beer;
+            });
+        });
+
+        it("can trigger on touch number", function() {
+            var testObj = {
+                beer: "yummy"
+            };
+            var w = new Wrapper(testObj, "beer");
+
+            w.triggerOnTouchNumber(1)
+                .actionCustom(function(curr) {
+                    curr.exception = new Error("surprise!");
+                });
+
+            var ret;
+            assert.doesNotThrow(function() {
+                ret = testObj.beer;
+            });
+            assert.throws(function() {
+                testObj.beer = "boo";
+            }, Error, "surprise!");
+            assert.doesNotThrow(function() {
+                testObj.beer = "boo";
+            });
+        });
+
+        it("can manage multiple triggers simultaneously", function() {
+            var w = new Wrapper();
+            w.triggerAlways()
+                .actionReturn("yup");
+            w.triggerOnCallNumber(1)
+                .actionCustom(function(curr) {
+                    curr.exception = new Error("surprise!");
+                });
+
+            var ret;
+            ret = w();
+            assert.strictEqual(ret, "yup");
+
+            assert.throws(function() {
+                w();
+            }, Error, "surprise!");
+
+            ret = w();
+            assert.strictEqual(ret, "yup");
+        });
+
+        it("can manage multiple triggers simultaneously 2", function() {
+            var testObj = {
+                beer: "yummy"
+            };
+            var w = new Wrapper(testObj, "beer");
+
+            w.triggerOnTouchNumber(1)
+                .actionCustom(function(single) {
+                    single.exception = new Error("surprise!");
+                });
+            w.triggerOnTouchNumber(3)
+                .actionCustom(function(single) {
+                    single.exception = new Error("boo!");
+                });
+
+            var ret;
+            assert.doesNotThrow(function() {
+                ret = testObj.beer;
+            });
+            assert.throws(function() {
+                testObj.beer = "boo";
+            }, Error, "surprise!");
+            assert.doesNotThrow(function() {
+                testObj.beer = "boo";
+            });
+            assert.throws(function() {
+                testObj.beer = "boo";
+            }, Error, "boo");
+        });
+    });
+
+    describe("trigger action", function() {
         it("can spoof a call return value", function() {
             var w = new Wrapper();
             var ret = w.triggerAlways().actionReturn({
@@ -879,6 +1402,180 @@ function depends(mod) {
             ret = testObj.beer;
             assert.strictEqual(ret, "all gone");
         });
+
+        it("can return from args", function() {
+            var w = new Wrapper();
+            w.triggerAlways()
+                .actionReturnFromArg(0);
+
+            var ret;
+            ret = w("beer");
+            assert.strictEqual(ret, "beer");
+            ret = w("foo");
+            assert.strictEqual(ret, "foo");
+            ret = w();
+            assert.isUndefined(ret);
+
+            w = new Wrapper();
+            w.triggerAlways()
+                .actionReturnFromArg(1);
+
+            ret = w(1, 2);
+            assert.strictEqual(ret, 2);
+            ret = w("beer", "wine");
+            assert.strictEqual(ret, "wine");
+        });
+
+        it("can return context", function() {
+            var w = new Wrapper();
+            var ctx = {
+                beer: "yummy"
+            };
+
+            w.triggerAlways()
+                .actionReturnContext();
+
+            var ret;
+            ret = w.call(ctx);
+            assert.deepEqual(ret, ctx);
+        });
+
+        it("can return from context", function() {
+            var w = new Wrapper();
+            var ctx = {
+                beer: "yummy"
+            };
+
+            w.triggerAlways()
+                .actionReturnFromContext("beer");
+
+            var ret;
+            ret = w.call(ctx);
+            assert.strictEqual(ret, "yummy");
+        });
+
+        it("can throw error", function() {
+            var w = new Wrapper();
+
+            w.triggerAlways()
+                .actionThrowException(new TypeError("supersonic boom"));
+
+            // throw the requested error
+            assert.throws(function() {
+                w();
+            }, TypeError, "supersonic boom");
+
+            // throw a real error
+            w = new Wrapper();
+            w.triggerAlways()
+                .actionThrowException("not an error");
+
+            assert.throws(function() {
+                w();
+            }, Error, "actionThrowException: expected 'err' argument to be error");
+        });
+
+        it("can setval", function() {
+            var testObj = {
+                beer: "yummy"
+            };
+            var w = new Wrapper(testObj, "beer");
+
+            w.triggerAlways()
+                .actionSetVal("more!");
+
+            // no set, unchanged value
+            var ret;
+            ret = testObj.beer;
+            assert.strictEqual(ret, "yummy");
+
+            // set has replaced value
+            testObj.beer = "foo";
+            ret = testObj.beer;
+            assert.strictEqual(ret, "more!");
+        });
+
+        it("can return a resolved promise", function() {
+            var testFunc = function() {
+                return "sleepy";
+            };
+            testFunc = new Wrapper(testFunc);
+
+            testFunc.triggerAlways()
+                .actionReturnPromise();
+
+            var ret1 = testFunc();
+            assert.instanceOf(ret1, Promise);
+
+            testFunc.triggerAlways()
+                .actionReturnPromise("foo");
+
+            var ret2 = testFunc();
+            assert.instanceOf(ret2, Promise);
+
+            return ret1.then((v) => {
+                assert.strictEqual(v, "sleepy");
+                return ret2;
+            }).then((v) => {
+                assert.strictEqual(v, "foo");
+            });
+        });
+
+        it("can return a rejected promise", function() {
+            var testFunc = function() {
+                throw new TypeError("lazy");
+            };
+            testFunc = new Wrapper(testFunc);
+
+            testFunc.triggerAlways()
+                .actionRejectPromise();
+
+            var ret1;
+            assert.doesNotThrow(function() {
+                ret1 = testFunc();
+            });
+            assert.instanceOf(ret1, Promise);
+
+            return ret1.then(
+                () => {
+                    assert.isNotOk(true, "expected promise to fail");
+                },
+                (e) => {
+                    assert.instanceOf(e, TypeError);
+                    assert.strictEqual(e.message, "lazy");
+                });
+        });
+
+        it("can return a rejected promise of a different type", function() {
+            var testFunc = function() {
+                throw new TypeError("lazy");
+            };
+            testFunc = new Wrapper(testFunc);
+
+            testFunc.triggerAlways()
+                .actionRejectPromise(new Error("foo"));
+
+            var ret1;
+            assert.doesNotThrow(function() {
+                ret1 = testFunc();
+            });
+            assert.instanceOf(ret1, Promise);
+
+            return ret1.then(
+                () => {
+                    assert.isNotOk(true, "expected promise to fail");
+                },
+                (e) => {
+                    assert.instanceOf(e, Error);
+                    assert.strictEqual(e.message, "foo");
+                });
+        });
+
+        it("can chain actions");
+    });
+
+    describe("trigger expects", function() {
+        it("can chain expects");
     });
 
     describe("match", function() {
@@ -1192,7 +1889,7 @@ function depends(mod) {
         });
 
         it("can diff single invocations", function() {
-            // constructor(thisArg, argList, retVal, exception)
+            // constructor(context, argList, retVal, exception)
             var si = new SingleCall({}, [1, 2, 3]);
             var m = new Match({
                 value: si
