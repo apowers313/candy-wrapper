@@ -73,7 +73,7 @@
     var wrapperCookieKey = "uniquePlaceToKeepAGuidForCandyWrapper";
 
     /**
-     * Creates a new function or attribute wrapper -- a spy, stub, mock, etc.
+     * Creates a new function or property wrapper -- a spy, stub, mock, etc.
      */
     class Wrapper extends Function {
 
@@ -93,9 +93,9 @@
             // new Wrapper(obj)
             // new Wrapper(func)
             // new Wrapper(obj, method)
-            // new Wrapper(obj, attribute)
+            // new Wrapper(obj, property)
             // new Wrapper(obj, method, func)
-            // new Wrapper(obj, attribute, func)
+            // new Wrapper(obj, property, func)
 
             // constructed like: wrapper()
             if (arguments.length === 0) {
@@ -107,7 +107,7 @@
             /**
              * Wrap all aspects of an object
              * @param  {Object} obj Object to be wrapped
-             * @return {Object}    Returns an object with all methods and attributes wrapped
+             * @return {Object}    Returns an object with all methods and propertys wrapped
              * @lends Wrapper
              * @constructor
              */
@@ -130,23 +130,23 @@
             }
 
             // wrapper(obj, method)
-            // wrapper(obj, attribute)
+            // wrapper(obj, property)
             if (arguments.length === 2 &amp;&amp;
                 typeof arguments[0] === "object" &amp;&amp;
                 typeof arguments[1] === "string") {
                 let obj = arguments[0];
                 let key = arguments[1];
-                debug("wrapping method or attribute:", key);
+                debug("wrapping method or property:", key);
                 if (typeof obj[key] === "function") {
                     obj[key] = this._callConstructor(obj[key]);
                     return obj[key];
                 } else {
-                    return this._attrConstructor(obj, key);
+                    return this._propConstructor(obj, key);
                 }
             }
 
             // wrapper(obj, method, func)
-            // wrapper(obj, attribute, func)
+            // wrapper(obj, property, func)
             if (arguments.length === 3 &amp;&amp;
                 typeof arguments[0] === "object" &amp;&amp;
                 typeof arguments[1] === "string" &amp;&amp;
@@ -154,11 +154,11 @@
                 let obj = arguments[0];
                 let key = arguments[1];
                 let fn = arguments[2];
-                debug("wrapping method or attribute:", key);
+                debug("wrapping method or property:", key);
                 if (typeof obj[key] === "function") {
                     return this._callConstructor(obj[key], fn);
                 } else {
-                    return this._attrConstructor(obj, key, fn);
+                    return this._propConstructor(obj, key, fn);
                 }
             }
 
@@ -257,16 +257,16 @@
             return si.retVal;
         }
 
-        _attrConstructor(obj, attr, fn) {
-            if (typeof obj[attr] === "object") {
+        _propConstructor(obj, prop, fn) {
+            if (typeof obj[prop] === "object") {
                 throw new TypeError("can't wrap a sub-object: not implemented");
             }
 
             // save the values
-            this.origAttr = Object.getOwnPropertyDescriptor(obj, attr);
-            this.attrValue = this.origAttr.value;
+            this.origProp = Object.getOwnPropertyDescriptor(obj, prop);
+            this.propValue = this.origProp.value;
             this.setterGetterFn = fn;
-            this.type = "attribute";
+            this.type = "property";
             this.touchList = new Filter(this);
 
             // create a proxy for the setter / getters
@@ -284,9 +284,9 @@
             });
 
             // define the new property
-            Object.defineProperty(obj, attr, {
-                configurable: this.origAttr.configurable,
-                enumerable: this.origAttr.enumerable,
+            Object.defineProperty(obj, prop, {
+                configurable: this.origProp.configurable,
+                enumerable: this.origProp.enumerable,
                 get: this.chainable,
                 set: this.chainable,
             });
@@ -299,7 +299,7 @@
 
         _doSetterGetter(type, val) {
             // create a new single touch instance
-            var st = new SingleTouch(this, type, this.attrValue, val);
+            var st = new SingleTouch(this, type, this.propValue, val);
 
             debug(`_doSetterGetter ${type} "${val}"`);
 
@@ -312,9 +312,9 @@
             } else if (type === "set" &amp;&amp; this.setterGetterFn) {
                 st.retVal = this.setterGetterFn(type, st.setVal);
             } else if (type === "set") {
-                // if no setter / getter function, just used the cached attrValue
+                // if no setter / getter function, just used the cached propValue
                 st.retVal = st.setVal;
-                this.attrValue = st.setVal;
+                this.propValue = st.setVal;
             }
 
             // run post-call trigger
@@ -346,15 +346,15 @@
         }
 
         /**
-         * Asserts that the current Wrapper is wrapping an attribute.
+         * Asserts that the current Wrapper is wrapping an property.
          * @param  {String} callerName The name of the calling function, to be included in
          * the error message if the assertion fails.
-         * @throws {Error} If Current Wrapper is not wrapping an attribute.
+         * @throws {Error} If Current Wrapper is not wrapping an property.
          * @private
          */
-        _attrOnly(callerName) {
-            if (this.type !== "attribute") {
-                throw new Error(`${callerName} is only supported for ATTRIBUTE wrappers`);
+        _propOnly(callerName) {
+            if (this.type !== "property") {
+                throw new Error(`${callerName} is only supported for PROPERTY wrappers`);
             }
         }
 
@@ -478,14 +478,14 @@
 
         /**
          * This static method checks whether something is a Wrapper or not, similar to `Array.isArray`.
-         * Works on functions, methods, and attributes. This function has multiple signatures as illustrated
+         * Works on functions, methods, and propertys. This function has multiple signatures as illustrated
          * below.
          * @example
          *
          * var testFunction = function(){};
          *
          * var testObject {
-         *    attr: 1,
+         *    prop: 1,
          *    meth: function() {}
          * }
          *
@@ -493,9 +493,9 @@
          * testFunction = new Wrapper(testFunction);
          * Wrapper.isWrapper(testFunction); // true
          *
-         * Wrapper.isWrapper(testObject, "attr"); // false
-         * new Wrapper(testObject, "attr");
-         * Wrapper.isWrapper(testObject, "attr"); // true
+         * Wrapper.isWrapper(testObject, "prop"); // false
+         * new Wrapper(testObject, "prop");
+         * Wrapper.isWrapper(testObject, "prop"); // true
          *
          * Wrapper.isWrapper(testObject, "meth"); // false
          * new Wrapper(testObject, "meth");
@@ -520,7 +520,7 @@
                 let obj = arguments[0];
                 let key = arguments[1];
 
-                // attribute is a function
+                // property is a function
                 if (typeof obj[key] === "function")
                     return Wrapper.isWrapper(obj[key]);
 
@@ -576,8 +576,8 @@
                 this._configCallReset();
             }
 
-            if (this.type === "attribute") {
-                this._configAttrReset();
+            if (this.type === "property") {
+                this._configPropReset();
             }
 
             return this.chainable;
@@ -587,7 +587,7 @@
             this.callList.length = 0;
         }
 
-        _configAttrReset() {
+        _configPropReset() {
             this.touchList.length = 0;
         }
 
@@ -669,7 +669,7 @@
         }
 
         triggerOnSet() {
-            this._attrOnly();
+            this._propOnly();
             var t = new Trigger(this, function(single) {
                 if (single.type === "set") return true;
                 return false;
@@ -679,7 +679,7 @@
         }
 
         triggerOnSetVal(setVal) {
-            this._attrOnly();
+            this._propOnly();
             var m = Match.Value(setVal);
             var t = new Trigger(this, function(single) {
                 return m.compare(single.setVal);
@@ -689,7 +689,7 @@
         }
 
         triggerOnSetNumber(num) {
-            this._attrOnly();
+            this._propOnly();
             var count = 0;
             var t = new Trigger(this, function(single) {
                 if (single.type !== "set") return false;
@@ -702,7 +702,7 @@
         }
 
         triggerOnGet() {
-            this._attrOnly();
+            this._propOnly();
             var t = new Trigger(this, function(single) {
                 if (single.type === "get") return true;
                 return false;
@@ -712,7 +712,7 @@
         }
 
         triggerOnGetNumber(num) {
-            this._attrOnly();
+            this._propOnly();
             var count = 0;
             var t = new Trigger(this, function(single) {
                 if (single.type !== "get") return false;
@@ -725,7 +725,7 @@
         }
 
         triggerOnTouchNumber(num) {
-            this._attrOnly();
+            this._propOnly();
             var count = 0;
             var t = new Trigger(this, function(single) {
                 var ret = (count === num);
@@ -871,23 +871,23 @@
             super(...args);
             this.wrapper = wrapper;
 
-            alias(this, "filterAttrSet",
-                this._filter, "filterSet", "attribute",
+            alias(this, "filterPropSet",
+                this._filter, "filterSet", "property",
                 function(element) {
                     if (element.type === "set") return true;
                 });
 
-            alias(this, "filterAttrGet",
-                this._filter, "filterGet", "attribute",
+            alias(this, "filterPropGet",
+                this._filter, "filterGet", "property",
                 function(element) {
                     if (element.type === "get") return true;
                 });
 
-            alias(this, "filterAttrSetByVal",
-                this._filter, "filterAttrSetByVal", "attribute",
+            alias(this, "filterPropSetByVal",
+                this._filter, "filterPropSetByVal", "property",
                 function(element, index, array, ...args) {
                     if (args.length !== 1) {
-                        throw new TypeError("filterAttrSetByVal: expected one argument");
+                        throw new TypeError("filterPropSetByVal: expected one argument");
                     }
                     var setVal = args[0];
 
@@ -947,13 +947,13 @@
             alias(this, "getAllReturns",
                 this._get, "getAllReturns", "both", "retVal");
             alias(this, "getAllSetVals",
-                this._get, "getAllSetVals", "attribute", "setVal");
+                this._get, "getAllSetVals", "property", "setVal");
 
             alias(this, "filterFirst", this.filterByNumber, 0);
         }
 
         _filter(name, type, fn, ...args) {
-            if (type === "attribute") this.wrapper._attrOnly(name);
+            if (type === "property") this.wrapper._propOnly(name);
             if (type === "function") this.wrapper._funcOnly(name);
 
             return this.filter(function(element, index, array) {
@@ -962,7 +962,7 @@
         }
 
         _get(name, type, idx) {
-            if (type === "attribute") this.wrapper._attrOnly(name);
+            if (type === "property") this.wrapper._propOnly(name);
             if (type === "function") this.wrapper._funcOnly(name);
 
             return this.map(function(element) {
@@ -1017,7 +1017,7 @@
     }
 
     /**
-     * A representation of a single `get` or `set` on an attribute.
+     * A representation of a single `get` or `set` on an property.
      */
     class SingleTouch extends Expect {
         constructor(wrapper, type, retVal, setVal, exception) {
@@ -1052,7 +1052,7 @@
 
     /**
      * A `Trigger` determines what `expect` or `action` calls get run on a wrapped
-     * function or attribute. Triggers usally get created by calling a trigger function
+     * function or property. Triggers usally get created by calling a trigger function
      * on the {@link Wrapper}.
      * @example
      * var wrapper = new Wrapper(something);
@@ -1590,7 +1590,7 @@
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.3</a> on Sat Mar 25 2017 05:09:17 GMT+0000 (UTC) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.3</a> on Sat Mar 25 2017 05:15:52 GMT+0000 (UTC) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>
