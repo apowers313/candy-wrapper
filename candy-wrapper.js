@@ -610,7 +610,7 @@
          */
         triggerOnContext(context) {
             this._funcOnly();
-            var m = Match.Value(ctx);
+            var m = Match.Value(context);
             var t = new Trigger(this, function(single) {
                 var ret = m.compare(single.context);
                 return ret;
