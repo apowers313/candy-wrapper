@@ -16,6 +16,7 @@ function depends(mod) {
     var Match = CandyWrapper.Match;
     var Trigger = CandyWrapper.Trigger;
     var SingleCall = CandyWrapper.SingleCall;
+    var ExpectError = CandyWrapper.ExpectError;
 
     describe("requested new feature list", function() {
         it("can detect when a function has been invoked with 'new()'"); // Proxy.handler.construct()?
@@ -117,13 +118,13 @@ function depends(mod) {
 
         it("throws error when called with bad arguments", function() {
             assert.throws(function() {
-                var w = new Wrapper("foo");
+                new Wrapper("foo");
             }, TypeError, /Wrapper: bad arguments/);
             assert.throws(function() {
-                var w = new Wrapper(true);
+                new Wrapper(true);
             }, TypeError, /Wrapper: bad arguments/);
             assert.throws(function() {
-                var w = new Wrapper(null);
+                new Wrapper(null);
             }, TypeError, /Wrapper: bad arguments/);
         });
         it("mirrors defineProperty values");
@@ -1118,7 +1119,7 @@ function depends(mod) {
             ret = w.touchList
                 .filterFirst()
                 .expectCustom(function(curr) {
-                    assert.strictEqual (curr.retVal, "yummy");
+                    assert.strictEqual(curr.retVal, "yummy");
                     return null;
                 });
             assert.isBoolean(ret);
@@ -1127,7 +1128,7 @@ function depends(mod) {
             // fail
             ret = w.touchList
                 .filterFirst()
-                .expectCustom(function(curr) {
+                .expectCustom(function() {
                     return "error mesage";
                 });
             assert.isBoolean(ret);
@@ -1168,11 +1169,118 @@ function depends(mod) {
             });
         });
 
-        // expectReturn
-        // expectContext
-        // expectException
-        // expectSetVal
-        // expectCustom
+        it("does return", function() {
+            var testFunc = function() {
+                return "beer";
+            };
+
+            // pass
+            testFunc = new Wrapper(testFunc);
+            testFunc.triggerAlways()
+                .expectReturn("beer");
+            assert.doesNotThrow(function() {
+                testFunc();
+            });
+
+            // fail
+            testFunc = new Wrapper(testFunc);
+            testFunc.triggerAlways()
+                .expectReturn("wine");
+            assert.throws(function() {
+                testFunc();
+            }, ExpectError);
+        });
+
+        it("does context", function() {
+            // pass
+            var w = new Wrapper();
+            w.triggerAlways()
+                .expectContext({location: "home"});
+            assert.doesNotThrow(function() {
+                w.call({location: "home"});
+            });
+
+            // pass
+            var w = new Wrapper();
+            w.triggerAlways()
+                .expectContext({location: "home"});
+            assert.throws(function() {
+                w.call({location: "store"});
+            }, ExpectError);
+        });
+
+        it("does exception", function() {
+            var testFunc = function() {
+                throw new Error("fridge empty");
+            };
+
+            // pass
+            testFunc = new Wrapper(testFunc);
+            testFunc.triggerAlways()
+                .expectException(new Error("fridge empty"));
+            assert.throws(function() {
+                testFunc();
+            }, Error, "fridge empty");
+
+            // fail
+            testFunc = new Wrapper(testFunc);
+            testFunc.triggerAlways()
+                .expectException(new TypeError("yogurt"));
+            assert.throws(function() {
+                testFunc();
+            }, ExpectError);
+        });
+
+        it("does setval", function() {
+            var testObj = {
+                beer: "yummy"
+            };
+
+            // pass
+            var w = new Wrapper(testObj, "beer");
+            w.triggerAlways()
+                .expectSetVal(42);
+            assert.doesNotThrow(function() {
+                testObj.beer = 42;
+            });
+
+            // fail
+            assert.throws(function() {
+                testObj.beer = 666;
+            }, ExpectError);
+        });
+
+        it("does custom", function() {
+            var w = new Wrapper();
+
+            // pass
+            var check = false;
+            w.triggerAlways()
+                .expectCustom(function(curr) {
+                    check = true;
+                    assert.isObject(curr);
+                    assert.isOk(Wrapper.isWrapper(curr.wrapper));
+                    return null;
+                });
+            assert.doesNotThrow(function() {
+                w();
+            });
+            assert.isOk(check);
+
+            // pass
+            check = false;
+            w.triggerAlways()
+                .expectCustom(function(curr) {
+                    check = true;
+                    assert.isObject(curr);
+                    assert.isOk(Wrapper.isWrapper(curr.wrapper));
+                    return "error message";
+                });
+            assert.throws(function() {
+                w();
+            }, ExpectError);
+            assert.isOk(check);
+        });
 
         it("is chainable");
     });
@@ -1363,7 +1471,7 @@ function depends(mod) {
         it("can trigger on custom function", function() {
             var count = 0;
 
-            function custom(single) {
+            function custom() {
                 count++;
                 if (!(count % 4)) { // runs every 4th time
                     return true;
@@ -1838,7 +1946,7 @@ function depends(mod) {
 
             var called = false;
 
-            function cb(...args) {
+            function cb() {
                 assert.deepEqual(this, {
                     context: "awesome!"
                 });
