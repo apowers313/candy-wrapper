@@ -22,7 +22,7 @@
 <label for="nav-trigger" class="overlay"></label>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Expect.html">Expect</a></li><li><a href="Match.html">Match</a></li><li><a href="SingleCall.html">SingleCall</a></li><li><a href="SingleTouch.html">SingleTouch</a></li><li><a href="Trigger.html">Trigger</a></li><li><a href="Wrapper.html">Wrapper</a><ul class='methods'><li data-type='method'><a href="Wrapper.html#.isWrapper">isWrapper</a></li><li data-type='method'><a href="Wrapper.html#configDefault">configDefault</a></li><li data-type='method'><a href="Wrapper.html#configReset">configReset</a></li></ul></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Expect.html">Expect</a><ul class='methods'><li data-type='method'><a href="Expect.html#expectReturn">expectReturn</a></li></ul></li><li><a href="ExpectError.html">ExpectError</a></li><li><a href="Filter.html">Filter</a><ul class='methods'><li data-type='method'><a href="Filter.html#filterPropGet">filterPropGet</a></li><li data-type='method'><a href="Filter.html#filterPropSet">filterPropSet</a></li></ul></li><li><a href="Match.html">Match</a></li><li><a href="SingleCall.html">SingleCall</a><ul class='methods'><li data-type='method'><a href="SingleCall.html#expectReturn">expectReturn</a></li></ul></li><li><a href="SingleTouch.html">SingleTouch</a><ul class='methods'><li data-type='method'><a href="SingleTouch.html#expectReturn">expectReturn</a></li></ul></li><li><a href="Trigger.html">Trigger</a><ul class='methods'><li data-type='method'><a href="Trigger.html#actionReturn">actionReturn</a></li><li data-type='method'><a href="Trigger.html#expectReturn">expectReturn</a></li></ul></li><li><a href="Wrapper.html">Wrapper</a><ul class='methods'><li data-type='method'><a href="Wrapper.html#.isWrapper">isWrapper</a></li><li data-type='method'><a href="Wrapper.html#configDefault">configDefault</a></li><li data-type='method'><a href="Wrapper.html#configReset">configReset</a></li><li data-type='method'><a href="Wrapper.html#triggerOnArgs">triggerOnArgs</a></li><li data-type='method'><a href="Wrapper.html#triggerOnCallNumber">triggerOnCallNumber</a></li><li data-type='method'><a href="Wrapper.html#triggerOnContext">triggerOnContext</a></li></ul></li></ul>
 </nav>
 
 <div id="main">
@@ -45,7 +45,9 @@
         
             <div class="class-description"><p>A <code>Trigger</code> determines what <code>expect</code> or <code>action</code> calls get run on a wrapped
 function or property. Triggers usally get created by calling a trigger function
-on the <a href="Wrapper.html">Wrapper</a>.</p></div>
+on the <a href="Wrapper.html">Wrapper</a>. Note that triggers are always run in the order that they
+are added to a <code>Wrapper</code>, and any expectations or actions on a trigger are run
+in the order they were added to the <code>Trigger</code>.</p></div>
         
     
 </header>
@@ -71,7 +73,7 @@ on the <a href="Wrapper.html">Wrapper</a>.</p></div>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="candy-wrapper.js.html">candy-wrapper.js</a>, <a href="candy-wrapper.js.html#line1024">line 1024</a>
+        <a href="candy-wrapper.js.html">candy-wrapper.js</a>, <a href="candy-wrapper.js.html#line1116">line 1116</a>
     </li></ul></dd>
     
 
@@ -146,6 +148,17 @@ wrapper.triggerAlways()          // every time the wrapper is called...
     </div>
 
     
+        <h3 class="subsection-title">Extends</h3>
+
+        
+
+
+    <ul>
+        <li><a href="Expect.html">Expect</a></li>
+    </ul>
+
+
+    
 
     
 
@@ -157,6 +170,329 @@ wrapper.triggerAlways()          // every time the wrapper is called...
 
     
 
+    
+        <h3 class="subsection-title">Methods</h3>
+
+        
+            
+
+    
+
+    <h4 class="name" id="actionReturn"><span class="type-signature"></span>actionReturn<span class="signature">(retVal)</span><span class="type-signature"> &rarr; {<a href="Trigger.html">Trigger</a>}</span></h4>
+
+    
+
+
+
+
+<dl class="details">
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="candy-wrapper.js.html">candy-wrapper.js</a>, <a href="candy-wrapper.js.html#line1124">line 1124</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+<div class="description">
+    <p>When triggered, this action will change the return value of a function call or property get to the value specified by <code>retVal</code>.</p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>retVal</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">any</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>The value that will be returned by the function or attribute when this action is triggered.</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    <p>Returns this <code>Trigger</code>, so that further actions or expectations can be chained.</p>
+</div>
+
+
+
+<dl class="param-type">
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type"><a href="Trigger.html">Trigger</a></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="expectReturn"><span class="type-signature"></span>expectReturn<span class="signature">(retVal)</span><span class="type-signature"> &rarr; {<a href="Trigger.html">Trigger</a>|Boolean}</span></h4>
+
+    
+
+
+
+
+<dl class="details">
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="candy-wrapper.js.html">candy-wrapper.js</a>, <a href="candy-wrapper.js.html#line762">line 762</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+    <dt class="inherited-from">Inherited From:</dt>
+    <dd class="inherited-from"><ul class="dummy"><li>
+        <a href="Expect.html#expectReturn">Expect#expectReturn</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+<div class="description">
+    <p>Evaluates whether the <code>call</code> or <code>get</code> returned the value <code>retVal</code>.</p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>retVal</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">any</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>The value that is expected to be returned from the function call or property getter.</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    <p>When called on a <a href="Trigger.html">Trigger</a>, the expectation is stored for future evaluation and the <code>Trigger</code> value is returned to make this chainable.
+When called on a <a href="SingleCall.html">SingleCall</a> or <a href="SingleTouch.html">SingleTouch</a>, the expectation is evaluated immediately and <code>true</code> is returned if the expectation passed; <code>false</code> if it failed.</p>
+</div>
+
+
+
+<dl class="param-type">
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type"><a href="Trigger.html">Trigger</a></span>
+|
+
+<span class="param-type">Boolean</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+        
     
 
     
@@ -174,7 +510,7 @@ wrapper.triggerAlways()          // every time the wrapper is called...
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.3</a> on Sat Mar 25 2017 05:15:52 GMT+0000 (UTC) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.3</a> on Sat Mar 25 2017 06:48:44 GMT+0000 (UTC) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>

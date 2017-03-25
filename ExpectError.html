@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>SingleCall - Documentation</title>
+    <title>ExpectError - Documentation</title>
 
     <script src="scripts/prettify/prettify.js"></script>
     <script src="scripts/prettify/lang-css.js"></script>
@@ -27,7 +27,7 @@
 
 <div id="main">
     
-    <h1 class="page-title">SingleCall</h1>
+    <h1 class="page-title">ExpectError</h1>
     
 
     
@@ -40,10 +40,10 @@
 <header>
     
         <h2>
-        SingleCall
+        ExpectError
         </h2>
         
-            <div class="class-description"><p>A representation of a single function call.</p></div>
+            <div class="class-description"><p>An Error thrown by a failed <a href="Expect.html">Expect</a> call.</p></div>
         
     
 </header>
@@ -57,7 +57,7 @@
     <h2>Constructor</h2>
     
 
-    <h4 class="name" id="SingleCall"><span class="type-signature"></span>new SingleCall<span class="signature">()</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="ExpectError"><span class="type-signature"></span>new ExpectError<span class="signature">()</span><span class="type-signature"></span></h4>
 
     
 
@@ -69,7 +69,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="candy-wrapper.js.html">candy-wrapper.js</a>, <a href="candy-wrapper.js.html#line1087">line 1087</a>
+        <a href="candy-wrapper.js.html">candy-wrapper.js</a>, <a href="candy-wrapper.js.html#line892">line 892</a>
     </li></ul></dd>
     
 
@@ -142,7 +142,7 @@
 
 
     <ul>
-        <li><a href="Expect.html">Expect</a></li>
+        <li>Error</li>
     </ul>
 
 
@@ -158,174 +158,6 @@
 
     
 
-    
-        <h3 class="subsection-title">Methods</h3>
-
-        
-            
-
-    
-
-    <h4 class="name" id="expectReturn"><span class="type-signature"></span>expectReturn<span class="signature">(retVal)</span><span class="type-signature"> &rarr; {<a href="Trigger.html">Trigger</a>|Boolean}</span></h4>
-
-    
-
-
-
-
-<dl class="details">
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="candy-wrapper.js.html">candy-wrapper.js</a>, <a href="candy-wrapper.js.html#line762">line 762</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-    <dt class="inherited-from">Inherited From:</dt>
-    <dd class="inherited-from"><ul class="dummy"><li>
-        <a href="Expect.html#expectReturn">Expect#expectReturn</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-<div class="description">
-    <p>Evaluates whether the <code>call</code> or <code>get</code> returned the value <code>retVal</code>.</p>
-</div>
-
-
-
-
-
-
-
-
-
-
-
-    <h5>Parameters:</h5>
-    
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>retVal</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">any</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last"><p>The value that is expected to be returned from the function call or property getter.</p></td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<h5>Returns:</h5>
-
-        
-<div class="param-desc">
-    <p>When called on a <a href="Trigger.html">Trigger</a>, the expectation is stored for future evaluation and the <code>Trigger</code> value is returned to make this chainable.
-When called on a <a href="SingleCall.html">SingleCall</a> or <a href="SingleTouch.html">SingleTouch</a>, the expectation is evaluated immediately and <code>true</code> is returned if the expectation passed; <code>false</code> if it failed.</p>
-</div>
-
-
-
-<dl class="param-type">
-    <dt>
-        Type
-    </dt>
-    <dd>
-        
-<span class="param-type"><a href="Trigger.html">Trigger</a></span>
-|
-
-<span class="param-type">Boolean</span>
-
-
-    </dd>
-</dl>
-
-    
-
-
-        
     
 
     
