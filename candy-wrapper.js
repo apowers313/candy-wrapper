@@ -35,6 +35,21 @@
 
     /**
      * Creates a new function or property wrapper -- a spy, stub, mock, etc.
+     *
+     * Below are all the different forms of the contructor,
+     * which are basically syntactic sugar for creating wrappers
+     * around lots of different kinds of things
+     *
+     * Signatures for Wrapper:
+     *      new Wrapper()
+     *      new Wrapper(obj)
+     *      new Wrapper(func)
+     *      new Wrapper(obj, method)
+     *      new Wrapper(obj, property)
+     *      new Wrapper(obj, method, func)
+     *      new Wrapper(obj, property, func)
+     *
+     * @extends {Function}
      */
     class Wrapper extends Function {
 
@@ -44,19 +59,6 @@
             if (arguments[0] === null) {
                 throw new TypeError("Wrapper: bad arguments to constructor. RTFM.");
             }
-
-            // below are all the different forms of the contructor,
-            // which are basically syntactic sugar for creating wrappers
-            // around lots of different kinds of things
-
-            // forms of wrapper:
-            // new Wrapper()
-            // new Wrapper(obj)
-            // new Wrapper(func)
-            // new Wrapper(obj, method)
-            // new Wrapper(obj, property)
-            // new Wrapper(obj, method, func)
-            // new Wrapper(obj, property, func)
 
             // constructed like: wrapper()
             if (arguments.length === 0) {
@@ -69,7 +71,6 @@
              * Wrap all aspects of an object
              * @param  {Object} obj Object to be wrapped
              * @return {Object}    Returns an object with all methods and propertys wrapped
-             * @lends Wrapper
              * @constructor
              */
             if (arguments.length === 1 && typeof arguments[0] === "object") {
@@ -127,6 +128,7 @@
         }
 
         _callConstructor(origFn, wrappedFn) {
+            /** @lends Wrapper# */
             this.type = "function";
             this.callList = new Filter(this);
             this.orig = origFn;
@@ -219,18 +221,24 @@
         }
 
         _propConstructor(obj, prop, fn) {
+            /** @lends Wrapper# */
             if (typeof obj[prop] === "object") {
                 throw new TypeError("can't wrap a sub-object: not implemented");
             }
 
-            // save the values
+            /** @type {Object} The results of `getOwnPropertyDescriptor` on the original property, saved so that it can be restored later. */
             this.origProp = Object.getOwnPropertyDescriptor(obj, prop);
+            /** @type {any} The current value of the property. */
             this.propValue = this.origProp.value;
+            /** @type {Function} An optional custom function that will be called when getting or setting the property. */
             this.setterGetterFn = fn;
+            /** @type {String} The type of this Wrapper object. Options are "property" or "function". */
             this.type = "property";
+            /** @type {Filter} A list of all the touches (gets / sets) on the property. */
             this.touchList = new Filter(this);
 
             // create a proxy for the setter / getters
+            /** @type {Proxy.<Wrapper>} The thing that is returned representing the Wrapped and is intended to be used for chainable Wrapper calls */
             this.chainable = new Proxy(this, {
                 apply: (target, context, argList) => {
                     switch (argList.length) {
@@ -254,7 +262,6 @@
 
             this.configDefault();
             this.configReset();
-            this.chainable = this;
             return this.chainable;
         }
 
@@ -560,6 +567,21 @@
             return t;
         }
 
+        /**
+         * Creates a new {@link Trigger} on the `Wrapper` that executes when the arguments to the wrapper match the arguments to this call.
+         * @param  {...any} args  A list of any arguments that, when matched, will cause this `Trigger` to execute.
+         * @return {Trigger}      The `Trigger` that was created.
+         * @example
+         * // create a Wrapper around something
+         * var w = new Wrapper(obj, "method");
+         *
+         * // create a trigger that executes whenever the arguments exactly "beer"
+         * w.triggerOnArgs("drink", "beer")
+         *      .actionReturn("yum!");
+         *
+         * // call the wrapped method and see what happens...
+         * obj.method("drink", "beer") // returns "yum!"
+         */
         triggerOnArgs(...args) {
             this._funcOnly();
             var m = Match.Value([...args]);
@@ -570,7 +592,23 @@
             return t;
         }
 
-        triggerOnContext(ctx) {
+        /**
+         * Creates a new {@link Trigger} on the `Wrapper` that executes when the `this` value of the wrapped function
+         * matches the `context` argument.
+         * @param  {Object} context An `Object` that, when matched to the `this` value of the function, will cause the `Trigger` to execute.
+         * @return {Trigger}        The `Trigger` that was created.
+         * @example
+         * // create a Wrapper around something
+         * var w = new Wrapper(obj, "method");
+         *
+         * // create a trigger that executes whenever the arguments exactly "beer"
+         * w.triggerOnContext({location: "home"})
+         *      .actionThrowException(new Error("You should be at work right now."));
+         *
+         * // call the wrapped method and see what happens...
+         * obj.method.call({location: "home"}, "hi mom") // throws "You should be at work right now."
+         */
+        triggerOnContext(context) {
             this._funcOnly();
             var m = Match.Value(ctx);
             var t = new Trigger(this, function(single) {
@@ -581,6 +619,23 @@
             return t;
         }
 
+        /**
+         * Creates a new {@link Trigger} on the `Wrapper` that executes the `Nth` time the wrapper is called.
+         * @param  {Number} num What call number this `Trigger` should execute on. Counting starts from zero, so the first call is 0, the second is 1, etc.
+         * @return {Trigger}     The `Trigger` that was created.
+         * @example
+         * // create a Wrapper around something
+         * var w = new Wrapper(obj, "method");
+         *
+         * // create a trigger that executes whenever the arguments exactly "beer"
+         * w.triggerOnCallNumber(2)
+         *      .actionThrowException(new Error("BOOM!"));
+         *
+         * // call the wrapped method and see what happens...
+         * obj.method(); // nothing...
+         * obj.method(); // still nothing...
+         * obj.method(); // throws "BOOM!"
+         */
         triggerOnCallNumber(num) {
             this._funcOnly();
             var count = 0;
@@ -704,6 +759,16 @@
      */
     class Expect {
         constructor() {
+            /**
+             * Evaluates whether the `call` or `get` returned the value `retVal`.
+             * @name expectReturn
+             * @function
+             * @memberof Expect
+             * @param  {any} retVal       The value that is expected to be returned from the function call or property getter.
+             * @return {Trigger|Boolean}  When called on a {@link Trigger}, the expectation is stored for future evaluation and the `Trigger` value is returned to make this chainable.
+             * When called on a {@link SingleCall} or {@link SingleTouch}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
+             * @instance
+             */
             alias(this, "expectReturn",
                 this._expect, "expectReturn", "post",
                 function(single, retVal) {
@@ -820,6 +885,10 @@
         }
     }
 
+    /**
+     * An Error thrown by a failed {@link Expect} call.
+     * @extends {Error}
+     */
     class ExpectError extends Error {
         constructor(message) {
             super(message);
@@ -827,17 +896,35 @@
         }
     }
 
+    /**
+     * Methods for filtering the `callList` or `touchList` of a {@link Wrapper}.
+     * @extends {Array}
+     */
     class Filter extends Array {
         constructor(wrapper, ...args) {
             super(...args);
             this.wrapper = wrapper;
 
+            /**
+             * When called, will return the members of the `Filter` that were occurances of when the property was set. Only works for properties.
+             * @name filterPropSet
+             * @function
+             * @memberof Filter
+             * @instance
+             */
             alias(this, "filterPropSet",
                 this._filter, "filterSet", "property",
                 function(element) {
                     if (element.type === "set") return true;
                 });
 
+            /**
+             * When called, will return the members of the `Filter` that were occurances of when the property was retrieved (i.e. `get`). Only works for properties.
+             * @name filterPropGet
+             * @function
+             * @memberof Filter
+             * @instance
+             */
             alias(this, "filterPropGet",
                 this._filter, "filterGet", "property",
                 function(element) {
@@ -979,6 +1066,7 @@
 
     /**
      * A representation of a single `get` or `set` on an property.
+     * @extends {Expect}
      */
     class SingleTouch extends Expect {
         constructor(wrapper, type, retVal, setVal, exception) {
@@ -994,6 +1082,7 @@
 
     /**
      * A representation of a single function call.
+     * @extends {Expect}
      */
     class SingleCall extends Expect {
         constructor(wrapper, context, argList, retVal, exception) {
@@ -1014,7 +1103,10 @@
     /**
      * A `Trigger` determines what `expect` or `action` calls get run on a wrapped
      * function or property. Triggers usally get created by calling a trigger function
-     * on the {@link Wrapper}.
+     * on the {@link Wrapper}. Note that triggers are always run in the order that they
+     * are added to a `Wrapper`, and any expectations or actions on a trigger are run
+     * in the order they were added to the `Trigger`.
+     * @extends {Expect}
      * @example
      * var wrapper = new Wrapper(something);
      * wrapper.triggerAlways()          // every time the wrapper is called...
@@ -1029,17 +1121,37 @@
             this.currentCall = null;
             this.actionList = [];
 
+            /**
+             * When triggered, this action will change the return value of a function call or property get to the value specified by `retVal`.
+             * @name actionReturn
+             * @function
+             * @memberof Trigger
+             * @instance
+             * @param  {any} retVal  The value that will be returned by the function or attribute when this action is triggered.
+             * @return {Trigger}     Returns this `Trigger`, so that further actions or expectations can be chained.
+             */
             alias(this, "actionReturn",
                 this._action, "actionReturn", "post",
                 function(curr, retVal) {
                     curr.retVal = retVal;
                 });
 
+            /**
+             * Specifies a custom action that will be run when triggered.
+             * @param  {Trigger#actionCustom~requestCallback}    fn  The function to be run when this action is triggered.
+             * @return {Trigger}         Returns this `Trigger`, so that further actions or expectations can be chained.
+             */
             alias(this, "actionCustom",
                 this._action, "actionCustom", "both",
                 function(curr, fn, ...args) {
                     return fn.call(this, curr, ...args);
                 });
+            /**
+             * The callback
+             * @callback Trigger#actionCustom~requestCallback
+             * @param {SingleCall|SingleTouch} current The currently executing function or property touch.
+             * @param {...any} args The arguments that were passed to the function call or property setter.
+             */
 
             alias(this, "actionReturnFromArg",
                 this._action, "actionReturnFromArg", "post",
