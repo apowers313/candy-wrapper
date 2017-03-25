@@ -244,7 +244,16 @@
             si.postCall = si.preCall = true; // in the future evaulate both pre and post calls
             this.callList.push(si);
 
+            // throw the exception...
             if (si.exception) throw si.exception;
+            // ...or call the callback...
+            if (typeof si.callback.fn === "function") {
+                let cbFn = si.callback.fn;
+                let cbArgs = si.callback.argList || [];
+                let cbCtx = si.callback.context || {};
+                si.callback.retVal = cbFn.call(cbCtx, ...cbArgs);
+            }
+            // ...then return the return value.
             return si.retVal;
         }
 
@@ -282,6 +291,7 @@
                 set: this.chainable,
             });
 
+            this.configDefault();
             this.configReset();
             this.chainable = this;
             return this.chainable;
@@ -450,7 +460,7 @@
          * @return {Boolean}      Returns `true` if `arr` has less than `count` members, `false` otherwise
          * @private
          */
-         _CountMax(name, arr, max) {
+        _CountMax(name, arr, max) {
             if (typeof name !== "string") {
                 throw new TypeError("_CountMax: expected 'name' to be string");
             }
@@ -579,19 +589,6 @@
 
         _configAttrReset() {
             this.touchList.length = 0;
-        }
-
-        // TODO: remove
-        filterOneByCallNumber(num) {
-            var callCount = this.callList.length;
-            if (typeof num !== "number" || num &lt; 0) {
-                throw new TypeError(`filterOneByCallNumber: bad call number argument: ${num}`);
-            }
-            if (num >= callCount) {
-                throw new RangeError(`filterOneByCallNumber: ${num} is more than the number of calls made`);
-            }
-
-            return this.callList[num];
         }
 
         triggerAlways() {
@@ -749,8 +746,31 @@
             alias(this, "expectReturn",
                 this._expect, "expectReturn", "post",
                 function(single, retVal) {
-                    if (single.retVal === retVal) return null;
+                    var m = Match.Value(retVal);
+                    if (m.compare(single.retVal)) {
+                        return null;
+                    }
                     return "expectReturn: expectation failed for:" + retVal;
+                });
+
+            alias(this, "expectCallArgs",
+                this._expect, "expectCallArgs", "pre",
+                function(single, ...args) {
+                    var m = Match.Value(args);
+                    if (m.compare(single.argList)) {
+                        return null;
+                    }
+                    return "expectCallArgs: expectation failed for:" + args;
+                });
+
+            alias(this, "expectContext",
+                this._expect, "expectContext", "pre",
+                function(single, context) {
+                    var m = Match.Value(context);
+                    if (m.compare(single.context)) {
+                        return null;
+                    }
+                    return "expectContext: expectation failed for:" + context;
                 });
 
             alias(this, "expectException",
@@ -763,40 +783,23 @@
                     return "expectException: expectation failed for:" + exception;
                 });
 
-            alias(this, "expectCallArgs",
-                this._expect, "expectCallArgs", "pre",
-                function(single, ...args) {
-                    var m = Match.Value(args);
-                    if (m.compare(single.argList)) {
+            alias(this, "expectSetVal",
+                this._expect, "expectSetVal", "post",
+                function(single, setVal) {
+                    var m = Match.Value(setVal);
+                    if (m.compare(single.setVal)) {
                         return null;
                     }
-                    return "expectException: expectation failed for:" + args;
+                    return "expectSetVal: expectation failed for:" + setVal;
+                });
+
+            // returns string or null
+            alias(this, "expectCustom",
+                this._expect, "expectCustom", "post",
+                function(single, fn, ...args) {
+                    return fn.call(this, single, ...args);
                 });
         }
-
-        /* DESIGN PATTERN
-         *
-         * All expect... and action... calls have a similar design pattern.
-         * The template looks something like:
-         *
-         * expectOrFunctionThingy(args) {
-         *    var curr = getCurrOrDefer("expectOrFunctionThingy", args);
-         *    if (!curr || !curr.postCall) return this;
-         *    // do test here
-         * }
-         *
-         * The first line of the function figures out if we have a current context
-         * for the call (either a SingleCall or a SingleTouch, depending on whether
-         * the wrapper is wrapping a function or attribute). If there's a current call
-         * it will return curr. If there is no current context, then the expect or
-         * action will be added to the action list and will be executed when triggered.
-         *
-         * The second line, in addition to checking whether this is the current call,
-         * checks whether this call should be run pre-call or post-call.
-         *
-         * The rest of the funcation is dedicated to the logic of the actual action
-         * or expect.
-         */
 
         addDeferredAction(name, argList) {
             var action = {
@@ -826,7 +829,7 @@
             if (!passed) {
                 // see if the config says we should throw
                 if ((this instanceof Trigger &amp;&amp; this.wrapper.config.expectThrowOnTrigger) ||
-                    this.wrapper.config.exepctThrow) {
+                    this.wrapper.config.expectThrow) {
                     throw new ExpectError(message);
                 }
 
@@ -839,8 +842,6 @@
         }
 
         _expect(name, timing, fn, ...args) {
-            // this call only works for functions
-            this.wrapper._funcOnly();
             // get the current call, or save the args for when the call is actually run
             var curr = this.getCurrCallOrDefer(name, ...args);
             // if there isn't a current call, return 'this' to enable chaining
@@ -856,12 +857,6 @@
 
             return passed;
         }
-
-        // expectCallArgs(si)
-        // expectContext(si)
-        // expectReturn(si)
-        // expectException(si)
-        // expectCustom (fn, param)
     }
 
     class ExpectError extends Error {
@@ -1032,7 +1027,7 @@
             this.type = type;
             this.setVal = setVal;
             this.retVal = retVal;
-            this.exception = exception;
+            this.exception = exception || null;
         }
     }
 
@@ -1050,7 +1045,8 @@
             this.context = context;
             this.argList = argList;
             this.retVal = retVal;
-            this.exception = exception;
+            this.exception = exception || null;
+            this.callback = {};
         }
     }
 
@@ -1133,6 +1129,35 @@
                     e = e || curr.exception;
                     curr.exception = null;
                     curr.retVal = Promise.reject(e);
+                });
+
+            alias(this, "actionCallbackFunction",
+                this._action, "actionCallbackFunction", "post",
+                function(curr, fn) {
+                    curr.callback.fn = fn;
+                });
+
+            alias(this, "actionCallbackToArg",
+                this._action, "actionCallbackToArg", "post",
+                function(curr, num) {
+                    var cb = curr.argList[num];
+                    if (typeof cb !== "function") {
+                        curr.exception = new Error(`actionCallbackToArg: expected argument ${num} to be callback function`);
+                        return;
+                    }
+                    curr.callback.fn = cb;
+                });
+
+            alias(this, "actionCallbackContext",
+                this._action, "actionCallbackContext", "post",
+                function(curr, context) {
+                    curr.callback.context = context;
+                });
+
+            alias(this, "actionCallbackArgs",
+                this._action, "actionCallbackArgs", "post",
+                function(curr, ...args) {
+                    curr.callback.argList = args;
                 });
         }
 
@@ -1565,7 +1590,7 @@
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.3</a> on Fri Mar 24 2017 22:55:44 GMT+0000 (UTC) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.3</a> on Sat Mar 25 2017 05:09:17 GMT+0000 (UTC) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>
