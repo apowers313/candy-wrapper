@@ -57,17 +57,17 @@ function depends(mod) {
             assert.strictEqual(w.type, "function");
         });
 
-        it("can wrap an attribute", function() {
+        it("can wrap an property", function() {
             var testObj = {
                 beer: "yummy"
             };
             var w = new Wrapper(testObj, "beer");
             assert.isFunction(w);
             assert.instanceOf(w, Wrapper);
-            assert.strictEqual(w.type, "attribute");
-            assert.strictEqual(w.attrValue, "yummy");
+            assert.strictEqual(w.type, "property");
+            assert.strictEqual(w.propValue, "yummy");
             testObj.beer = "all gone";
-            assert.strictEqual(w.attrValue, "all gone");
+            assert.strictEqual(w.propValue, "all gone");
             var ret = testObj.beer;
             assert.strictEqual(ret, "all gone");
         });
@@ -91,7 +91,7 @@ function depends(mod) {
             assert.strictEqual(called, true, "expected wrapped function to get called");
         });
 
-        it("can wrap an attribute with a custom function", function() {
+        it("can wrap an property with a custom function", function() {
             var testObj = {
                 beer: "yummy"
             };
@@ -131,12 +131,12 @@ function depends(mod) {
     });
 
     describe("helpers", function() {
-        it("_attrOnly throws", function() {
+        it("_propOnly throws", function() {
             var w = new Wrapper();
 
             assert.throws(function() {
-                w._attrOnly("test");
-            }, Error, "test is only supported for ATTRIBUTE wrappers");
+                w._propOnly("test");
+            }, Error, "test is only supported for PROPERTY wrappers");
         });
 
         it("_funcOnly throws", function() {
@@ -237,8 +237,8 @@ function depends(mod) {
             assert.isOk(Wrapper.isWrapper(testObj, "goBowling"), "exepcted a wrapper");
             assert.isNotOk(Wrapper.isWrapper(testObj, "notBowling"), "exepcted not a wrapper");
 
-            // wrapped attribute
-            var testAttrs = {
+            // wrapped property
+            var testProps = {
                 iAmWrapped: "whee",
                 iAmSam: "SAM.",
                 deeperDownTheHole: {
@@ -246,11 +246,11 @@ function depends(mod) {
                 },
                 groceryList: ["egg", "ham", "green"]
             };
-            w = new Wrapper(testAttrs, "iAmWrapped");
-            assert.isOk(Wrapper.isWrapper(testAttrs, "iAmWrapped"), "exepcted a wrapper");
-            assert.isNotOk(Wrapper.isWrapper(testAttrs, "iAmSam"), "exepcted not a wrapper");
-            assert.isNotOk(Wrapper.isWrapper(testAttrs, "deeperDownTheHole"), "exepcted not a wrapper");
-            assert.isNotOk(Wrapper.isWrapper(testAttrs, "groceryList"), "exepcted not a wrapper");
+            w = new Wrapper(testProps, "iAmWrapped");
+            assert.isOk(Wrapper.isWrapper(testProps, "iAmWrapped"), "exepcted a wrapper");
+            assert.isNotOk(Wrapper.isWrapper(testProps, "iAmSam"), "exepcted not a wrapper");
+            assert.isNotOk(Wrapper.isWrapper(testProps, "deeperDownTheHole"), "exepcted not a wrapper");
+            assert.isNotOk(Wrapper.isWrapper(testProps, "groceryList"), "exepcted not a wrapper");
 
             assert.throws(function() {
                 Wrapper.isWrapper();
@@ -282,7 +282,7 @@ function depends(mod) {
             assert.instanceOf(ret, SingleCall);
         });
 
-        it("can select only attribute gets", function() {
+        it("can select only property gets", function() {
             var testObj = {
                 beer: "yummy"
             };
@@ -292,8 +292,8 @@ function depends(mod) {
             var getList, setList;
             assert.isArray(w.touchList);
             assert.strictEqual(w.touchList.length, 0);
-            getList = w.touchList.filterAttrGet();
-            setList = w.touchList.filterAttrSet();
+            getList = w.touchList.filterPropGet();
+            setList = w.touchList.filterPropSet();
             assert.isArray(getList);
             assert.strictEqual(getList.length, 0);
             assert.isArray(setList);
@@ -302,8 +302,8 @@ function depends(mod) {
             // set #1
             testObj.beer = "gone";
             assert.strictEqual(w.touchList.length, 1);
-            getList = w.touchList.filterAttrGet();
-            setList = w.touchList.filterAttrSet();
+            getList = w.touchList.filterPropGet();
+            setList = w.touchList.filterPropSet();
             assert.isArray(getList);
             assert.strictEqual(getList.length, 0);
             assert.isArray(setList);
@@ -317,8 +317,8 @@ function depends(mod) {
             var ret = testObj.beer;
             assert.strictEqual(ret, "gone");
             assert.strictEqual(w.touchList.length, 2);
-            getList = w.touchList.filterAttrGet();
-            setList = w.touchList.filterAttrSet();
+            getList = w.touchList.filterPropGet();
+            setList = w.touchList.filterPropSet();
             assert.isArray(getList);
             assert.strictEqual(getList.length, 1);
             assert.isArray(setList);
@@ -331,8 +331,8 @@ function depends(mod) {
             // set #2
             testObj.beer = "more";
             assert.strictEqual(w.touchList.length, 3);
-            getList = w.touchList.filterAttrGet();
-            setList = w.touchList.filterAttrSet();
+            getList = w.touchList.filterPropGet();
+            setList = w.touchList.filterPropSet();
             assert.isArray(getList);
             assert.strictEqual(getList.length, 1);
             assert.isArray(setList);
@@ -346,8 +346,8 @@ function depends(mod) {
             ret = testObj.beer;
             assert.strictEqual(ret, "more");
             assert.strictEqual(w.touchList.length, 4);
-            getList = w.touchList.filterAttrGet();
-            setList = w.touchList.filterAttrSet();
+            getList = w.touchList.filterPropGet();
+            setList = w.touchList.filterPropSet();
             assert.isArray(getList);
             assert.strictEqual(getList.length, 2);
             assert.isArray(setList);
@@ -555,18 +555,18 @@ function depends(mod) {
 
             // match set value by "good"
             var list;
-            list = w.touchList.filterAttrSetByVal("good");
+            list = w.touchList.filterPropSetByVal("good");
             assert.strictEqual(list.length, 2);
             assert.strictEqual(list[0].setVal, "good");
             assert.strictEqual(list[1].setVal, "good");
 
             // non-match
-            list = w.touchList.filterAttrSetByVal("nothing");
+            list = w.touchList.filterPropSetByVal("nothing");
             assert.strictEqual(list.length, 0);
         });
 
-        it("throws when filtering attributes by call filters");
-        it("throws when filtering calls by attribute filters");
+        it("throws when filtering propertys by call filters");
+        it("throws when filtering calls by property filters");
 
         it("can chain filters", function() {
             var count = 0;
@@ -628,8 +628,8 @@ function depends(mod) {
             w = new Wrapper(testObj, "beer");
             testObj.beer = "gulp";
             assert.throws(function() {
-                w.touchList.filterAttrSetByVal();
-            }, TypeError, "filterAttrSetByVal: expected one argument");
+                w.touchList.filterPropSetByVal();
+            }, TypeError, "filterPropSetByVal: expected one argument");
         });
 
         it("can get only value", function() {
@@ -685,7 +685,7 @@ function depends(mod) {
             assert.instanceOf(ret, SingleCall);
         });
 
-        it("can filter attribute by number");
+        it("can filter property by number");
 
         it("can filter first", function() {
             var w = new Wrapper();
@@ -819,9 +819,9 @@ function depends(mod) {
             assert.deepEqual(list[4], "wine");
         });
 
-        it("can get all return values with an attribute");
+        it("can get all return values with an property");
         it("can get all exceptions with a function");
-        it("can get all exceptions with an attribute");
+        it("can get all exceptions with an property");
         it("can get all set values");
     });
 
@@ -1590,7 +1590,7 @@ function depends(mod) {
             });
         });
 
-        it("can spoof an attribute return value", function() {
+        it("can spoof an property return value", function() {
             var testObj = {
                 beer: "yummy"
             };
@@ -1602,7 +1602,7 @@ function depends(mod) {
             // XXX: intresting -- this doesn't actually get the return value of the setter... it gets "more"
             // ret = (testObj.beer = "more");
             testObj.beer = "more";
-            assert.strictEqual(w.attrValue, "more");
+            assert.strictEqual(w.propValue, "more");
             ret = testObj.beer;
             assert.strictEqual(ret, "all gone");
         });
@@ -1858,7 +1858,7 @@ function depends(mod) {
 
         it("can chain actions");
         it("actionCallbackAsync");
-        it("actionCallbackAttribute");
+        it("actionCallbackPropibute");
         it("actionAsync");
     });
 
