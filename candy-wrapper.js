@@ -30,6 +30,17 @@
         ctx[aliasName] = fn.bind(ctx, ...args);
     }
 
+    function walkObject(obj, cb) {
+        for (let key in obj) {
+            if (!obj.hasOwnProperty(key)) continue;
+            if (typeof obj[key] === "object") {
+                walkObject(obj[key], cb);
+            } else {
+                cb(obj, key);
+            }
+        }
+    }
+
     var wrapperCookie = "193fe616-09d1-4d5c-a5b9-ff6f3e79714c";
     var wrapperCookieKey = "uniquePlaceToKeepAGuidForCandyWrapper";
 
@@ -68,14 +79,17 @@
 
             // constructed like: wrapper(obj)
             /**
-             * Wrap all aspects of an object
+             * Recursively wrap all properties and methods of an object
              * @param  {Object} obj Object to be wrapped
              * @return {Object}    Returns an object with all methods and propertys wrapped
              * @constructor
              */
             if (arguments.length === 1 && typeof arguments[0] === "object") {
-                debug("wrapping object");
-                throw new Error("not implemented");
+                var obj = arguments[0];
+                walkObject(obj, function(obj, key) {
+                    new Wrapper(obj, key);
+                });
+                return obj;
             }
 
             // constructed like: wrapper(func)
@@ -98,7 +112,6 @@
                 typeof arguments[1] === "string") {
                 let obj = arguments[0];
                 let key = arguments[1];
-                debug("wrapping method or property:", key);
                 if (typeof obj[key] === "function") {
                     obj[key] = this._callConstructor(obj[key]);
                     return obj[key];
@@ -496,6 +509,9 @@
                     return false;
 
                 let desc = Object.getOwnPropertyDescriptor(obj, key);
+                if (desc === undefined)
+                    return false;
+
                 if (typeof desc.set !== "function" ||
                     typeof desc.get !== "function")
                     return false;

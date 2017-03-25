@@ -73,8 +73,115 @@ function depends(mod) {
             assert.strictEqual(ret, "all gone");
         });
 
-        it("can wrap an object");
-        it("can wrap a nested object");
+        it("can wrap an object", function() {
+            var testObj = {
+                beer: "yummy",
+                check: false,
+                goBowling: function() {
+                    this.check = true;
+                }
+            };
+            new Wrapper(testObj);
+            assert.strictEqual(testObj.beer, "yummy");
+            assert.strictEqual(testObj.check, false);
+            assert.isFunction(testObj.goBowling);
+            testObj.goBowling();
+            assert.strictEqual(testObj.check, true);
+            assert.isOk(testObj.check);
+            assert.isOk(Wrapper.isWrapper(testObj, "beer"));
+            assert.isOk(Wrapper.isWrapper(testObj, "check"));
+            assert.isOk(Wrapper.isWrapper(testObj, "goBowling"));
+            // TODO: does check get called?
+        });
+
+        it("can wrap a nested object", function() {
+            var testObj = {
+                rabbitHole: {
+                    deep: {
+                        deeper: {
+                            deepest: {
+                                location: "wonderland",
+                                check1: false,
+                                check2: false,
+                                eatMe: function() {
+                                    this.check1 = true;
+                                },
+                                drinkMe: function() {
+                                    this.check2 = true;
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+            new Wrapper(testObj);
+            assert.strictEqual(testObj.rabbitHole.deep.deeper.deepest.location, "wonderland");
+            assert.strictEqual(testObj.rabbitHole.deep.deeper.deepest.check1, false);
+            assert.strictEqual(testObj.rabbitHole.deep.deeper.deepest.check2, false);
+            assert.isFunction(testObj.rabbitHole.deep.deeper.deepest.eatMe);
+            assert.isFunction(testObj.rabbitHole.deep.deeper.deepest.drinkMe);
+            testObj.rabbitHole.deep.deeper.deepest.eatMe();
+            testObj.rabbitHole.deep.deeper.deepest.drinkMe();
+            assert.strictEqual(testObj.rabbitHole.deep.deeper.deepest.check1, true);
+            assert.strictEqual(testObj.rabbitHole.deep.deeper.deepest.check2, true);
+            assert.isOk(Wrapper.isWrapper(testObj.rabbitHole.deep.deeper.deepest, "location"));
+            assert.isOk(Wrapper.isWrapper(testObj.rabbitHole.deep.deeper.deepest, "check1"));
+            assert.isOk(Wrapper.isWrapper(testObj.rabbitHole.deep.deeper.deepest, "check2"));
+            assert.isOk(Wrapper.isWrapper(testObj.rabbitHole.deep.deeper.deepest, "eatMe"));
+            assert.isOk(Wrapper.isWrapper(testObj.rabbitHole.deep.deeper.deepest, "drinkMe"));
+        });
+
+        it("can wrap objects in an array", function() {
+            var testObj = {
+                locationList: [{
+                    locationNo: 1,
+                    name: "home"
+                }, {
+                    locationNo: 2,
+                    name: "store",
+                    gps: {
+                        lat: 123,
+                        long: 456
+                    }
+                }]
+            };
+            new Wrapper(testObj);
+            assert.isOk(Wrapper.isWrapper(testObj.locationList[0], "locationNo"));
+            assert.isOk(Wrapper.isWrapper(testObj.locationList[0], "name"));
+            assert.isOk(Wrapper.isWrapper(testObj.locationList[1], "locationNo"));
+            assert.isOk(Wrapper.isWrapper(testObj.locationList[1], "name"));
+            assert.isOk(Wrapper.isWrapper(testObj.locationList[1].gps, "lat"));
+            assert.isOk(Wrapper.isWrapper(testObj.locationList[1].gps, "long"));
+        });
+
+        it("can wrap array of objects", function() {
+            var testArr = [{
+                locationNo: 1,
+                name: "home"
+            }, {
+                locationNo: 2,
+                name: "store",
+                gps: {
+                    lat: 123,
+                    long: 456
+                }
+            }];
+            new Wrapper(testArr);
+            assert.isOk(Wrapper.isWrapper(testArr[0], "locationNo"));
+            assert.isOk(Wrapper.isWrapper(testArr[0], "name"));
+            assert.isOk(Wrapper.isWrapper(testArr[1], "locationNo"));
+            assert.isOk(Wrapper.isWrapper(testArr[1], "name"));
+            assert.isOk(Wrapper.isWrapper(testArr[1].gps, "lat"));
+            assert.isOk(Wrapper.isWrapper(testArr[1].gps, "long"));
+        });
+
+        it("can wrap values of an array", function() {
+            var testArr = [1, "string", true];
+            new Wrapper(testArr);
+            assert.isOk(Wrapper.isWrapper(testArr, "0"));
+            assert.isOk(Wrapper.isWrapper(testArr, "1"));
+            assert.isOk(Wrapper.isWrapper(testArr, "2"));
+        });
 
         it("can wrap a method with a custom function", function() {
             var called = false;
@@ -252,6 +359,9 @@ function depends(mod) {
             assert.isNotOk(Wrapper.isWrapper(testProps, "iAmSam"), "exepcted not a wrapper");
             assert.isNotOk(Wrapper.isWrapper(testProps, "deeperDownTheHole"), "exepcted not a wrapper");
             assert.isNotOk(Wrapper.isWrapper(testProps, "groceryList"), "exepcted not a wrapper");
+
+            // non-existant property
+            assert.isNotOk(Wrapper.isWrapper(testProps, "missing"), "exepcted not a wrapper");
 
             assert.throws(function() {
                 Wrapper.isWrapper();
@@ -1195,17 +1305,25 @@ function depends(mod) {
             // pass
             var w = new Wrapper();
             w.triggerAlways()
-                .expectContext({location: "home"});
+                .expectContext({
+                    location: "home"
+                });
             assert.doesNotThrow(function() {
-                w.call({location: "home"});
+                w.call({
+                    location: "home"
+                });
             });
 
             // pass
             var w = new Wrapper();
             w.triggerAlways()
-                .expectContext({location: "home"});
+                .expectContext({
+                    location: "home"
+                });
             assert.throws(function() {
-                w.call({location: "store"});
+                w.call({
+                    location: "store"
+                });
             }, ExpectError);
         });
 
