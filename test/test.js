@@ -265,20 +265,20 @@ function depends(mod) {
             var ret;
             var w = new Wrapper();
             assert.throws(function() {
-                w.filterOneByCallNumber(0);
+                w.callList.filterByNumber(0);
             }, RangeError);
             w();
             w();
             w();
-            ret = w.filterOneByCallNumber(0);
+            ret = w.callList.filterByNumber(0);
             assert.instanceOf(ret, SingleCall);
-            w.filterOneByCallNumber(1);
-            w.filterOneByCallNumber(2);
+            w.callList.filterByNumber(1);
+            w.callList.filterByNumber(2);
             assert.throws(function() {
-                w.filterOneByCallNumber(3);
+                w.callList.filterByNumber(3);
             }, RangeError);
             w();
-            ret = w.filterOneByCallNumber(3);
+            ret = w.callList.filterByNumber(3);
             assert.instanceOf(ret, SingleCall);
         });
 
@@ -311,7 +311,7 @@ function depends(mod) {
             assert.strictEqual(setList[0].type, "set");
             assert.strictEqual(setList[0].setVal, "gone");
             assert.strictEqual(setList[0].retVal, "gone");
-            assert.isUndefined(setList[0].exception);
+            assert.isNull(setList[0].exception);
 
             // get #1
             var ret = testObj.beer;
@@ -326,7 +326,7 @@ function depends(mod) {
             assert.strictEqual(getList[0].type, "get");
             assert.isUndefined(getList[0].setVal);
             assert.strictEqual(getList[0].retVal, "gone");
-            assert.isUndefined(getList[0].exception);
+            assert.isNull(getList[0].exception);
 
             // set #2
             testObj.beer = "more";
@@ -340,7 +340,7 @@ function depends(mod) {
             assert.strictEqual(setList[1].type, "set");
             assert.strictEqual(setList[1].setVal, "more");
             assert.strictEqual(setList[1].retVal, "more");
-            assert.isUndefined(setList[1].exception);
+            assert.isNull(setList[1].exception);
 
             // get #2
             ret = testObj.beer;
@@ -355,7 +355,7 @@ function depends(mod) {
             assert.strictEqual(getList[1].type, "get");
             assert.isUndefined(getList[1].setVal);
             assert.strictEqual(getList[1].retVal, "more");
-            assert.isUndefined(getList[1].exception);
+            assert.isNull(getList[1].exception);
         });
 
         it("can filter function calls by argument list", function() {
@@ -870,42 +870,25 @@ function depends(mod) {
         it("call args", function() {
             var w = new Wrapper();
             w();
-            assert.isOk(w.filterOneByCallNumber(0).expectCallArgs());
-            assert.isNotOk(w.filterOneByCallNumber(0).expectCallArgs("foo"));
+            assert.isOk(w.callList.filterByNumber(0).expectCallArgs());
+            assert.isNotOk(w.callList.filterByNumber(0).expectCallArgs("foo"));
             w("beer");
-            assert.isOk(w.filterOneByCallNumber(1).expectCallArgs("beer"));
-            assert.isNotOk(w.filterOneByCallNumber(1).expectCallArgs("foo"));
+            assert.isOk(w.callList.filterByNumber(1).expectCallArgs("beer"));
+            assert.isNotOk(w.callList.filterByNumber(1).expectCallArgs("foo"));
             w(true);
-            assert.isOk(w.filterOneByCallNumber(2).expectCallArgs(true));
-            assert.isNotOk(w.filterOneByCallNumber(2).expectCallArgs("foo"));
+            assert.isOk(w.callList.filterByNumber(2).expectCallArgs(true));
+            assert.isNotOk(w.callList.filterByNumber(2).expectCallArgs("foo"));
             w(false);
-            assert.isOk(w.filterOneByCallNumber(3).expectCallArgs(false));
-            assert.isNotOk(w.filterOneByCallNumber(3).expectCallArgs("foo"));
-            // w({});
-            // assert.isOk (w.filterOneByCallNumber(4).expectCallArgs({}));
-            // assert.isNotOk (w.filterOneByCallNumber(4).expectCallArgs("foo"));
-            // w([]);
-            // assert.isOk (w.filterOneByCallNumber(5).expectCallArgs([]));
-            // assert.isNotOk (w.filterOneByCallNumber(5).expectCallArgs("foo"));
+            assert.isOk(w.callList.filterByNumber(3).expectCallArgs(false));
+            assert.isNotOk(w.callList.filterByNumber(3).expectCallArgs("foo"));
+            w({});
+            assert.isOk(w.callList.filterByNumber(4).expectCallArgs({}));
+            assert.isNotOk(w.callList.filterByNumber(4).expectCallArgs("foo"));
+            w([]);
+            assert.isOk(w.callList.filterByNumber(5).expectCallArgs([]));
+            assert.isNotOk(w.callList.filterByNumber(5).expectCallArgs("foo"));
         });
 
-        it("call args deep equal");
-        // object, array, array buffer
-        it("check bad arguments to functions");
-        it("throws TypeError if expectCallCount called with bad arg", function() {
-            var w = new Wrapper();
-            w();
-            assert.throws(function() {
-                w.expectCallCount("foo");
-            }, TypeError);
-        });
-        it("throws TypeError if expectCallCountRange called with bad min");
-        it("throws TypeError if expectCallCountRange called with bad max");
-        it("throws TypeError if expectCallCountMin called with bad min");
-        it("throws TypeError if expectCallCountMax called with bad max");
-    });
-
-    describe("expect on single", function() {
         it("does args", function() {
             var testFunc = function() {
                 return "beer";
@@ -924,6 +907,145 @@ function depends(mod) {
             ret = testFunc.callList
                 .filterFirst()
                 .expectReturn("wine");
+            assert.isBoolean(ret);
+            assert.isNotOk(ret);
+        });
+
+        it("call context", function() {
+            var w = new Wrapper();
+
+            // pass
+            w.call({
+                beer: "yummy"
+            });
+            assert.isOk(w.callList.filterByNumber(0).expectContext({
+                beer: "yummy"
+            }));
+            assert.isNotOk(w.callList.filterByNumber(0).expectContext({
+                wine: "empty"
+            }));
+            w.call(null);
+            assert.isOk(w.callList.filterByNumber(1).expectContext(null));
+            assert.isNotOk(w.callList.filterByNumber(1).expectContext({
+                wine: "empty"
+            }));
+        });
+
+        it("call return", function() {
+            var count = 0;
+            var testFunc = function() {
+                count++;
+                switch (count) {
+                    case 1:
+                        return "beer";
+                    case 2:
+                        return {
+                            a: 1
+                        };
+                    case 3:
+                        return [1, 2, 3];
+                }
+            };
+            testFunc = new Wrapper(testFunc);
+
+            var ret;
+            ret = testFunc();
+            assert.isOk(testFunc.callList.filterByNumber(0).expectReturn("beer"));
+            assert.isNotOk(testFunc.callList.filterByNumber(0).expectReturn({
+                wine: "empty"
+            }));
+            ret = testFunc();
+            assert.isOk(testFunc.callList.filterByNumber(1).expectReturn({
+                a: 1
+            }));
+            assert.isNotOk(testFunc.callList.filterByNumber(1).expectReturn({
+                wine: "empty"
+            }));
+            ret = testFunc();
+            assert.isOk(testFunc.callList.filterByNumber(2).expectReturn([1, 2, 3]));
+            assert.isNotOk(testFunc.callList.filterByNumber(2).expectReturn([]));
+        });
+
+        it("property return", function() {
+            var testObj = {
+                beer: "yummy"
+            };
+            var w = new Wrapper(testObj, "beer");
+            w.triggerOnGetNumber(0)
+                .actionReturn("beer");
+            w.triggerOnGetNumber(1)
+                .actionReturn({
+                    a: 1
+                });
+            w.triggerOnGetNumber(2)
+                .actionReturn([1, 2, 3]);
+
+            var ret;
+            ret = testObj.beer;
+            assert.isOk(w.touchList.filterByNumber(0).expectReturn("beer"));
+            assert.isNotOk(w.touchList.filterByNumber(0).expectReturn({
+                wine: "empty"
+            }));
+            ret = testObj.beer;
+            assert.isOk(w.touchList.filterByNumber(1).expectReturn({
+                a: 1
+            }));
+            assert.isNotOk(w.touchList.filterByNumber(1).expectReturn({
+                wine: "empty"
+            }));
+            ret = testObj.beer;
+            assert.isOk(w.touchList.filterByNumber(2).expectReturn([1, 2, 3]));
+            assert.isNotOk(w.touchList.filterByNumber(2).expectReturn([]));
+        });
+
+        it("property exception", function() {
+            var testObj = {
+                beer: "yummy"
+            };
+            var w = new Wrapper(testObj, "beer");
+            w.triggerOnGetNumber(0)
+                .actionThrowException(new Error("one"));
+            w.triggerOnGetNumber(1)
+                .actionThrowException(new TypeError("two"));
+            w.triggerOnGetNumber(2)
+                .actionThrowException(new RangeError("three"));
+
+            var ret;
+            assert.throws(function() {
+                ret = testObj.beer;
+            }, Error, "one");
+            assert.isOk(w.touchList.filterByNumber(0).expectException(new Error("one")));
+            assert.isNotOk(w.touchList.filterByNumber(0).expectException(new TypeError("beer")));
+            assert.throws(function() {
+                ret = testObj.beer;
+            }, TypeError, "two");
+            assert.isOk(w.touchList.filterByNumber(1).expectException(new TypeError("two")));
+            assert.isNotOk(w.touchList.filterByNumber(1).expectException(new Error("one")));
+            assert.throws(function() {
+                ret = testObj.beer;
+            }, RangeError, "three");
+            assert.isOk(w.touchList.filterByNumber(2).expectException(new RangeError("three")));
+            assert.isNotOk(w.touchList.filterByNumber(2).expectException(new TypeError("beer")));
+        });
+
+        it("property set val", function() {
+            var testObj = {
+                beer: "yummy"
+            };
+            var w = new Wrapper(testObj, "beer");
+
+            // pass
+            testObj.beer = "gone";
+            var ret = w.touchList
+                .filterFirst()
+                .expectSetVal("gone");
+            assert.isBoolean(ret);
+            assert.isOk(ret);
+
+            // fail
+            var ret = w.touchList
+                .filterFirst()
+                .expectSetVal("wine");
             assert.isBoolean(ret);
             assert.isNotOk(ret);
         });
@@ -952,6 +1074,80 @@ function depends(mod) {
             assert.isBoolean(ret);
             assert.isNotOk(ret);
         });
+
+        it("call custom", function() {
+            var testFunc = function() {
+                return "beer";
+            };
+            testFunc = new Wrapper(testFunc);
+
+            // pass
+            var ret;
+            ret = testFunc("drink");
+            assert.strictEqual(ret, "beer");
+            ret = testFunc.callList
+                .filterFirst()
+                .expectCustom(function(curr) {
+                    assert.strictEqual(curr.retVal, "beer");
+                    assert.deepEqual(curr.argList, ["drink"]);
+                    return null;
+                });
+            assert.isBoolean(ret);
+            assert.isOk(ret);
+
+            // fail
+            ret = testFunc.callList
+                .filterFirst()
+                .expectCustom(function() {
+                    return "error message";
+                });
+            assert.isBoolean(ret);
+            assert.isNotOk(ret);
+        });
+
+        it("property custom", function() {
+            var testObj = {
+                beer: "yummy"
+            };
+            var w = new Wrapper(testObj, "beer");
+
+            // pass
+            var ret;
+            ret = testObj.beer;
+            assert.strictEqual(ret, "yummy");
+            ret = w.touchList
+                .filterFirst()
+                .expectCustom(function(curr) {
+                    assert.strictEqual (curr.retVal, "yummy");
+                    return null;
+                });
+            assert.isBoolean(ret);
+            assert.isOk(ret);
+
+            // fail
+            ret = w.touchList
+                .filterFirst()
+                .expectCustom(function(curr) {
+                    return "error mesage";
+                });
+            assert.isBoolean(ret);
+            assert.isNotOk(ret);
+        });
+
+        it("call args deep equal");
+        // object, array, array buffer
+        it("check bad arguments to functions");
+        it("throws TypeError if expectCallCount called with bad arg", function() {
+            var w = new Wrapper();
+            w();
+            assert.throws(function() {
+                w.expectCallCount("foo");
+            }, TypeError);
+        });
+        it("throws TypeError if expectCallCountRange called with bad min");
+        it("throws TypeError if expectCallCountRange called with bad max");
+        it("throws TypeError if expectCallCountMin called with bad min");
+        it("throws TypeError if expectCallCountMax called with bad max");
     });
 
     describe("expect on trigger", function() {
@@ -971,6 +1167,14 @@ function depends(mod) {
                 w("foo");
             });
         });
+
+        // expectReturn
+        // expectContext
+        // expectException
+        // expectSetVal
+        // expectCustom
+
+        it("is chainable");
     });
 
     describe("aliases", function() {
@@ -1571,7 +1775,91 @@ function depends(mod) {
                 });
         });
 
+        it("set callback function", function() {
+            var w = new Wrapper();
+
+            var called = false;
+
+            function cb() {
+                called = true;
+            }
+
+            w.triggerAlways()
+                .actionCallbackFunction(cb);
+            assert.isNotOk(called);
+            w(cb);
+            assert.isOk(called);
+        });
+
+        it("can callback an argument", function() {
+            var w = new Wrapper();
+
+            var called = false;
+
+            function cb() {
+                called = true;
+            }
+
+            w.triggerAlways()
+                .actionCallbackToArg(0);
+            assert.isNotOk(called);
+            w(cb);
+            assert.isOk(called);
+
+            w = new Wrapper();
+            called = false;
+            w.triggerAlways()
+                .actionCallbackToArg(1);
+            assert.isNotOk(called);
+            w("beer", cb);
+            assert.isOk(called);
+        });
+
+        it("can callback with args", function() {
+            var w = new Wrapper();
+
+            var called = false;
+
+            function cb(...args) {
+                assert.deepEqual(args, [1, {}, true, "beer"]);
+                called = true;
+            }
+
+            w.triggerAlways()
+                .actionCallbackToArg(0)
+                .actionCallbackArgs(1, {}, true, "beer");
+            assert.isNotOk(called);
+            w(cb);
+            assert.isOk(called, "expected callback to be called");
+        });
+
+        it("can callback with context", function() {
+            var w = new Wrapper();
+
+            var called = false;
+
+            function cb(...args) {
+                assert.deepEqual(this, {
+                    context: "awesome!"
+                });
+                called = true;
+            }
+
+            w.triggerAlways()
+                .actionCallbackFunction(cb)
+                .actionCallbackContext({
+                    context: "awesome!"
+                });
+            assert.isNotOk(called);
+            w();
+            assert.isOk(called, "expected callback to be called");
+        });
+
+
         it("can chain actions");
+        it("actionCallbackAsync");
+        it("actionCallbackAttribute");
+        it("actionAsync");
     });
 
     describe("trigger expects", function() {
