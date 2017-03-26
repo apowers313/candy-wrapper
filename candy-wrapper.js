@@ -521,6 +521,30 @@
             throw new TypeError("isWrapper: unsupported arguments");
         }
 
+        static getWrapperFromProperty(obj, key) {
+            if (typeof obj !== "object") {
+                throw new TypeError ("getWrapperFromProperty; exepcted 'obj' argument to be Object");
+            }
+
+            if (typeof key !== "string") {
+                throw new TypeError ("getWrapperFromProperty: expected 'key' argument to be String");
+            }
+
+            var desc = Object.getOwnPropertyDescriptor(obj, key);
+            if (desc === undefined)
+                return null;
+
+            var wrapper = desc.set;
+            if (typeof wrapper !== "function")
+                return null;
+
+            if(wrapper[wrapperCookieKey] === wrapperCookie) {
+                return wrapper;
+            } else {
+                return null;
+            }
+        }
+
         /**
          * Resets the wrapper to the default configuration, undoing the effects of any `config` calls.
          * @public

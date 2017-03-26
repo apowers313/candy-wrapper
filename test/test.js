@@ -327,7 +327,7 @@ function depends(mod) {
         });
     });
 
-    describe("config", function() {
+    describe("static", function() {
         it("can identify a wrapper", function() {
             var w = new Wrapper();
 
@@ -367,6 +367,36 @@ function depends(mod) {
                 Wrapper.isWrapper();
             }, TypeError, "isWrapper: unsupported arguments");
         });
+
+        it("can get a Wrapper from a property", function() {
+            var testObj = {
+                beer: "yummy"
+            };
+            assert.throws(function() {
+                Wrapper.getWrapperFromProperty();
+            }, TypeError, "getWrapperFromProperty; exepcted 'obj' argument to be Object");
+
+            assert.throws(function() {
+                Wrapper.getWrapperFromProperty({});
+            }, TypeError, "getWrapperFromProperty: expected 'key' argument to be String");
+
+            // fail, property not defined on ojbect
+            var ret;
+            ret = Wrapper.getWrapperFromProperty({}, "foo");
+            assert.isNull(ret);
+
+            // fail, not wrapped
+            ret = Wrapper.getWrapperFromProperty(testObj, "beer");
+            assert.isNull (ret);
+
+            // pass
+            new Wrapper(testObj, "beer");
+            ret = Wrapper.getWrapperFromProperty(testObj, "beer");
+            assert.isOk(Wrapper.isWrapper(ret));
+        });
+    });
+
+    describe("config", function() {
         it("can restore wrapped function");
         it("can reset wrapper");
     });
