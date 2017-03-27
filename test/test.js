@@ -238,6 +238,194 @@ function depends(mod) {
         it("mirrors function name, argument length, and argument list");
     });
 
+    describe("unwrap", function() {
+        it("throws with bad args", function() {
+            assert.throws(function() {
+                Wrapper.unwrap();
+            }, TypeError, /Wrapper.unwrap: unexpected arguments: /);
+        });
+
+        it("function", function() {
+            var testFunc = function pudding(a, b, c) {
+                a = b = c; // make linter happy
+            };
+            assert.isFalse(Wrapper.isWrapper(testFunc));
+            testFunc = new Wrapper(testFunc);
+            assert.isTrue(Wrapper.isWrapper(testFunc));
+
+            var w = testFunc;
+            testFunc = testFunc.configUnwrap();
+            assert.isFalse(Wrapper.isWrapper(testFunc));
+            assert.isFunction(testFunc);
+            assert.strictEqual(testFunc.name, "pudding");
+            assert.strictEqual(testFunc.length, 3);
+            assert.throws(function() {
+                w();
+            }, Error, "Calling Wrapper after it has been unwrapped");
+        });
+
+        it("method", function() {
+            var testObj = {
+                goBowling: function bowl(a, b, c, d) {
+                    a = b = c = d; // make linter happy
+                }
+            };
+            assert.isFalse(Wrapper.isWrapper(testObj, "goBowling"));
+            var w = new Wrapper(testObj, "goBowling");
+            assert.isTrue(Wrapper.isWrapper(testObj, "goBowling"));
+            w.configUnwrap();
+            assert.isFalse(Wrapper.isWrapper(testObj, "goBowling"));
+            assert.isFunction(testObj.goBowling);
+            assert.strictEqual(testObj.goBowling.name, "bowl");
+            assert.strictEqual(testObj.goBowling.length, 4);
+        });
+
+        it("property", function() {
+            var testObj = {
+                beer: "yummy"
+            };
+            assert.isFalse(Wrapper.isWrapper(testObj, "beer"));
+            var w = new Wrapper(testObj, "beer");
+            assert.isTrue(Wrapper.isWrapper(testObj, "beer"));
+            testObj.beer = "gone";
+            w.configUnwrap();
+            assert.isFalse(Wrapper.isWrapper(testObj, "beer"));
+            assert.strictEqual(testObj.beer, "gone");
+        });
+
+        it("function via static", function() {
+            var testFunc = function pudding(a, b, c) {
+                a = b = c; // make linter happy
+            };
+            assert.isFalse(Wrapper.isWrapper(testFunc));
+            testFunc = new Wrapper(testFunc);
+            assert.isTrue(Wrapper.isWrapper(testFunc));
+            testFunc = Wrapper.unwrap(testFunc);
+            assert.isFalse(Wrapper.isWrapper(testFunc));
+            assert.isFunction(testFunc);
+            assert.strictEqual(testFunc.name, "pudding");
+            assert.strictEqual(testFunc.length, 3);
+        });
+
+        it("method via static", function() {
+            var testObj = {
+                goBowling: function bowl(a, b, c, d) {
+                    a = b = c = d; // make linter happy
+                }
+            };
+            assert.isFalse(Wrapper.isWrapper(testObj, "goBowling"));
+            new Wrapper(testObj, "goBowling");
+            assert.isTrue(Wrapper.isWrapper(testObj, "goBowling"));
+            Wrapper.unwrap(testObj, "goBowling");
+            assert.isFalse(Wrapper.isWrapper(testObj, "goBowling"));
+            assert.isFunction(testObj.goBowling);
+            assert.strictEqual(testObj.goBowling.name, "bowl");
+            assert.strictEqual(testObj.goBowling.length, 4);
+        });
+
+        it("property via static", function() {
+            var testObj = {
+                beer: "yummy"
+            };
+            assert.isFalse(Wrapper.isWrapper(testObj, "beer"));
+            new Wrapper(testObj, "beer");
+            assert.isTrue(Wrapper.isWrapper(testObj, "beer"));
+            testObj.beer = "gone";
+            Wrapper.unwrap(testObj, "beer");
+            assert.isFalse(Wrapper.isWrapper(testObj, "beer"));
+            assert.strictEqual(testObj.beer, "gone");
+        });
+
+        it("object via static", function() {
+            var testObj = {
+                beer: "yummy",
+                goBowling: function bowl(a, b, c, d) {
+                    a = b = c = d; // make linter happy
+                }
+            };
+
+            assert.isFalse(Wrapper.isWrapper(testObj, "beer"));
+            assert.isFalse(Wrapper.isWrapper(testObj, "goBowling"));
+
+            new Wrapper(testObj);
+            assert.isTrue(Wrapper.isWrapper(testObj, "beer"));
+            assert.isTrue(Wrapper.isWrapper(testObj, "goBowling"));
+
+            testObj.beer = "gone";
+            Wrapper.unwrap(testObj);
+            assert.isFalse(Wrapper.isWrapper(testObj, "beer"));
+            assert.strictEqual(testObj.beer, "gone");
+            assert.isFalse(Wrapper.isWrapper(testObj, "goBowling"));
+            assert.isFunction(testObj.goBowling);
+            assert.strictEqual(testObj.goBowling.name, "bowl");
+            assert.strictEqual(testObj.goBowling.length, 4);
+        });
+
+        it("mixed object via static", function() {
+            var testObj = {
+                beer: "yummy",
+                goBowling: function bowl(a, b, c, d) {
+                    a = b = c = d; // make linter happy
+                },
+                notWrapped: true,
+                goFishing: function fish(a, b, c) {
+                    a = b = c;
+                },
+                rabbitHole: {
+                    deep: {
+                        deeper: {
+                            deepest: {
+                                location: "wonderland",
+                                eatMe: function() {
+                                    this.check1 = true;
+                                },
+                                drinkMe: function() {
+                                    this.check2 = true;
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+
+            assert.isFalse(Wrapper.isWrapper(testObj, "beer"));
+            assert.isFalse(Wrapper.isWrapper(testObj, "goBowling"));
+
+            new Wrapper(testObj, "beer");
+            new Wrapper(testObj, "goBowling");
+            new Wrapper(testObj.rabbitHole.deep.deeper.deepest, "location");
+            new Wrapper(testObj.rabbitHole.deep.deeper.deepest, "eatMe");
+            assert.isTrue(Wrapper.isWrapper(testObj, "beer"));
+            assert.isTrue(Wrapper.isWrapper(testObj, "goBowling"));
+            assert.isTrue(Wrapper.isWrapper(testObj.rabbitHole.deep.deeper.deepest, "location"));
+            assert.isTrue(Wrapper.isWrapper(testObj.rabbitHole.deep.deeper.deepest, "eatMe"));
+            assert.isFalse(Wrapper.isWrapper(testObj, "notWrapped"));
+            assert.isFalse(Wrapper.isWrapper(testObj, "goFishing"));
+            assert.isFalse(Wrapper.isWrapper(testObj.rabbitHole.deep.deeper.deepest, "drinkMe"));
+
+            testObj.beer = "gone";
+            Wrapper.unwrap(testObj);
+            assert.isFalse(Wrapper.isWrapper(testObj, "beer"));
+            assert.strictEqual(testObj.beer, "gone");
+            assert.isFalse(Wrapper.isWrapper(testObj, "notWrapped"));
+            assert.strictEqual(testObj.notWrapped, true);
+            assert.isFalse(Wrapper.isWrapper(testObj, "goBowling"));
+            assert.isFalse(Wrapper.isWrapper(testObj, "goFishing"));
+            assert.isFunction(testObj.goBowling);
+            assert.strictEqual(testObj.goBowling.name, "bowl");
+            assert.strictEqual(testObj.goBowling.length, 4);
+            assert.isFunction(testObj.goFishing);
+            assert.strictEqual(testObj.goFishing.name, "fish");
+            assert.strictEqual(testObj.goFishing.length, 3);
+            assert.strictEqual(testObj.rabbitHole.deep.deeper.deepest.location, "wonderland");
+            assert.isFalse(Wrapper.isWrapper(testObj.rabbitHole.deep.deeper.deepest, "location"));
+            assert.isFunction(testObj.rabbitHole.deep.deeper.deepest.eatMe);
+            assert.isFalse(Wrapper.isWrapper(testObj.rabbitHole.deep.deeper.deepest, "eatMe"));
+            assert.isFunction(testObj.rabbitHole.deep.deeper.deepest.drinkMe);
+            assert.isFalse(Wrapper.isWrapper(testObj.rabbitHole.deep.deeper.deepest, "drinkMe"));
+        });
+    });
+
     describe("helpers", function() {
         it("_propOnly throws", function() {
             var w = new Wrapper();
@@ -387,7 +575,7 @@ function depends(mod) {
 
             // fail, not wrapped
             ret = Wrapper.getWrapperFromProperty(testObj, "beer");
-            assert.isNull (ret);
+            assert.isNull(ret);
 
             // pass
             new Wrapper(testObj, "beer");
@@ -1275,9 +1463,6 @@ function depends(mod) {
             assert.isNotOk(ret);
         });
 
-        it("call args deep equal");
-        // object, array, array buffer
-        it("check bad arguments to functions");
         it("throws TypeError if expectCallCount called with bad arg", function() {
             var w = new Wrapper();
             w();
@@ -1285,6 +1470,96 @@ function depends(mod) {
                 w.expectCallCount("foo");
             }, TypeError);
         });
+
+        it("validates exepctations", function() {
+            var testFunc = function() {
+                return "beer";
+            };
+            testFunc = new Wrapper(testFunc);
+            testFunc("drink up!");
+
+            var ret;
+            // console.log ("callList", testFunc.callList[0]);
+            ret = testFunc.callList
+                .filterFirst()
+                .expectCallArgs("drink up!");
+            assert.strictEqual(ret, true);
+            ret = testFunc.callList
+                .filterFirst()
+                .expectReturn("beer");
+            assert.strictEqual(ret, true);
+
+            // pass
+            ret = testFunc.expectValidateAll();
+            assert.strictEqual(ret, true);
+            assert.strictEqual(testFunc.expectMessageList.length, 0);
+
+            // pass and clear
+            ret = testFunc.expectValidateAll(true);
+            assert.strictEqual(ret, true);
+            assert.strictEqual(testFunc.expectMessageList.length, 0);
+
+            // fail return
+            testFunc("drink up!");
+            ret = testFunc.callList
+                .filterFirst()
+                .expectCallArgs("drink up!");
+            assert.strictEqual(ret, true);
+            ret = testFunc.callList
+                .filterFirst()
+                .expectReturn("wine");
+            assert.strictEqual(ret, false);
+            assert.strictEqual(testFunc.expectMessageList.length, 1);
+            assert.throws(function() {
+                testFunc.expectValidateAll();
+            }, ExpectError, /1 expectation\(s\) failed:\n.*/);
+
+            // fail return again and clear expectation results
+            assert.throws(function() {
+                testFunc.expectValidateAll(true);
+            }, ExpectError, /1 expectation\(s\) failed:\n.*/);
+
+            // pass, list is empty now
+            ret = testFunc.expectValidateAll();
+            assert.strictEqual(ret, true);
+
+            // fail args
+            testFunc("drink up!");
+            ret = testFunc.callList
+                .filterFirst()
+                .expectCallArgs("party down!");
+            assert.strictEqual(ret, false);
+            ret = testFunc.callList
+                .filterFirst()
+                .expectReturn("beer");
+            assert.strictEqual(ret, true);
+            assert.strictEqual(testFunc.expectMessageList.length, 1);
+            assert.throws(function() {
+                testFunc.expectValidateAll(true);
+            }, ExpectError, /1 expectation\(s\) failed:\n.*/);
+
+            // fail args and return
+            testFunc("drink up!");
+            ret = testFunc.callList
+                .filterFirst()
+                .expectCallArgs("party down!");
+            assert.strictEqual(ret, false);
+            ret = testFunc.callList
+                .filterFirst()
+                .expectReturn("wine");
+            assert.strictEqual(ret, false);
+            assert.strictEqual(testFunc.expectMessageList.length, 2);
+            assert.throws(function() {
+                testFunc.expectValidateAll();
+            }, ExpectError, /2 expectation\(s\) failed:\n.*/);
+        });
+
+        it("clears expectation messages");
+        it("validate and clears");
+
+        it("call args deep equal");
+        // object, array, array buffer
+        it("check bad arguments to functions");
         it("throws TypeError if expectCallCountRange called with bad min");
         it("throws TypeError if expectCallCountRange called with bad max");
         it("throws TypeError if expectCallCountMin called with bad min");
@@ -2449,7 +2724,7 @@ function depends(mod) {
         });
 
         it("can diff undefined", function() {
-            var m = Match.Value(undefined);
+            var m = Match.value(undefined);
 
             // matches
             var ret;
@@ -2469,7 +2744,7 @@ function depends(mod) {
         });
 
         it("can diff null", function() {
-            var m = Match.Value(null);
+            var m = Match.value(null);
 
             // matches
             var ret;
@@ -2493,7 +2768,7 @@ function depends(mod) {
         it("can convert a diff to a string");
 
         it("cannot extend an existing name", function() {
-            var m = Match.Value("10");
+            var m = Match.value("10");
 
             // missing name
             assert.throws(function() {
