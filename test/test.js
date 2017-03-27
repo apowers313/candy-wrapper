@@ -245,6 +245,15 @@ function depends(mod) {
             }, TypeError, /Wrapper.unwrap: unexpected arguments: /);
         });
 
+        it("won't unwrap non-wrapper", function() {
+            var testObj = {
+                beer: "yummy"
+            };
+            assert.throws(function() {
+                Wrapper.unwrap(testObj, "beer");
+            }, TypeError, "Wrapper.unwrap: attempting to unwrap non-wrapper");
+        });
+
         it("function", function() {
             var testFunc = function pudding(a, b, c) {
                 a = b = c; // make linter happy
@@ -558,8 +567,14 @@ function depends(mod) {
 
         it("can get a Wrapper from a property", function() {
             var testObj = {
-                beer: "yummy"
+                beer: "yummy",
+                goBowling: function() {},
+                down: {},
+                arr: []
             };
+            Object.defineProperty(testObj, "setter", {
+                set: function() {}
+            });
             assert.throws(function() {
                 Wrapper.getWrapperFromProperty();
             }, TypeError, "getWrapperFromProperty; exepcted 'obj' argument to be Object");
@@ -575,6 +590,22 @@ function depends(mod) {
 
             // fail, not wrapped
             ret = Wrapper.getWrapperFromProperty(testObj, "beer");
+            assert.isNull(ret);
+
+            // fail, not wrapped
+            ret = Wrapper.getWrapperFromProperty(testObj, "goBowling");
+            assert.isNull(ret);
+
+            // fail, not wrapped
+            ret = Wrapper.getWrapperFromProperty(testObj, "down");
+            assert.isNull(ret);
+
+            // fail, not wrapped
+            ret = Wrapper.getWrapperFromProperty(testObj, "arr");
+            assert.isNull(ret);
+
+            // fail, not wrapped
+            ret = Wrapper.getWrapperFromProperty(testObj, "setter");
             assert.isNull(ret);
 
             // pass
@@ -941,15 +972,15 @@ function depends(mod) {
 
             assert.throws(function() {
                 w.callList.filterCallByContext();
-            }, TypeError, "filterCallByContext: expected one argument");
+            }, TypeError, "filterCallByContext: expected a single argument of type Object");
 
             assert.throws(function() {
                 w.callList.filterByException();
-            }, TypeError, "filterByException: expected one argument");
+            }, TypeError, "filterByException: expected a single argument of type Error");
 
-            assert.throws(function() {
-                w.callList.filterByReturn();
-            }, TypeError, "filterByReturn: expected one argument");
+            // assert.throws(function() {
+            //     w.callList.filterByReturn();
+            // }, TypeError, "filterByReturn: expected one argument");
 
             var testObj = {
                 beer: "yummy"
@@ -958,7 +989,7 @@ function depends(mod) {
             testObj.beer = "gulp";
             assert.throws(function() {
                 w.touchList.filterPropSetByVal();
-            }, TypeError, "filterPropSetByVal: expected one argument");
+            }, TypeError, "filterPropSetByVal: expected a single argument of any type");
         });
 
         it("can get only value", function() {
@@ -988,26 +1019,26 @@ function depends(mod) {
             // missing arg
             assert.throws(function() {
                 w.callList.filterByNumber();
-            }, TypeError, "expected 'num' to be number");
+            }, TypeError, "filterByNumber: expected a single argument of type Number");
             // arg wrong type
             assert.throws(function() {
                 w.callList.filterByNumber("foo");
-            }, TypeError, "expected 'num' to be number");
+            }, TypeError, "filterByNumber: expected a single argument of type Number");
 
             // nothing to get
             assert.throws(function() {
                 w.callList.filterByNumber(1);
-            }, RangeError, "empty list");
+            }, RangeError, "filterByNumber: empty list");
 
             w("beer");
             // only 0, can't get 1
             assert.throws(function() {
                 w.callList.filterByNumber(1);
-            }, RangeError, "'num' out of bounds");
+            }, RangeError, "filterByNumber: 'num' out of bounds");
             // no negative indexes please
             assert.throws(function() {
                 w.callList.filterByNumber(-1);
-            }, RangeError, "'num' out of bounds");
+            }, RangeError, "filterByNumber: 'num' out of bounds");
 
             // success
             var ret = w.callList.filterByNumber(0);
@@ -1080,7 +1111,7 @@ function depends(mod) {
             assert.deepEqual(list[5], ["martini"]);
         });
 
-        it("get get all this values", function() {
+        it("get all this values", function() {
             var w = new Wrapper();
             w.call({
                 prop: "beer"
@@ -1106,6 +1137,80 @@ function depends(mod) {
             assert.deepEqual(list[2], {
                 prop: "beer"
             });
+        });
+
+        it("get all exceptions", function() {
+            var count = 0;
+            var testFunc = function() {
+                count++;
+                switch (count) {
+                    case 1:
+                        throw new Error("out of beer");
+                    case 2:
+                        throw new TypeError("wine");
+                    case 3:
+                        throw new Error("out of beer");
+                    case 4:
+                        throw new RangeError("missed target");
+                    case 5:
+                        throw new Error("out of beer");
+                }
+            };
+            testFunc = new Wrapper(testFunc);
+            try {
+                testFunc();
+            } catch (e) {}
+            try {
+                testFunc();
+            } catch (e) {}
+            try {
+                testFunc();
+            } catch (e) {}
+            try {
+                testFunc();
+            } catch (e) {}
+            try {
+                testFunc();
+            } catch (e) {}
+
+            assert.isArray(testFunc.callList);
+            assert.strictEqual(testFunc.callList.length, 5);
+            var list = testFunc.callList.getAllExceptions();
+            assert.isArray(list);
+            assert.strictEqual(list.length, 5);
+            assert.strictEqual(list[0].name, "Error");
+            assert.strictEqual(list[0].message, "out of beer");
+            assert.strictEqual(list[1].name, "TypeError");
+            assert.strictEqual(list[1].message, "wine");
+            assert.strictEqual(list[2].name, "Error");
+            assert.strictEqual(list[2].message, "out of beer");
+            assert.strictEqual(list[3].name, "RangeError");
+            assert.strictEqual(list[3].message, "missed target");
+            assert.strictEqual(list[4].name, "Error");
+            assert.strictEqual(list[4].message, "out of beer");
+        });
+
+        it("can get all set vals", function() {
+            var testObj = {
+                beer: "yummy"
+            };
+            var w = new Wrapper(testObj, "beer");
+
+            testObj.beer = "good";
+            testObj.beer = "yummy";
+            testObj.beer = "good";
+            testObj.beer = [1, 2, 3];
+
+            assert.isArray(w.touchList);
+            assert.strictEqual(w.touchList.length, 4);
+
+            var list = w.touchList.getAllSetVals();
+            assert.isArray(list);
+            assert.strictEqual(list.length, 4);
+            assert.strictEqual(list[0], "good");
+            assert.strictEqual(list[1], "yummy");
+            assert.strictEqual(list[2], "good");
+            assert.deepEqual(list[3], [1, 2, 3]);
         });
 
         it("can get all return values with a function", function() {
@@ -1153,6 +1258,8 @@ function depends(mod) {
         it("can get all exceptions with an property");
         it("can get all set values");
     });
+
+
 
     describe("expect on filter", function() {
         it("call count", function() {
@@ -1315,16 +1422,20 @@ function depends(mod) {
             assert.isNotOk(w.touchList.filterByNumber(0).expectReturn({
                 wine: "empty"
             }));
+
+            testObj.beer = "stuff";
+
             ret = testObj.beer;
-            assert.isOk(w.touchList.filterByNumber(1).expectReturn({
+            assert.isOk(w.touchList.filterByNumber(2).expectReturn({
                 a: 1
             }));
-            assert.isNotOk(w.touchList.filterByNumber(1).expectReturn({
+            assert.isNotOk(w.touchList.filterByNumber(2).expectReturn({
                 wine: "empty"
             }));
+
             ret = testObj.beer;
-            assert.isOk(w.touchList.filterByNumber(2).expectReturn([1, 2, 3]));
-            assert.isNotOk(w.touchList.filterByNumber(2).expectReturn([]));
+            assert.isOk(w.touchList.filterByNumber(3).expectReturn([1, 2, 3]));
+            assert.isNotOk(w.touchList.filterByNumber(3).expectReturn([]));
         });
 
         it("property exception", function() {
@@ -1432,6 +1543,12 @@ function depends(mod) {
                 });
             assert.isBoolean(ret);
             assert.isNotOk(ret);
+
+            assert.throws(function() {
+                testFunc.callList
+                    .filterFirst()
+                    .expectCustom();
+            }, TypeError, "expected the first argument to be of type Function");
         });
 
         it("property custom", function() {
@@ -1745,6 +1862,60 @@ function depends(mod) {
             var w = new Wrapper();
             var ret = w.triggerAlways();
             assert.instanceOf(ret, Trigger);
+        });
+
+        it("throws on bad args", function() {
+            assert.throws(function() {
+                new Trigger();
+            }, TypeError, "Trigger constructor: expected first argument to be of type Wrapper");
+
+            assert.throws(function() {
+                var w = new Wrapper();
+                new Trigger(w);
+            }, TypeError, "Trigger constructor: expected second argument to be of type Function");
+
+        });
+
+        it("_action", function() {
+            var w = new Wrapper();
+            var t = new Trigger(w, function() {});
+
+            assert.throws(function() {
+                t._action();
+            }, TypeError, "_action: expected 'name' argument");
+
+            assert.throws(function() {
+                t._action("name", "both");
+            }, TypeError, "_action: expected 'timing' argument");
+
+            assert.throws(function() {
+                t._action("name", "both", "timing");
+            }, TypeError, "_action: expected 'validateFn' argument");
+
+            assert.throws(function() {
+                t._action("name", "both", "timing", function() {});
+            }, TypeError, "_action: expected function argument");
+        });
+
+        it("_expect", function() {
+            var w = new Wrapper();
+            var t = new Trigger(w, function() {});
+
+            assert.throws(function() {
+                t._expect();
+            }, TypeError, "_expect: expected 'name' argument");
+
+            assert.throws(function() {
+                t._expect("name", "both");
+            }, TypeError, "_expect: expected 'timing' argument");
+
+            assert.throws(function() {
+                t._expect("name", "both", "timing");
+            }, TypeError, "_expect: expected 'validateFn' argument");
+
+            assert.throws(function() {
+                t._expect("name", "both", "timing", function() {});
+            }, TypeError, "_expect: expected function argument");
         });
 
         it("can trigger on args", function() {
@@ -2119,6 +2290,10 @@ function depends(mod) {
             assert.deepEqual(ret, {
                 foo: "bar"
             });
+
+            assert.throws(function() {
+                w.triggerAlways().actionReturn();
+            }, TypeError, "expected a single argument of any type");
         });
 
         it("can spoof an property return value", function() {
@@ -2159,6 +2334,21 @@ function depends(mod) {
             assert.strictEqual(ret, 2);
             ret = w("beer", "wine");
             assert.strictEqual(ret, "wine");
+
+            assert.throws(function() {
+                w.triggerAlways()
+                    .actionReturnFromArg("foo");
+            }, TypeError, "expected a single argument of type Number");
+
+            assert.throws(function() {
+                w.triggerAlways()
+                    .actionReturnFromArg();
+            }, TypeError, "expected a single argument of type Number");
+
+            assert.throws(function() {
+                w.triggerAlways()
+                    .actionSetVal(42);
+            }, Error, "actionSetVal is only supported for PROPERTY wrappers");
         });
 
         it("can return context", function() {
@@ -2173,6 +2363,11 @@ function depends(mod) {
             var ret;
             ret = w.call(ctx);
             assert.deepEqual(ret, ctx);
+
+            assert.throws(function() {
+                w.triggerAlways()
+                    .actionReturnContext("foo");
+            }, TypeError, "didn't expect any args");
         });
 
         it("can return from context", function() {
@@ -2187,6 +2382,11 @@ function depends(mod) {
             var ret;
             ret = w.call(ctx);
             assert.strictEqual(ret, "yummy");
+
+            assert.throws(function() {
+                w.triggerAlways()
+                    .actionReturnFromContext();
+            }, TypeError, "expected a single argument of type String");
         });
 
         it("can throw error", function() {
@@ -2202,12 +2402,11 @@ function depends(mod) {
 
             // throw a real error
             w = new Wrapper();
-            w.triggerAlways()
-                .actionThrowException("not an error");
 
             assert.throws(function() {
-                w();
-            }, Error, "actionThrowException: expected 'err' argument to be error");
+                w.triggerAlways()
+                    .actionThrowException("not an error");
+            }, TypeError, "actionThrowException: expected a single argument of type Error");
         });
 
         it("can setval", function() {
@@ -2228,6 +2427,16 @@ function depends(mod) {
             testObj.beer = "foo";
             ret = testObj.beer;
             assert.strictEqual(ret, "more!");
+
+            assert.throws(function() {
+                w.triggerAlways()
+                    .actionSetVal();
+            }, TypeError, "expected a single argument of any type");
+
+            assert.throws(function() {
+                w.triggerAlways()
+                    .actionReturnContext();
+            }, Error, "actionReturnContext is only supported for FUNCTION wrappers");
         });
 
         it("can return a resolved promise", function() {
@@ -2247,6 +2456,11 @@ function depends(mod) {
 
             var ret2 = testFunc();
             assert.instanceOf(ret2, Promise);
+
+            assert.throws(function() {
+                testFunc.triggerAlways()
+                    .actionReturnPromise(1, 2);
+            }, TypeError, "expected exactly one or two args");
 
             return ret1.then((v) => {
                 assert.strictEqual(v, "sleepy");
@@ -2270,6 +2484,16 @@ function depends(mod) {
                 ret1 = testFunc();
             });
             assert.instanceOf(ret1, Promise);
+
+            assert.throws(function() {
+                testFunc.triggerAlways()
+                    .actionRejectPromise("test");
+            }, TypeError, "expected first argument to be of type Error, or no arguments");
+
+            assert.throws(function() {
+                testFunc.triggerAlways()
+                    .actionRejectPromise(new Error("test"), 2);
+            }, TypeError, "expected first argument to be of type Error, or no arguments");
 
             return ret1.then(
                 () => {
@@ -2320,6 +2544,11 @@ function depends(mod) {
             assert.isNotOk(called);
             w(cb);
             assert.isOk(called);
+
+            assert.throws(function() {
+                w.triggerAlways()
+                    .actionCallbackFunction();
+            }, TypeError, "expected a single argument of type Function");
         });
 
         it("can callback an argument", function() {
@@ -2344,6 +2573,10 @@ function depends(mod) {
             assert.isNotOk(called);
             w("beer", cb);
             assert.isOk(called);
+
+            assert.throws(function() {
+                w("foo", "bar");
+            }, Error, "expected argument 1 to be callback function");
         });
 
         it("can callback with args", function() {
@@ -2384,8 +2617,13 @@ function depends(mod) {
             assert.isNotOk(called);
             w();
             assert.isOk(called, "expected callback to be called");
-        });
 
+            assert.throws(function() {
+                w.triggerAlways()
+                    .actionCallbackFunction(cb)
+                    .actionCallbackContext();
+            }, TypeError, "expected a single argument of type Object");
+        });
 
         it("can chain actions");
         it("actionCallbackAsync");

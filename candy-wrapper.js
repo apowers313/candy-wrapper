@@ -240,9 +240,6 @@
 
         _propConstructor(obj, prop, fn) {
             /** @lends Wrapper# */
-            if (typeof obj[prop] === "object") {
-                throw new TypeError("can't wrap a sub-object: not implemented");
-            }
 
             /** @type {Object} The results of `getOwnPropertyDescriptor` on the original property, saved so that it can be restored later. */
             this.origPropDesc = Object.getOwnPropertyDescriptor(obj, prop);
@@ -769,6 +766,7 @@
          */
         triggerOnContext(context) {
             this._funcOnly();
+            validateArgsSingleObject("triggerOnContext", context);
             var m = Match.value(context);
             var t = new Trigger(this, function(single) {
                 var ret = m.compare(single.context);
@@ -797,6 +795,7 @@
          */
         triggerOnCallNumber(num) {
             this._funcOnly();
+            validateArgsSingleNumber("triggerOnCallNumber", num);
             var count = 0;
             var t = new Trigger(this, function(single) {
                 var ret = (count === num);
@@ -808,6 +807,7 @@
         }
 
         triggerOnException(e) {
+            validateArgsSingleException("triggerOnException", e);
             var m = Match.value(e);
             var t = new Trigger(this, function(single) {
                 var ret = m.compare(single.exception);
@@ -818,6 +818,7 @@
         }
 
         triggerOnReturn(retVal) {
+            validateArgsSingle("triggerOnReturn", retVal);
             var m = Match.value(retVal);
             var t = new Trigger(this, function(single) {
                 var ret = m.compare(single.retVal);
@@ -838,6 +839,7 @@
         // behavior of the wrapper. If you want the wrapper to throw an exception, set `single.exception`
         // to a `new Error()`; however, this is best done through an action anyway.
         triggerOnCustom(fn) {
+            validateArgsSingleFunction("triggerOnCustom", fn);
             var t = new Trigger(this, fn);
             this.triggerList.push(t);
             return t;
@@ -855,6 +857,7 @@
 
         triggerOnSetVal(setVal) {
             this._propOnly();
+            validateArgsSingle("triggerOnSetVal", setVal);
             var m = Match.value(setVal);
             var t = new Trigger(this, function(single) {
                 return m.compare(single.setVal);
@@ -865,6 +868,8 @@
 
         triggerOnSetNumber(num) {
             this._propOnly();
+            validateArgsSingleNumber("triggerOnSetNumber", num);
+
             var count = 0;
             var t = new Trigger(this, function(single) {
                 if (single.type !== "set") return false;
@@ -888,6 +893,8 @@
 
         triggerOnGetNumber(num) {
             this._propOnly();
+            validateArgsSingleNumber("triggerOnGetNumber", num);
+
             var count = 0;
             var t = new Trigger(this, function(single) {
                 if (single.type !== "get") return false;
@@ -901,6 +908,8 @@
 
         triggerOnTouchNumber(num) {
             this._propOnly();
+            validateArgsSingleNumber("triggerOnTouchNumber", num);
+
             var count = 0;
             var t = new Trigger(this, function(single) {
                 var ret = (count === num);
@@ -929,7 +938,7 @@
              * @instance
              */
             alias(this, "expectReturn",
-                this._expect, "expectReturn", "post",
+                this._expect, "expectReturn", "both", "post", validateArgsSingle,
                 function(single, retVal) {
                     var m = Match.value(retVal);
                     if (m.compare(single.retVal)) {
@@ -939,7 +948,7 @@
                 });
 
             alias(this, "expectCallArgs",
-                this._expect, "expectCallArgs", "pre",
+                this._expect, "expectCallArgs", "function", "pre", validateArgsAny,
                 function(single, ...args) {
                     var m = Match.value(args);
                     if (m.compare(single.argList)) {
@@ -949,7 +958,7 @@
                 });
 
             alias(this, "expectContext",
-                this._expect, "expectContext", "pre",
+                this._expect, "expectContext", "function", "pre", validateArgsSingleObject,
                 function(single, context) {
                     var m = Match.value(context);
                     if (m.compare(single.context)) {
@@ -959,7 +968,7 @@
                 });
 
             alias(this, "expectException",
-                this._expect, "expectException", "post",
+                this._expect, "expectException", "both", "post", validateArgsSingleException,
                 function(single, exception) {
                     var m = Match.value(exception);
                     if (m.compare(single.exception)) {
@@ -969,7 +978,7 @@
                 });
 
             alias(this, "expectSetVal",
-                this._expect, "expectSetVal", "post",
+                this._expect, "expectSetVal", "property", "post", validateArgsSingle,
                 function(single, setVal) {
                     var m = Match.value(setVal);
                     if (m.compare(single.setVal)) {
@@ -980,7 +989,7 @@
 
             // returns string or null
             alias(this, "expectCustom",
-                this._expect, "expectCustom", "post",
+                this._expect, "expectCustom", "both", "post", validateArgsFirstFunction,
                 function(single, fn, ...args) {
                     return fn.call(this, single, ...args);
                 });
@@ -999,9 +1008,7 @@
             if (this instanceof SingleCall) return this;
             if (this instanceof SingleTouch) return this;
             if (this instanceof Trigger && this.currentCall) return this.currentCall;
-            var argArray = [...args];
-            if (typeof this._addDeferredAction === "function") return this._addDeferredAction(name, argArray);
-            throw new Error(`Couldn't figure current or how to defer for: ${name}`);
+            return this._addDeferredAction(name, args);
         }
 
         _softAssert(message) {
@@ -1022,7 +1029,28 @@
             return passed;
         }
 
-        _expect(name, timing, fn, ...args) {
+        _expect(name, type, timing, validateFn, fn, ...args) {
+            if (typeof name !== "string") {
+                throw new TypeError("_expect: expected 'name' argument");
+            }
+
+            if (type === "property") this.wrapper._propOnly(name);
+            if (type === "function") this.wrapper._funcOnly(name);
+
+            if (typeof timing !== "string") {
+                throw new TypeError("_expect: expected 'timing' argument");
+            }
+
+            if (typeof validateFn !== "function") {
+                throw new TypeError("_expect: expected 'validateFn' argument");
+            }
+
+            if (typeof fn !== "function") {
+                throw new TypeError(`_expect: expected function argument`);
+            }
+
+            validateFn(name, ...args);
+
             // get the current call, or save the args for when the call is actually run
             var curr = this._getCurrCallOrDefer(name, ...args);
             // if there isn't a current call, return 'this' to enable chaining
@@ -1089,9 +1117,7 @@
             alias(this, "filterPropSetByVal",
                 this._filter, "filterPropSetByVal", "property",
                 function(element, index, array, ...args) {
-                    if (args.length !== 1) {
-                        throw new TypeError("filterPropSetByVal: expected one argument");
-                    }
+                    validateArgsSingle("filterPropSetByVal", ...args);
                     var setVal = args[0];
 
                     var m = Match.value(setVal);
@@ -1108,9 +1134,7 @@
             alias(this, "filterCallByContext",
                 this._filter, "filterCallByContext", "function",
                 function(element, index, array, ...args) {
-                    if (args.length !== 1) {
-                        throw new TypeError("filterCallByContext: expected one argument");
-                    }
+                    validateArgsSingleObject("filterCallByContext", ...args);
                     var context = args[0];
 
                     var m = Match.value(context);
@@ -1120,9 +1144,7 @@
             alias(this, "filterByException",
                 this._filter, "filterByException", "both",
                 function(element, index, array, ...args) {
-                    if (args.length !== 1) {
-                        throw new TypeError("filterByException: expected one argument");
-                    }
+                    validateArgsSingleException("filterByException", ...args);
                     var exception = args[0];
 
                     var m = Match.value(exception);
@@ -1132,9 +1154,6 @@
             alias(this, "filterByReturn",
                 this._filter, "filterByReturn", "both",
                 function(element, index, array, ...args) {
-                    if (args.length !== 1) {
-                        throw new TypeError("filterByReturn: expected one argument");
-                    }
                     var retVal = args[0];
 
                     var m = Match.value(retVal);
@@ -1182,16 +1201,14 @@
         }
 
         filterByNumber(num) {
-            if (typeof num !== "number") {
-                throw new TypeError("expected 'num' to be number");
-            }
+            validateArgsSingleNumber("filterByNumber", num);
 
             if (this.length === 0) {
-                throw new RangeError("empty list");
+                throw new RangeError("filterByNumber: empty list");
             }
 
             if (num < 0 || num >= this.length) {
-                throw new RangeError("'num' out of bounds");
+                throw new RangeError("filterByNumber: 'num' out of bounds");
             }
 
             return this[num];
@@ -1201,6 +1218,7 @@
             if (this.length === 0) {
                 throw new RangeError("filterlast: empty list");
             }
+
             return this[this.length - 1];
         }
 
@@ -1271,6 +1289,15 @@
     class Trigger extends Expect {
         constructor(wrapper, triggerFn) {
             super();
+
+            if (!(wrapper instanceof Wrapper)) {
+                throw new TypeError("Trigger constructor: expected first argument to be of type Wrapper");
+            }
+
+            if(typeof triggerFn !== "function") {
+                throw new TypeError("Trigger constructor: expected second argument to be of type Function");
+            }
+
             this.wrapper = wrapper;
             this.triggerFn = triggerFn;
             this.currentCall = null;
@@ -1286,7 +1313,7 @@
              * @return {Trigger}     Returns this `Trigger`, so that further actions or expectations can be chained.
              */
             alias(this, "actionReturn",
-                this._action, "actionReturn", "post",
+                this._action, "actionReturn", "both", "post", validateArgsSingle,
                 function(curr, retVal) {
                     curr.retVal = retVal;
                 });
@@ -1297,7 +1324,7 @@
              * @return {Trigger}         Returns this `Trigger`, so that further actions or expectations can be chained.
              */
             alias(this, "actionCustom",
-                this._action, "actionCustom", "both",
+                this._action, "actionCustom", "both", "both", validateArgsFirstFunction,
                 function(curr, fn, ...args) {
                     return fn.call(this, curr, ...args);
                 });
@@ -1309,50 +1336,44 @@
              */
 
             alias(this, "actionReturnFromArg",
-                this._action, "actionReturnFromArg", "post",
+                this._action, "actionReturnFromArg", "function", "post", validateArgsSingleNumber,
                 function(curr, num) {
                     curr.retVal = curr.argList[num];
                 });
 
             alias(this, "actionReturnContext",
-                this._action, "actionReturnContext", "post",
+                this._action, "actionReturnContext", "function", "post", validateArgsNone,
                 function(curr) {
                     curr.retVal = curr.context;
                 });
 
             alias(this, "actionReturnFromContext",
-                this._action, "actionReturnFromContext", "post",
+                this._action, "actionReturnFromContext", "function", "post", validateArgsSingleString,
                 function(curr, prop) {
-                    if (typeof curr.context !== "object") {
-                        throw new TypeError("actionReturnFromContext: expected context to be object");
-                    }
                     curr.retVal = curr.context[prop];
                 });
 
             alias(this, "actionThrowException",
-                this._action, "actionThrowException", "post",
+                this._action, "actionThrowException", "both", "post", validateArgsSingleException,
                 function(curr, err) {
-                    if (!(err instanceof Error)) {
-                        throw new Error("actionThrowException: expected 'err' argument to be error");
-                    }
                     curr.exception = err;
                 });
 
             alias(this, "actionSetVal",
-                this._action, "actionSetVal", "pre",
+                this._action, "actionSetVal", "property", "pre", validateArgsSingle,
                 function(curr, setVal) {
                     curr.setVal = setVal;
                 });
 
             alias(this, "actionReturnPromise",
-                this._action, "actionReturnPromise", "post",
+                this._action, "actionReturnPromise", "both", "post", validateArgsNoneOrOne,
                 function(curr, retVal) {
                     retVal = retVal || curr.retVal;
                     curr.retVal = Promise.resolve(retVal);
                 });
 
             alias(this, "actionRejectPromise",
-                this._action, "actionRejectPromise", "post",
+                this._action, "actionRejectPromise", "both", "post", validateArgsNoneOrOneException,
                 function(curr, e) {
                     e = e || curr.exception;
                     curr.exception = null;
@@ -1360,13 +1381,13 @@
                 });
 
             alias(this, "actionCallbackFunction",
-                this._action, "actionCallbackFunction", "post",
+                this._action, "actionCallbackFunction", "function", "post", validateArgsSingleFunction,
                 function(curr, fn) {
                     curr.callback.fn = fn;
                 });
 
             alias(this, "actionCallbackToArg",
-                this._action, "actionCallbackToArg", "post",
+                this._action, "actionCallbackToArg", "function", "post", validateArgsSingleNumber,
                 function(curr, num) {
                     var cb = curr.argList[num];
                     if (typeof cb !== "function") {
@@ -1377,13 +1398,13 @@
                 });
 
             alias(this, "actionCallbackContext",
-                this._action, "actionCallbackContext", "post",
+                this._action, "actionCallbackContext", "function", "post", validateArgsSingleObject,
                 function(curr, context) {
                     curr.callback.context = context;
                 });
 
             alias(this, "actionCallbackArgs",
-                this._action, "actionCallbackArgs", "post",
+                this._action, "actionCallbackArgs", "function", "post", validateArgsAny,
                 function(curr, ...args) {
                     curr.callback.argList = args;
                 });
@@ -1402,14 +1423,27 @@
             this.currentCall = null;
         }
 
-        _action(name, timing, fn, ...args) {
+        _action(name, type, timing, validateFn, fn, ...args) {
             if (typeof name !== "string") {
                 throw new TypeError("_action: expected 'name' argument");
             }
 
-            if (typeof fn !== "function") {
-                throw new TypeError(`${name}: expected function argument`);
+            if (type === "property") this.wrapper._propOnly(name);
+            if (type === "function") this.wrapper._funcOnly(name);
+
+            if (typeof timing !== "string") {
+                throw new TypeError("_action: expected 'timing' argument");
             }
+
+            if (typeof validateFn !== "function") {
+                throw new TypeError("_action: expected 'validateFn' argument");
+            }
+
+            if (typeof fn !== "function") {
+                throw new TypeError(`_action: expected function argument`);
+            }
+
+            validateFn(name, ...args);
 
             // get the current call, or save the args for when the call is actually run
             var curr = this._getCurrCallOrDefer(name, ...args);
@@ -1426,6 +1460,78 @@
             return this;
         }
     }
+
+    /***************************************************
+     * helper functions for validating arguments
+     ****************************************************/
+    function validateArgsSingleObject(name, ...args) {
+        if (args.length !== 1 ||
+            typeof args[0] !== "object") {
+            throw new TypeError(`${name}: expected a single argument of type Object`);
+        }
+    }
+
+    function validateArgsSingleException(name, ...args) {
+        if (args.length !== 1 ||
+            !(args[0] instanceof Error)) {
+            throw new TypeError(`${name}: expected a single argument of type Error`);
+        }
+    }
+
+    function validateArgsSingleFunction(name, ...args) {
+        if (args.length !== 1 ||
+            typeof args[0] !== "function") {
+            throw new TypeError(`${name}: expected a single argument of type Function`);
+        }
+    }
+
+    function validateArgsFirstFunction(name, ...args) {
+        if (typeof args[0] !== "function") {
+            throw new TypeError(`${name}: expected the first argument to be of type Function`);
+        }
+    }
+
+    function validateArgsSingleNumber(name, ...args) {
+        if (args.length !== 1 ||
+            typeof args[0] !== "number") {
+            throw new TypeError(`${name}: expected a single argument of type Number`);
+        }
+    }
+
+    function validateArgsSingleString(name, ...args) {
+        if (args.length !== 1 ||
+            typeof args[0] !== "string") {
+            throw new TypeError(`${name}: expected a single argument of type String`);
+        }
+    }
+
+    function validateArgsSingle(name, ...args) {
+        if (args.length !== 1) {
+            throw new TypeError(`${name}: expected a single argument of any type`);
+        }
+    }
+
+    function validateArgsNone(name, ...args) {
+        if (args.length !== 0) {
+            throw new TypeError(`${name}: didn't expect any args`);
+        }
+    }
+
+    function validateArgsNoneOrOne(name, ...args) {
+        if (args.length < 0 ||
+            args.length > 1) {
+            throw new TypeError(`${name}: expected exactly one or two args`);
+        }
+    }
+
+    function validateArgsNoneOrOneException(name, ...args) {
+        if (args.length === 0) return;
+        if (args.length === 1 && args[0] instanceof Error) return;
+
+        throw new TypeError(`${name}: expected first argument to be of type Error, or no arguments`);
+    }
+
+    function validateArgsAny() {}
 
     /**
      * A class for matching anything. Really, anything.
@@ -1521,11 +1627,6 @@
                 debug("findCommonType: converting matcher2 value to matcher:", matcher2);
                 matcher2 = this.getType(matcher2);
                 debug("matcher2:", matcher2);
-            }
-
-            if (!matcher1 || !matcher2) {
-                // throw new TypeError ("findCommonType: couldn't identify types to match");
-                return null;
             }
 
             var m1types = [];
@@ -1702,10 +1803,6 @@
     function diffArray(a1, a2) {
         var diff = [];
 
-        if (!Array.isArray(a1) || !Array.isArray(a2)) {
-            throw new TypeError("diffArray got non-array");
-        }
-
         // for the longer of the arrays, create a list of different values
         var len = (a1.length > a2.length) ? a1.length : a2.length;
         for (let i = 0; i < len; i++) {
@@ -1724,8 +1821,9 @@
         return false;
     }
 
-    function diffNull(n1, n2) {
-        if (n1 !== n2) return newDiff(n1, n2);
+    function diffNull() {
+        // guaranteed that both n1 and n2 are of type "null"
+        // since there's no different types of null, there can be no real diff here
         return [];
     }
 
@@ -1759,8 +1857,9 @@
         return false;
     }
 
-    function diffUndef(u1, u2) {
-        if (u1 !== u2) return newDiff(u1, u2);
+    function diffUndef() {
+        // guaranteed that both n1 and n2 are of type "undefined"
+        // since there's no different types of undefined, there can be no real diff here
         return [];
     }
 
