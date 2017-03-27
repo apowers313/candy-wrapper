@@ -1,202 +1,171 @@
 Work in progress. Please don't use.
 
-## Candy Wrapper
+![##candy-wrapper](https://cdn.rawgit.com/apowers313/candy-wrapper/2e325ece/img/candy-wrapper-full-logo-1116x200.png?raw=true)
 
 [![Build Status](https://travis-ci.org/apowers313/candy-wrapper.svg?branch=master)](https://travis-ci.org/apowers313/candy-wrapper)
 [![Coverage Status](https://coveralls.io/repos/github/apowers313/candy-wrapper/badge.svg?branch=master)](https://coveralls.io/github/apowers313/candy-wrapper?branch=master)
 
 <!-- [![Sauce Test Status](https://saucelabs.com/browser-matrix/apowers313.svg)](https://saucelabs.com/u/apowers313) -->
 
-Docs: https://apowers313.github.io/candy-wrapper
+[Full API Documentation Available Here!](https://apowers313.github.io/candy-wrapper)
 
 This library is similar to the wonderful [Sinon](http://sinonjs.org/) and can be used for creating stubs, spys, and mocks for testing. The API has been re-invented to be consistent and re-use code across all those functionalities.
 
 The primary interfaces are Wrapper, Expect, Trigger, and Action.
-* [Wrappers](https://apowers313.github.io/candy-wrapper/Wrapper.html) wrap a function or attribute, so that when the Wrapper is called, so is the underlying function or attribute.
+* [Wrappers](https://apowers313.github.io/candy-wrapper/Wrapper.html) wrap a function or property, so that when the Wrapper is called, so is the underlying function or property.
 * You can use [Expect](https://apowers313.github.io/candy-wrapper/Expect.html) to examine what happened with a Wrapper, such as seeing what args were passed to it or what the return value was.
 * [Triggers](https://apowers313.github.io/candy-wrapper/Trigger.html) get called just before or just after a function call, providing the opportunity validate Expects or perform Actions.
 * Actions can do things like change arguments recieved by the wrapped function or change the value returned to the caller.
 
 ## ES6
-Note that this library currently makes exensive use of the features of JavaScript ES6, notably [Proxies](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy), [classes](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Classes), [temlate literals](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals), and the [spread operator](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Spread_operator). For information about which platforms currently support ES6, see the [ES6 compatibility table](https://kangax.github.io/compat-table/es6/). It has been tested against Node 6 and seems to run on the latest versions of Chrome and Firefox.
+Note that this library currently makes exensive use of the features of [JavaScript ES6](http://www.ecma-international.org/ecma-262/6.0/), notably [Proxies](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy), [classes](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Classes), [template literals](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals), [rest parameters](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/rest_parameters), and the [spread operator](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Spread_operator). For information about which platforms currently support ES6, see the [ES6 compatibility table](https://kangax.github.io/compat-table/es6/). It has been tested against Node 6 and seems to run on the latest versions of Chrome and Firefox.
 
 Presumably it could be back-ported to ES5.1, perhaps drawing on the work of Sinon. The biggest challenge would be removing the use of Proxies. A [pull request](https://github.com/apowers313/candy-wrapper) would be more than welcome if anyone wants to take that challenge on.
 
+## Installing and Using
+
+### node.js
+
+Install:
+
+``` bash
+$ npm install candy-wrapper
+```
+
+Use:
+
+``` js
+var Wrapper = require("candy-wrapper").Wrapper.
+new Wrapper();
+```
+
+### Browser
+
+**Note**: I wouldn't recommend using candy-wrapper browser for now, but if you want to play around with it...
+
+Install:
+
+``` html
+<script src=https://rawgit.com/apowers313/candy-wrapper/master/candy-wrapper.js></script>
+```
+
+Use:
+
+```
+<script>
+var Wrapper = CandyWrapper.Wrapper;
+</script>
+```
+
 ## Examples
+Here are few example use cases to get you started with candy-wrapper...
 
-## API Overview
-#### Wrapper
+### Spys
+Let's say that you have already written some code and now you want to test it to make sure it works right. Your very simple function `square()` simply takes a number and squares it and you want to make sure it's working right.
 
-#### Config
+``` js
+// our simple square function, squares the number passed in
+// throws error if the argument isn't a number
+var square = function(num) {
+    if (typeof num !== "number") {
+        throw new TypeError ("expected argument to be Number");
+    }
 
-| Function Name         | Description |
-|-----------------------|-------------|
-| configReset | |
+    return num * num;
+};
 
-* configPassThrough
-* configObserveWaitForValidate
-* configObserveThrows
-* configRestore
+// wrap square so that we can analyze it later
+square = new Wrapper(square);
 
-#### Wrapper Expect
+// let's make some calls to square
+square(2);
+square(4);
+try { // gobble up the exception from no arguments
+    square();
+} catch(e) {}
+square(3);
+square(5);
 
-Function
+square.callList.filterFirst().expectReturn(4); // true
+square.callList.filterSecond().expectReturn(16); // true
+square.callList.filterThird().expectException(new TypeError ("expected argument to be Number")); // true
+square.callList.filterFourth().expectReturn(10); // false, actually returned 9
+square.callList.filterFifth().expectReturn(23); // false, actually returned 25
 
-| Function Name         | Description |
-|-----------------------|-------------|
-| expectCallCount | |
-| expectCallCountMax | |
-| expectCallCountMin | |
-| expectCallCountRange | |
-| expectCallNever | |
-| expectCallOnce | |
-| expectCallTwice | |
-| expectCallThrice | |
+square.expectValidateAll();
+// ExpectError: 2 expectation(s) failed:
+//     expectReturn: expectation failed for: 10
+//     expectReturn: expectation failed for: 23
+```
 
-Attribute
+### Stubs
+Let's say you're working on a big complex system that's eventually going to hook up to a database, but you really don't want to have to write all the database code before you can start working on the more interesting code that would rely on it. If only you could create a fake database object that behaved like the real thing...
 
-* expectSetCount
-* expectGetCount
-* expectTouchCount
-* expectSetCountMax
-* expectGetCountMax
-* expectTouchCountMax
-* expectSetCountMin
-* expectGetCountMin
-* expectTouchCountMin
-* expectSetCountRange
-* expectGetCountRange
-* expectTouchCountRange
-* expectSetNever
-* expectGetNever
-* expectTouchNever
-* expectSetOnce
-* expectGetOnce
-* expectTouchOnce
-* expectSetTwice
-* expectGetTwice
-* expectTouchTwice
-* expectSetThrice
-* expectGetThrice
-* expectTouchThrice
+``` js
+var fakeDb = {};
+fakeDb.getUser = new Wrapper(); // create a stub function for getUser...
+fakeDb.listUsers = new Wrapper(); // create a stub function for listUsers...
 
-...All...
+// when `fakeDb.getUser` is called with the argument "apwoers", it returns the object below
+fakeDb.getUser.triggerOnArgs("apowers")
+    .actionReturn({
+        username: "apowers",
+        firstName: "Adam",
+        lastName: "Powers"
+    });
 
-...Sometimes...
+// everytime `fakeDb.listUsers` is called, it returns the same array...
+fakeDb.listUsers.triggerAlways()
+    .actionReturn([{
+        username: "apowers",
+        firstName: "Adam",
+        lastName: "Powers"
+    }, {
+        username: "bhope",
+        firstName: "Bob",
+        lastName: "Hope"
+    }]);
 
-...Never...
+var user = fakeDb.getUser("apowers"); // returns a user object...
+var userList = fakeDb.listUsers(); // returns an array of users...
+```
 
-#### Filter API
+### Mocks
+Now let's say it's been a few months, and your system is almost completely done. You have completed your real database, and you're having some sort of error that you suspect is due to your database timing out. You want to simulate errors with your database, but it's not easy to figure out how to make it time out when you want it to. Instead, you can just wrap your database object in a mock and start injecting errors...
 
-| Function Name         | Description |
-|-----------------------|-------------|
-* filterSet
-* filterGet
+``` js
+// this is your big complex interface to a MongoDB database
+var mysqlDbInterface = {
+    // ...
+    getUser: function() {
+        // make database call here
+    }
+    // ...
+};
 
-* filterCallByArgs
-* filterCallByContext
-* filterByException
-* filterByReturn
-* filterSetByVal
+var getUserWrapper = new Wrapper(mysqlDbInterface, "getUser");
+getUserWrapper.triggerOnCallNumber(2)
+    .actionThrowException(new Error("Connection to mySQL timed out"));
 
-* All
-* Some
-* None
+// start server
+// the third call to `mysqlDbInterface.getUser()` will throw a timeout Error now..
+```
 
-* filterFirst
-* filterLast
-* filterOnly
-* filterByNumber
+### Monkey Patching
+Let's say that you are tired of [Math.random()](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random) being a pseudo-random number generator and you want it to use your [Digital Random Number Generator (DRNG)](https://software.intel.com/en-us/articles/intel-digital-random-number-generator-drng-software-implementation-guide) instead. Using candy-wrapper, you can [monkey patch](https://en.wikipedia.org/wiki/Monkey_patch) (that is, replace) `Math.random()` with your DRNG:
 
-#### Get API
+``` js
+// replace "Math.random" with the new function of our choosing...
+new Wrapper(Math, "random", function() {
+    return 1.2345; // this is where you would call your DRNG...
+});
 
-Function
+// let's see what it does...
+Math.random() // returns 1.2345
 
-* _get
-* getAllContexts
-* getAllArgs
-* getAllExceptions
-* getAllReturns
-* getAllTriggers
+// check to see if Math.random is a Wrapper
+Wrapper.isWrapper(Math, "random"); // true
 
-Attribute
-
-* getAllExceptions
-* getAllReturns
-* getAllSetVals
-
-#### Single Expect
-
-General
-
-* expectValidate
-* _expect (name, trigger)
-
-Function
-
-* expectCallArgs
-* expectCallContext
-* expectReturn
-* expectException
-* expectCustom (fn, param)
-
-Attribute
-
-* expectSetVal
-* expectReturn
-* expectException
-
-#### Trigger
-
-* _trigger (name, function)
-* triggerOnAll
-* triggerOnArgs
-* triggerOnContext
-* triggerOnCallNumber
-* triggerOnException
-* triggerOnReturn
-* triggerOnCallLike (SingleCall)
-* triggerOnTouchLike (SingleTouch)
-* triggerOnCustom (fn, single, param)
-
-* ...OnSet
-* ...OnSetVal
-* ...OnSetNumber
-* ...OnGet
-* ...OnGetNumber
-* ...OnTouch
-* ...OnTouchNumber
-
-#### Actions
-
-Function
-
-Attribute
-
-* _action (name, function)
-* actionCallbackToArg(arg#)
-* actionCallbackFunction(function)
-* actionCallbackContext(thisVal)
-* actionCallbackArgs(any)
-* actionCallbackAsync()
-* actionCallbackAttribute(attrName) // returns object.attrName
-* actionReturn(any)
-* actionReturnFromArg(arg#)
-* actionReturnFromContext() // returns ‘this’
-* actionThrowException
-* actionReturnPromise
-* actionRejectPromise
-* actionCustom (fn, param)
-* actionSetVal
-
-#### Match
-
-* compare
-* diff
-* extend
-* getType
-* findCommonType
-* getLastDiff
-* getDiffMessage
-
-#### Sandbox
+// this is probably a bad idea, let's go back to the original random number generator...
+Wrapper.unwrap(Math, "random");
+```
