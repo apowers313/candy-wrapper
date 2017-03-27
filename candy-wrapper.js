@@ -136,7 +136,8 @@
                 this.origObj = obj;
                 this.origProp = key;
                 if (typeof obj[key] === "function") {
-                    return this._callConstructor(obj[key], fn);
+                    obj[key] = this._callConstructor(obj[key], fn);
+                    return obj[key];
                 } else {
                     return this._propConstructor(obj, key, fn);
                 }
@@ -668,11 +669,12 @@
                 // get: desc.get,
                 // set: desc.set
             });
+            return val;
         }
 
         _unwrapMethod() {
             // destroy this wrapper so that it isn't mistakenly used in the future
-            var orig = this.wrapped;
+            var orig = this.orig;
             this.wrapped = function() {
                 throw new Error("Calling Wrapper after it has been unwrapped");
             };
@@ -686,17 +688,13 @@
                 let obj = this.origObj;
                 let key = this.origProp;
                 obj[key] = orig;
+                return orig;
             } else {
                 // unwraps these:
                 // new Wrapper()
                 // new Wrapper(func)
-                return this.orig;
+                return orig;
             }
-
-            let obj = this.origObj;
-            let key = this.origProp;
-
-            obj[key] = orig;
         }
 
         expectValidateAll(clear) {
@@ -974,6 +972,7 @@
                     if (m.compare(single.exception)) {
                         return null;
                     }
+                    console.log ("diff", m.lastDiff);
                     return "expectException: expectation failed for: " + exception;
                 });
 
@@ -1172,6 +1171,10 @@
                 this._get, "getAllSetVals", "property", "setVal");
 
             alias(this, "filterFirst", this.filterByNumber, 0);
+            alias(this, "filterSecond", this.filterByNumber, 1);
+            alias(this, "filterThird", this.filterByNumber, 2);
+            alias(this, "filterFourth", this.filterByNumber, 3);
+            alias(this, "filterFifth", this.filterByNumber, 4);
         }
 
         _filter(name, type, fn, ...args) {
@@ -1574,6 +1577,7 @@
 
         compare(any) {
             var d = this.diff(this.value, any);
+            this.lastDiff = d;
             if (d.length === 0) return true;
             // TODO: if allowUndefined -- filter undefined
 
