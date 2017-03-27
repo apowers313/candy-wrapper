@@ -28,6 +28,121 @@ function depends(mod) {
         it("has a Mock class");
     });
 
+    describe("example", function() {
+        it("spy on square", function() {
+            // our simple square function, squares the number passed in
+            // throws error if the argument isn't a number
+            var square = function(num) {
+                if (typeof num !== "number") {
+                    throw new TypeError("expected argument to be Number");
+                }
+
+                return num * num;
+            };
+
+            // wrap square so that we can analyze it later
+            square = new Wrapper(square);
+
+            // let's make some calls to square
+            square(2);
+            square(4);
+            try { // gobble up the exception from no arguments
+                square();
+            } catch (e) {}
+            square(3);
+            square(5);
+
+            square.callList.filterFirst().expectReturn(4); // true
+            square.callList.filterSecond().expectReturn(16); // true
+            square.callList.filterThird().expectException(new TypeError("expected argument to be Number")); // true
+            square.callList.filterFourth().expectReturn(10); // false, actually returned 9
+            square.callList.filterFifth().expectReturn(23); // false, actually returned 25
+
+            assert.throws(function() {
+                square.expectValidateAll();
+                // ExpectError: 2 expectation(s) failed:
+                //     expectReturn: expectation failed for: 10
+                //     expectReturn: expectation failed for: 23
+            }, ExpectError);
+        });
+
+        it("stub fake database", function() {
+            var fakeDb = {};
+            fakeDb.getUser = new Wrapper();
+            fakeDb.listUsers = new Wrapper();
+            fakeDb.getUser.triggerOnArgs("apowers")
+                .actionReturn({
+                    username: "apowers",
+                    firstName: "Adam",
+                    lastName: "Powers"
+                });
+            fakeDb.listUsers.triggerAlways()
+                .actionReturn([{
+                    username: "apowers",
+                    firstName: "Adam",
+                    lastName: "Powers"
+                }, {
+                    username: "bhope",
+                    firstName: "Bob",
+                    lastName: "Hope"
+                }]);
+
+            var user = fakeDb.getUser("apowers");
+            assert.deepEqual(user, {
+                username: "apowers",
+                firstName: "Adam",
+                lastName: "Powers"
+            });
+            var userList = fakeDb.listUsers();
+            assert.deepEqual(userList, [{
+                username: "apowers",
+                firstName: "Adam",
+                lastName: "Powers"
+            }, {
+                username: "bhope",
+                firstName: "Bob",
+                lastName: "Hope"
+            }]);
+        });
+
+        it("mock database timeout", function() {
+            // this is your big complex interface to a MongoDB database
+            var mysqlDbInterface = {
+                // ...
+                getUser: function() {
+                        // make database call here
+                    }
+                    // ...
+            };
+
+            var getUserWrapper = new Wrapper(mysqlDbInterface, "getUser");
+            getUserWrapper.triggerOnCallNumber(2)
+                .actionThrowException(new Error("Connection to mySQL timed out"));
+
+            // start server
+
+            assert.doesNotThrow(function() {
+                mysqlDbInterface.getUser();
+            });
+            assert.doesNotThrow(function() {
+                mysqlDbInterface.getUser();
+            });
+            assert.throws(function() {
+                mysqlDbInterface.getUser();
+            }, Error, "Connection to mySQL timed out");
+        });
+
+        it("monkey patching Math.random", function() {
+            new Wrapper(Math, "random", function() {
+                return 1.2345; // this is where you would call your DRNG...
+            });
+            assert.isTrue(Wrapper.isWrapper(Math, "random"));
+            assert.strictEqual(Math.random(), 1.2345);
+            Wrapper.unwrap(Math, "random");
+            assert.notEqual(Math.random(), 1.2345);
+        });
+    });
+
     describe("create wrapper", function() {
         it("can create an empty wrapper", function() {
             var w = new Wrapper();
@@ -261,6 +376,38 @@ function depends(mod) {
             assert.isFalse(Wrapper.isWrapper(testFunc));
             testFunc = new Wrapper(testFunc);
             assert.isTrue(Wrapper.isWrapper(testFunc));
+
+            var w = testFunc;
+            testFunc = testFunc.configUnwrap();
+            assert.isFalse(Wrapper.isWrapper(testFunc));
+            assert.isFunction(testFunc);
+            assert.strictEqual(testFunc.name, "pudding");
+            assert.strictEqual(testFunc.length, 3);
+            assert.throws(function() {
+                w();
+            }, Error, "Calling Wrapper after it has been unwrapped");
+        });
+
+        it("function", function() {
+            function pudding(a, b, c) {
+                a = b = c; // make linter happy
+            }
+            var called = false;
+            var stupid = function bad(a, b) {
+                a = b; // make linter happy
+                called = true;
+            };
+            var testObj = {
+                test: pudding
+            };
+
+            // assert.isFalse(Wrapper.isWrapper(testFunc));
+            var testFunc = new Wrapper(testObj, "test", stupid);
+            assert.isTrue(Wrapper.isWrapper(testFunc));
+
+            assert.isFalse(called);
+            testFunc();
+            assert.isTrue(called);
 
             var w = testFunc;
             testFunc = testFunc.configUnwrap();
