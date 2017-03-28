@@ -59,7 +59,7 @@ function depends(mod) {
             square.callList.filterFifth().expectReturn(23); // false, actually returned 25
 
             assert.throws(function() {
-                square.expectValidateAll();
+                square.expectReportAllFailures();
                 // ExpectError: 2 expectation(s) failed:
                 //     expectReturn: expectation failed for: 10
                 //     expectReturn: expectation failed for: 23
@@ -1754,12 +1754,12 @@ function depends(mod) {
             assert.strictEqual(ret, true);
 
             // pass
-            ret = testFunc.expectValidateAll();
+            ret = testFunc.expectReportAllFailures();
             assert.strictEqual(ret, true);
             assert.strictEqual(testFunc.expectMessageList.length, 0);
 
             // pass and clear
-            ret = testFunc.expectValidateAll(true);
+            ret = testFunc.expectReportAllFailures(true);
             assert.strictEqual(ret, true);
             assert.strictEqual(testFunc.expectMessageList.length, 0);
 
@@ -1775,16 +1775,16 @@ function depends(mod) {
             assert.strictEqual(ret, false);
             assert.strictEqual(testFunc.expectMessageList.length, 1);
             assert.throws(function() {
-                testFunc.expectValidateAll();
+                testFunc.expectReportAllFailures();
             }, ExpectError, /1 expectation\(s\) failed:\n.*/);
 
             // fail return again and clear expectation results
             assert.throws(function() {
-                testFunc.expectValidateAll(true);
+                testFunc.expectReportAllFailures(true);
             }, ExpectError, /1 expectation\(s\) failed:\n.*/);
 
             // pass, list is empty now
-            ret = testFunc.expectValidateAll();
+            ret = testFunc.expectReportAllFailures();
             assert.strictEqual(ret, true);
 
             // fail args
@@ -1799,7 +1799,7 @@ function depends(mod) {
             assert.strictEqual(ret, true);
             assert.strictEqual(testFunc.expectMessageList.length, 1);
             assert.throws(function() {
-                testFunc.expectValidateAll(true);
+                testFunc.expectReportAllFailures(true);
             }, ExpectError, /1 expectation\(s\) failed:\n.*/);
 
             // fail args and return
@@ -1814,7 +1814,7 @@ function depends(mod) {
             assert.strictEqual(ret, false);
             assert.strictEqual(testFunc.expectMessageList.length, 2);
             assert.throws(function() {
-                testFunc.expectValidateAll();
+                testFunc.expectReportAllFailures();
             }, ExpectError, /2 expectation\(s\) failed:\n.*/);
         });
 
@@ -2793,7 +2793,7 @@ function depends(mod) {
             var m = new Match({
                 value: 5
             });
-            var type = m.getType(5);
+            var type = Match.getType(5);
             assert.strictEqual(type.name, "number");
         });
 
@@ -2801,11 +2801,11 @@ function depends(mod) {
             var m = new Match({
                 value: 5
             });
-            var ret = m.diff(m.value, 5);
+            var ret = Match.diff(m.value, 5);
             assert.isArray(ret);
             assert.strictEqual(ret.length, 0);
 
-            ret = m.diff(m.value, 3);
+            ret = Match.diff(m.value, 3);
             assert.isArray(ret);
             assert.strictEqual(ret.length, 1);
             assert.deepEqual(ret, [{
@@ -2813,7 +2813,7 @@ function depends(mod) {
                 dst: 3
             }]);
 
-            ret = m.diff(m.value, 0);
+            ret = Match.diff(m.value, 0);
             assert.isArray(ret);
             assert.strictEqual(ret.length, 1);
             assert.deepEqual(ret, [{
@@ -2837,12 +2837,12 @@ function depends(mod) {
             });
 
             var ret;
-            ret = m.diff(m.value, [1, 2, 3]);
+            ret = Match.diff(m.value, [1, 2, 3]);
             assert.isArray(ret);
             assert.strictEqual(ret.length, 0);
             assert.deepEqual(ret, []);
 
-            ret = m.diff(m.value, [1, 2]);
+            ret = Match.diff(m.value, [1, 2]);
             assert.isArray(ret);
             assert.strictEqual(ret.length, 1);
             assert.deepEqual(ret, [{
@@ -2851,7 +2851,7 @@ function depends(mod) {
                 dst: undefined
             }]);
 
-            // ret = m.diff(m.value, [1, 2, 3, 4]);
+            // ret = Match.diff(m.value, [1, 2, 3, 4]);
             // assert.isArray(ret);
             // assert.strictEqual(ret.length, 1);
             // assert.deepEqual(ret, [{
@@ -2877,12 +2877,12 @@ function depends(mod) {
             });
 
             var ret;
-            ret = m.diff(m.value, "beer");
+            ret = Match.diff(m.value, "beer");
             assert.isArray(ret);
             assert.strictEqual(ret.length, 0);
             assert.deepEqual(ret, []);
 
-            ret = m.diff(m.value, "wine");
+            ret = Match.diff(m.value, "wine");
             assert.isArray(ret);
             assert.strictEqual(ret.length, 1);
             assert.deepEqual(ret, [{
@@ -2890,7 +2890,7 @@ function depends(mod) {
                 dst: "wine"
             }]);
 
-            ret = m.diff(m.value, "");
+            ret = Match.diff(m.value, "");
             assert.isArray(ret);
             assert.strictEqual(ret.length, 1);
             assert.deepEqual(ret, [{
@@ -2909,7 +2909,7 @@ function depends(mod) {
 
             // same
             var ret;
-            ret = m.diff(m.value, {
+            ret = Match.diff(m.value, {
                 foo: "bar",
                 idx: 5
             });
@@ -2918,14 +2918,14 @@ function depends(mod) {
             assert.deepEqual(ret, []);
 
             // same empty
-            ret = m.diff({}, {});
+            ret = Match.diff({}, {});
             assert.isArray(ret);
             assert.strictEqual(ret.length, 0);
             assert.deepEqual(ret, []);
 
 
             // changed value
-            ret = m.diff(m.value, {
+            ret = Match.diff(m.value, {
                 foo: 1,
                 idx: 5
             });
@@ -2938,7 +2938,7 @@ function depends(mod) {
             }]);
 
             // missing key
-            ret = m.diff(m.value, {
+            ret = Match.diff(m.value, {
                 foo: "bar"
             });
             assert.isArray(ret);
@@ -2950,7 +2950,7 @@ function depends(mod) {
             }]);
 
             // added key
-            ret = m.diff(m.value, {
+            ret = Match.diff(m.value, {
                 foo: "bar",
                 idx: 5,
                 beer: "yum"
@@ -2993,9 +2993,9 @@ function depends(mod) {
                 value: now
             });
 
-            var matcher = m.getType(now);
+            var matcher = Match.getType(now);
             assert.isObject(matcher);
-            assert.isOk(m.isMatcher(matcher));
+            assert.isOk(Match.isMatcher(matcher));
             assert.strictEqual(matcher.name, "date");
         });
 
@@ -3008,13 +3008,13 @@ function depends(mod) {
 
             // same
             var ret;
-            ret = m.diff(m.value, date1);
+            ret = Match.diff(m.value, date1);
             assert.isArray(ret);
             assert.strictEqual(ret.length, 0);
             assert.deepEqual(ret, []);
 
             // different
-            ret = m.diff(m.value, date2);
+            ret = Match.diff(m.value, date2);
             assert.isArray(ret);
             assert.strictEqual(ret.length, 1);
             assert.deepEqual(ret, [{
@@ -3030,13 +3030,13 @@ function depends(mod) {
 
             // same
             var ret;
-            ret = m.diff(m.value, /a/);
+            ret = Match.diff(m.value, /a/);
             assert.isArray(ret);
             assert.strictEqual(ret.length, 0);
             assert.deepEqual(ret, []);
 
             // different
-            ret = m.diff(m.value, /b/);
+            ret = Match.diff(m.value, /b/);
             assert.isArray(ret);
             assert.strictEqual(ret.length, 1);
             assert.deepEqual(ret, [{
@@ -3052,13 +3052,13 @@ function depends(mod) {
 
             // same
             var ret;
-            ret = m.diff(m.value, new Error("this is a new error"));
+            ret = Match.diff(m.value, new Error("this is a new error"));
             assert.isArray(ret);
             assert.strictEqual(ret.length, 0);
             assert.deepEqual(ret, []);
 
             // different type
-            ret = m.diff(m.value, new Error("different error message"));
+            ret = Match.diff(m.value, new Error("different error message"));
             assert.isArray(ret);
             assert.strictEqual(ret.length, 1);
             assert.deepEqual(ret, [{
@@ -3068,7 +3068,7 @@ function depends(mod) {
             }]);
 
             // different message
-            ret = m.diff(m.value, new TypeError("this is a new error"));
+            ret = Match.diff(m.value, new TypeError("this is a new error"));
             assert.isArray(ret);
             assert.strictEqual(ret.length, 1);
             assert.deepEqual(ret, [{
@@ -3078,7 +3078,7 @@ function depends(mod) {
             }]);
 
             // completely different
-            ret = m.diff(m.value, new RangeError("blurp"));
+            ret = Match.diff(m.value, new RangeError("blurp"));
             assert.isArray(ret);
             assert.strictEqual(ret.length, 2);
             assert.deepEqual(ret, [{
@@ -3102,7 +3102,7 @@ function depends(mod) {
             // same
             var ret;
             var si2 = new SingleCall({}, [1, 2, 3]);
-            ret = m.diff(m.value, si2);
+            ret = Match.diff(m.value, si2);
             assert.isArray(ret);
             assert.strictEqual(ret.length, 0);
             assert.deepEqual(ret, []);
@@ -3113,13 +3113,13 @@ function depends(mod) {
 
             // matches
             var ret;
-            ret = m.diff(m.value, undefined);
+            ret = Match.diff(m.value, undefined);
             assert.isArray(ret);
             assert.strictEqual(ret.length, 0);
             assert.deepEqual(ret, []);
 
             // doesn't match
-            ret = m.diff(m.value, "bob");
+            ret = Match.diff(m.value, "bob");
             assert.isArray(ret);
             assert.strictEqual(ret.length, 1);
             assert.deepEqual(ret, [{
@@ -3133,13 +3133,13 @@ function depends(mod) {
 
             // matches
             var ret;
-            ret = m.diff(m.value, null);
+            ret = Match.diff(m.value, null);
             assert.isArray(ret);
             assert.strictEqual(ret.length, 0);
             assert.deepEqual(ret, []);
 
             // doesn't match
-            ret = m.diff(m.value, "bob");
+            ret = Match.diff(m.value, "bob");
             assert.isArray(ret);
             assert.strictEqual(ret.length, 1);
             assert.deepEqual(ret, [{
@@ -3157,13 +3157,13 @@ function depends(mod) {
 
             // missing name
             assert.throws(function() {
-                m.extend();
-            }, TypeError, "Match.extend: 'name' should be string");
+                Match.addType();
+            }, TypeError, "Match.addType: 'name' should be string");
 
             // duplicate name
             assert.throws(function() {
-                m.extend("string");
-            }, TypeError, "Match.extend: 'string' already exists");
+                Match.addType("string");
+            }, TypeError, "Match.addType: 'string' already exists");
         });
     });
 })();

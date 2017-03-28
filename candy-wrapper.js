@@ -51,6 +51,14 @@
      * which are basically syntactic sugar for creating wrappers
      * around lots of different kinds of things
      *
+     * TODO:
+     *     * what is a wrapper
+     *     * function vs. property wrappers; differences in behavior
+     *     * triggers
+     *     * callList / touchList / Filters
+     *     * configuration
+     *     * examples
+     *
      * Signatures for Wrapper:
      *      new Wrapper()
      *      new Wrapper(obj)
@@ -325,7 +333,7 @@
 
             for (let idx in this.triggerList) {
                 let trigger = this.triggerList[idx];
-                trigger.run(single);
+                trigger._run(single);
             }
         }
 
@@ -333,7 +341,7 @@
          * Asserts that the current Wrapper is wrapping an property.
          * @param  {String} callerName The name of the calling function, to be included in
          * the error message if the assertion fails.
-         * @throws {Error} If Current Wrapper is not wrapping an property.
+         * @throws {Error} If current Wrapper is not wrapping an property.
          * @private
          */
         _propOnly(callerName) {
@@ -346,7 +354,7 @@
          * Asserts that the current Wrapper is wrapping a function.
          * @param  {String} callerName The name of the calling function, to be included in
          * the error message if the assertion fails.
-         * @throws {Error} If Current Wrapper is not wrapping a function.
+         * @throws {Error} If current Wrapper is not wrapping a function.
          * @private
          */
         _funcOnly(callerName) {
@@ -462,8 +470,8 @@
 
         /**
          * This static method checks whether something is a Wrapper or not, similar to `Array.isArray`.
-         * Works on functions, methods, and propertys. This function has multiple signatures as illustrated
-         * below.
+         * Works on functions, methods, and properties. This constructor has multiple signatures as illustrated
+         * in the example below:
          * @example
          *
          * var testFunction = function(){};
@@ -524,6 +532,21 @@
             throw new TypeError("isWrapper: unsupported arguments");
         }
 
+        /**
+         * If the property `key` of `Object` `obj` is a wrapped property, the `Wrapper` for that property
+         * will be returned. Otherwise `null` will be returned. It is safe to use this in all instances, including
+         * if the property `key` isn't defined on the `Object`. Note that this will not return a `Wrapper` for a
+         * wrapped function / method.
+         * @param  {Object} obj The `Object` for the `obj[key]` combination for which a `Wrapper` will attempt to be retrieved.
+         * @param  {String} key The `String` for the `obj[key]` combination for which a `Wrapper` will attempt to be retrieved.
+         * @return {Wrapper|null}     Returns a `Wrapper` if the property has been wrapped, `null` otherwise.
+         * @example
+         * var testObj = {
+         *     location: "home"
+         * };
+         * new Wrapper(testObj, "location"); // wrap the property 'testObj.location'
+         * var wrapper = Wrapper.getWrapperFromProperty(testObj, "location"); // returns the wrapper created above
+         */
         static getWrapperFromProperty(obj, key) {
             if (typeof obj !== "object") {
                 throw new TypeError("getWrapperFromProperty; exepcted 'obj' argument to be Object");
@@ -548,6 +571,18 @@
             }
         }
 
+        /**
+         * This static method attempts to remove and destroy the Wrapper on the function, method, property or
+         * object that is passed to it. If an object has a mix of wrapped and non-wrapped methods and properties
+         * this `unwrap` will automatically detect and unwrap just those items which hvae been wrapped.
+         * @param  {...any} args See examples for the various signatures for this method.
+         * @return {Function|Object|any}       The original function, object, or the value of the property that has now been unwrapped.
+         * @example
+         * func = Wrapper.unwrap(func); // unwraps this function
+         * Wrapper.unwrap(obj, "property"); // unwraps the property or method at obj[property]
+         * Wrapper.unwrap(obj); // recursively unwraps all properties and methods on 'obj'
+         * @see  {@link Wrapper#configUnwrap}
+         */
         static unwrap(...args) {
             // unwrap(obj)
             if (args.length === 1 && typeof args[0] === "object") {
@@ -645,6 +680,13 @@
             this.touchList.length = 0;
         }
 
+        /**
+         * Restores the  wrapped property or function to its original value, and destroys this `Wrapper`.
+         * @return {Function|Object} The original function or object that was wrapped.
+         * @example
+         * var w = new Wrapper(obj, "method"); // create a new wrapper
+         * w.configUnwrap(); // destroys the wrapper
+         */
         configUnwrap() {
             if (this.type === "function") return this._unwrapMethod();
             return this._unwrapProp();
@@ -697,7 +739,37 @@
             }
         }
 
-        expectValidateAll(clear) {
+        /**
+         * The typical behavior for expectations called against a {@link Filter}, {@link SingleCall} or {@link SingleTouch}
+         * is that they will return `true` or `false` immediately. This allows them to be used with assertion libraries,
+         * such as [Chai](http://chaijs.com/). Alternatively, `expectReportAllFailures` allows you to run all your expectations
+         * and then report all the expectations that did not pass.
+         *
+         * If all your expectations passed, this function will return true. If one or more of your expectations failed
+         * this function will aggregate all the failure messages and throw a {@link ExpectError} that includes all the
+         * error messages.
+         *
+         * An example error message might look something like:
+         *
+         * > ExpectError: 2 expectation(s) failed:<br>
+         * > &nbsp;&nbsp;&nbsp;&nbsp;expectReturn: expectation failed for: 10<br>
+         * > &nbsp;&nbsp;&nbsp;&nbsp;expectReturn: expectation failed for: 23<br>
+         *
+         * `expectReportAllFailures` draws upon a list of messages stored in the wrapper at `Wrapper.expectMessageList`. This
+         * list will continue to be added to as new expectations fail. `expectReportAllFailures` includes a convenience
+         * argument, `clear`, that will clear out the previous expectation messages and status so that
+         * a fresh set of expectations can be built up.
+         *
+         * Note that the default behavior for {@link Trigger}s is to immediately throw an `ExpectError` if the expectation
+         * fails. This prevents them from adding expectation failures to the list for future reporting. This behavior may
+         * be changed by calling {@link configExpectThrowOnTrigger}. Likewise, if {@link configExpectThrow} has been set
+         * so that expecations always throw, there will be nothing cached for future validation.
+         * @param  {Boolean} clear If `truthy`, the list of previous exception results will be cleared out. If absent or
+         * `falsey` the results will continue to be added to as new expectations are run.
+         * @return {Boolean}       Returns `true` if all expectations have successfully passed.
+         * @throws {ExpectError} If any expectations have been evaluated and failed, but not immediately thrown.
+         */
+        expectReportAllFailures(clear) {
             if (this.expectPassed) return true;
             var message = `${this.expectMessageList.length} expectation(s) failed:\n`;
             for (let idx in this.expectMessageList) {
@@ -713,6 +785,10 @@
             throw new ExpectError(message);
         }
 
+        /**
+         * Creates a new {@link Trigger} on the `Wrapper` that always executes.
+         * @return {Trigger} The `Trigger` that was created.
+         */
         triggerAlways() {
             var t = new Trigger(this, function() {
                 return true;
@@ -804,9 +880,17 @@
             return t;
         }
 
-        triggerOnException(e) {
-            validateArgsSingleException("triggerOnException", e);
-            var m = Match.value(e);
+        /**
+         * Creates a {@link Trigger} on the `Wrapper` that executes whenever the exception matching `err` is thrown
+         * by the wrapped function / getter / setter.
+         * @param  {Error} err Any `Error` (or class that inherits from `Error`, such as `TypeError`, `RangeError`, or
+         * custom `Error`s). If `err` exactly matches the error thrown then this trigger will execute. Exactly matching
+         * an `Error` requires that the `Error.name` and `Error.message` are strictly equal.
+         * @return {Trigger}   The `Trigger` that was created.
+         */
+        triggerOnException(err) {
+            validateArgsSingleException("triggerOnException", err);
+            var m = Match.value(err);
             var t = new Trigger(this, function(single) {
                 var ret = m.compare(single.exception);
                 return ret;
@@ -815,6 +899,13 @@
             return t;
         }
 
+        /**
+         * Creates a {@link Trigger} on the `Wrapper` that executes whenever the return value of the wrapped
+         * function / getter / setter matches the value specified here.
+         * @param  {any} retVal The return value that will cause this `Trigger` to execute. Note that `undefined`
+         * is allowable, but should be explicitly passed as `undefined` rather than simply not passing an argument.
+         * @return {Trigger}        The `Trigger` that was created.
+         */
         triggerOnReturn(retVal) {
             validateArgsSingle("triggerOnReturn", retVal);
             var m = Match.value(retVal);
@@ -826,23 +917,52 @@
             return t;
         }
 
-        // Every trigger gets called twice, once before and once after the actual call / touch,
-        // ostensibly so that it can modify arguments or context before the call or so that it can
-        // modify the return value or exceptions thrown after a call.
-        // The `single` value passed in to the `callback` contains two properties for identifying
-        // and controlling behavior pre- and post- call / touch. `single.preCall` will be `true` before
-        // the call, and `false` afterwards; and `single.postCall` will be `true` after the call and
-        // `false` before.
-        // Throwing an exception in a custom trigger is not advised since it may adversely effect the
-        // behavior of the wrapper. If you want the wrapper to throw an exception, set `single.exception`
-        // to a `new Error()`; however, this is best done through an action anyway.
-        triggerOnCustom(fn) {
-            validateArgsSingleFunction("triggerOnCustom", fn);
-            var t = new Trigger(this, fn);
+        /**
+         * Creates a {@link Trigger} that gets executed based on the callback function `cb`.
+         * @param  {Trigger~triggerCustomCallback} cb The callback function. See
+         * {@link Trigger~triggerCustomCallback triggerCustomCallback} for the description of the expected syntax and behavior
+         * of the callback.
+         * @return {Trigger}                          The `Trigger` that was created
+         */
+        triggerOnCustom(cb) {
+            validateArgsSingleFunction("triggerOnCustom", cb);
+            var t = new Trigger(this, cb);
             this.triggerList.push(t);
             return t;
         }
+        /**
+         * This is the callback that is passed to {@link Wrapper#triggerOnCustom triggerOnCustom}. The most obvious thing to point out
+         * is that it returns `true` when the {@link Trigger} should execute, and `false` when the `Trigger`
+         * shouldn't execute; however, there are some unexpected behaviors with this callback that should
+         * be observed.
+         *
+         * First, every `Trigger` callback **is _called twice_ for every time the `Wrapper` is executed**.
+         * The callback is called once just before the `Wrapper` executes the wrapped function / setter / getter
+         * providing the callback with the opportunity to evaluate arguments and context before they are used. The
+         * callback is called again just after the wrapped function / setter / getter is called, giving the
+         * callback the opportunity to evaluate return values and exceptions.
+         *
+         * The first argument to the callback is `curr`, which is a `SingleCall` or `SingleTouch`, depending
+         * on whether the `Wrapper` is wrappign a `function` or a `property`. `curr` has the property `preCall`
+         * set to `true` if the callback is being called before the function / getter / setter; and has the
+         * property `postCall` that is set to `true` if the callback is being called after the function /
+         * getter / setter. `curr` also has the property `curr.wrapper`, which references the {@link Wrapper}.
+         *
+         * Also note that throwing an exception in a custom trigger is not advised since it may adversely effect
+         * the behavior of the `Wrapper` and the running of any subsequent `Triggers`. If you want the wrapper to
+         * throw an exception, set `single.exception` to a `new Error()`; however, this is best done through an
+         * {@link actionThrowException} anyway.
+         * @callback Trigger~triggerCustomCallback
+         * @param {SingleCall|SingleTouch} curr The current function call or property touch.
+         * @returns {Boolean} Returns `true` if the actions and expectations associated with the `Trigger`
+         * should run. Returns `false` if this `Trigger` should not be executed.
+         */
 
+        /**
+         * Creates a {@link Trigger} on the `Wrapper` that executes whenever a property is set. Only valid for
+         * `Wrappers` around a property.
+         * @return {Trigger} The `Trigger` that was created.
+         */
         triggerOnSet() {
             this._propOnly();
             var t = new Trigger(this, function(single) {
@@ -920,8 +1040,9 @@
     }
 
     /**
-     * A class for expect... calls. Gets mixed in to `Triggers` as well as
-     * `SingleCall` and `SingleTouch`.
+     * A class that contains all the `expect` calls that gets mixed in to `Triggers` as well as
+     * `SingleCall` and `SingleTouch`. This class really isn't intended to be used on its own.
+     * @private
      */
     class Expect {
         constructor() {
@@ -929,11 +1050,11 @@
              * Evaluates whether the `call` or `get` returned the value `retVal`.
              * @name expectReturn
              * @function
+             * @instance
              * @memberof Expect
              * @param  {any} retVal       The value that is expected to be returned from the function call or property getter.
              * @return {Trigger|Boolean}  When called on a {@link Trigger}, the expectation is stored for future evaluation and the `Trigger` value is returned to make this chainable.
              * When called on a {@link SingleCall} or {@link SingleTouch}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
-             * @instance
              */
             alias(this, "expectReturn",
                 this._expect, "expectReturn", "both", "post", validateArgsSingle,
@@ -945,6 +1066,16 @@
                     return "expectReturn: expectation failed for: " + retVal;
                 });
 
+            /**
+             * Evaluates whether the arguments to a function match the `...args`.
+             * @name expectCallArgs
+             * @function
+             * @instance
+             * @memberof Expect
+             * @param  {...any} args The list of arguments to validate for the function call.
+             * @return {Trigger|Boolean}           When called on a {@link Trigger}, the expectation is stored for future evaluation and the `Trigger` value is returned to make this chainable.
+             * When called on a {@link SingleCall} or {@link SingleTouch}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
+             */
             alias(this, "expectCallArgs",
                 this._expect, "expectCallArgs", "function", "pre", validateArgsAny,
                 function(single, ...args) {
@@ -955,6 +1086,17 @@
                     return "expectCallArgs: expectation failed for: " + args;
                 });
 
+            /**
+             * Evaluates whether the context (`this`) of a function call matches the `context` parameter.
+             * @name expectContext
+             * @function
+             * @instance
+             * @todo fix description and param
+             * @memberof Expect
+             * @param {Object} context The expected `this` for the function. Is compared by a strict deep-equals.
+             * @return {Trigger|Boolean}           When called on a {@link Trigger}, the expectation is stored for future evaluation and the `Trigger` value is returned to make this chainable.
+             * When called on a {@link SingleCall} or {@link SingleTouch}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
+             */
             alias(this, "expectContext",
                 this._expect, "expectContext", "function", "pre", validateArgsSingleObject,
                 function(single, context) {
@@ -965,6 +1107,18 @@
                     return "expectContext: expectation failed for: " + context;
                 });
 
+            /**
+             * Expects that the function call or property set / get threw an `Error` that strictly matches the `exception` arguemnt.
+             * @name expectException
+             * @function
+             * @instance
+             * @todo fix description and param
+             * @memberof Expect
+             * @param {Error} exception The `Error` (or class that inherits from `Error`) that is expected to strictly match. A strict
+             * comparison between errors evaluates that the `Error.name` and `Error.message` are the exact same.
+             * @return {Trigger|Boolean}           When called on a {@link Trigger}, the expectation is stored for future evaluation and the `Trigger` value is returned to make this chainable.
+             * When called on a {@link SingleCall} or {@link SingleTouch}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
+             */
             alias(this, "expectException",
                 this._expect, "expectException", "both", "post", validateArgsSingleException,
                 function(single, exception) {
@@ -976,6 +1130,18 @@
                     return "expectException: expectation failed for: " + exception;
                 });
 
+            /**
+             * Evaluates the value that is set on a property during assignment (e.g. - `obj.prop = setVal`) and expects the value to
+             * strictly equal the `setVal` argument.
+             * @name expectSetVal
+             * @function
+             * @instance
+             * @todo fix description and param
+             * @memberof Expect
+             * @param {any} setVal The value that is expected to be set on the property. An `undefined` value is allowed, but the value `undefined` must be passed explicitly to `expectSetVal`.
+             * @return {Trigger|Boolean}           When called on a {@link Trigger}, the expectation is stored for future evaluation and the `Trigger` value is returned to make this chainable.
+             * When called on a {@link SingleCall} or {@link SingleTouch}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
+             */
             alias(this, "expectSetVal",
                 this._expect, "expectSetVal", "property", "post", validateArgsSingle,
                 function(single, setVal) {
@@ -987,6 +1153,17 @@
                 });
 
             // returns string or null
+            /**
+             * DESCRIPTION GOES HERE
+             * @name expectCustom
+             * @function
+             * @instance
+             * @todo fix description and param
+             * @memberof Expect
+             * @param {TYPEGOESHERE} NAMEGOESHERE DESCRIPTION GOES HERE
+             * @return {Trigger|Boolean}           When called on a {@link Trigger}, the expectation is stored for future evaluation and the `Trigger` value is returned to make this chainable.
+             * When called on a {@link SingleCall} or {@link SingleTouch}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
+             */
             alias(this, "expectCustom",
                 this._expect, "expectCustom", "both", "post", validateArgsFirstFunction,
                 function(single, fn, ...args) {
@@ -1068,7 +1245,8 @@
     }
 
     /**
-     * An Error thrown by a failed {@link Expect} call.
+     * An Error thrown by a failed {@link Expect} call. Nothing fancy here, just a
+     * different error name so that it can be distinguished from other types of errors.
      * @extends {Error}
      */
     class ExpectError extends Error {
@@ -1080,6 +1258,16 @@
 
     /**
      * Methods for filtering the `callList` or `touchList` of a {@link Wrapper}.
+     *
+     * TODO:
+     *     * concept of a Filter; extends an Array with some syntactic sugar built in
+     *     * chainable
+     *     * expect calls
+     *     * filter
+     *     * get
+     *     * filtering down to a single record; filterFirst; filterLast; filterOnly; filterByNumber
+     *     * examples
+     *
      * @extends {Array}
      */
     class Filter extends Array {
@@ -1088,11 +1276,13 @@
             this.wrapper = wrapper;
 
             /**
-             * When called, will return the members of the `Filter` that were occurances of when the property was set. Only works for properties.
+             * Returns the members of the `Filter` that were occurances of when the property was set. Only
+             * works for properties.
              * @name filterPropSet
              * @function
              * @memberof Filter
              * @instance
+             * @returns {Filter} Returns a `Filter` containing just the `SingleTouch` records where a property was set.
              */
             alias(this, "filterPropSet",
                 this._filter, "filterSet", "property",
@@ -1101,11 +1291,13 @@
                 });
 
             /**
-             * When called, will return the members of the `Filter` that were occurances of when the property was retrieved (i.e. `get`). Only works for properties.
+             * Returns the members of the `Filter` that were occurances of when the property was retrieved
+             * (i.e. `get`). Only works for properties.
              * @name filterPropGet
              * @function
              * @memberof Filter
              * @instance
+             * @returns {Filter} Returns a `Filter` containing just the `SingleTouch` records when the property was gotten.
              */
             alias(this, "filterPropGet",
                 this._filter, "filterGet", "property",
@@ -1113,6 +1305,17 @@
                     if (element.type === "get") return true;
                 });
 
+            /**
+             * Returns the members of the `Filter` that were occurances of when the property was set to `setVal`
+             * @name filterPropSetByVal
+             * @function
+             * @memberof Filter
+             * @instance
+             * @param {any} setVal If `setVal` strictly matches the value of a `SingleTouch` where the property was set, the record
+             * will be included in the results.
+             * @returns {Filter} Returns a `Filter` containing just the `SingleTouch` records that are of type `set` and have a
+             * matching `setVal`.
+             */
             alias(this, "filterPropSetByVal",
                 this._filter, "filterPropSetByVal", "property",
                 function(element, index, array, ...args) {
@@ -1123,6 +1326,28 @@
                     return m.compare(element.setVal);
                 });
 
+            /**
+             * Returns the members of the `Filter` that were function calls with arguments matching `...args`.
+             * @name filterCallByArgs
+             * @function
+             * @memberof Filter
+             * @instance
+             * @param {...any} args The function arguments that will be matched
+             * @returns {Filter} A `Filter` continaing the function calls where the function was called with
+             * arguments that match `...args`.
+             * @example
+             * new Wrapper(obj, someMethod); // create a new wrapper
+             *
+             * // do some function calls
+             * obj.someMethod("drink", "beer");
+             * obj.someMethod("store", "wine");
+             * obj.someMethod("drink", "beer");
+             * obj.someMethod("store", "beer");
+             * obj.someMethod("martini");
+             *
+             * // returns a Filter with the two calls above that match `args[0] === "drink"` and `args[1] === "beer"`
+             * obj.someMethod.callList.filterCallByArgs("drink", "beer");
+             */
             alias(this, "filterCallByArgs",
                 this._filter, "filterCallByArgs", "function",
                 function(element, index, array, ...args) {
@@ -1130,6 +1355,15 @@
                     return m.compare(element.argList);
                 });
 
+            /**
+             * Returns the members of the `Filter` that were function calls with a `this` context that matches the `context` argument.
+             * @name filterCallByContext
+             * @function
+             * @memberof Filter
+             * @instance
+             * @param {Object} context The context that the `this` value of the function will be evaluated against.
+             * @returns {Filter} A `Filter` containing the function calls where the `this` strictly and deeply matched `context`.
+             */
             alias(this, "filterCallByContext",
                 this._filter, "filterCallByContext", "function",
                 function(element, index, array, ...args) {
@@ -1140,6 +1374,17 @@
                     return m.compare(element.context);
                 });
 
+            /**
+             * Returns the members of the `Filter` that threw exceptions that exactly matched `exception`.
+             * @name filterByException
+             * @function
+             * @memberof Filter
+             * @instance
+             * @param {Error} exception An `Error` (or any class that inherits from `Error`) that will be
+             * strictly matched.
+             * @returns {Filter} A `Filter` containing the function calls or property set / get that threw an
+             * `Error` that matches `exception`.
+             */
             alias(this, "filterByException",
                 this._filter, "filterByException", "both",
                 function(element, index, array, ...args) {
@@ -1150,6 +1395,18 @@
                     return m.compare(element.exception);
                 });
 
+            /**
+             * Returns the members of the `Filter` that are function calls or property set / get where their
+             * return value matches `retVal`.
+             * @name filterByReturn
+             * @function
+             * @memberof Filter
+             * @instance
+             * @param {any} retVal The value that will be matched against. May be `undefined`, but the value `undefined`
+             * must be explicitly passed to `filterByReturn`.
+             * @returns {Filter} A `Filter` containing the function calls or property set / get that returned a
+             * value stictly matching `retVal`.
+             */
             alias(this, "filterByReturn",
                 this._filter, "filterByReturn", "both",
                 function(element, index, array, ...args) {
@@ -1159,21 +1416,154 @@
                     return m.compare(element.retVal);
                 });
 
+            /**
+             * Gets the first {@link SingleCall} or {@link SingleTouch} from the filter. Is the same as
+             * `{@link Filter#filterByNumber filterByNumber}(0)`.
+             * @name filterFirst
+             * @function
+             * @memberof Filter
+             * @instance
+             * @returns {SingleCall|SingleTouch} The first record in the `Filter`
+             * @see {@link Filter#filterByNumber filterByNumber}
+             * {@link Filter#filterSecond filterSecond}
+             * {@link Filter#filterThird filterThird}
+             * {@link Filter#filterFourth filterFourth}
+             * {@link Filter#filterFifth filterFifth}
+             */
+            alias(this, "filterFirst", this.filterByNumber, 0);
+
+            /**
+             * Gets the second {@link SingleCall} or {@link SingleTouch} from the filter. Is the same as
+             * `{@link Filter#filterByNumber filterByNumber}(1)`.
+             * @name filterSecond
+             * @function
+             * @memberof Filter
+             * @instance
+             * @returns {SingleCall|SingleTouch} The second record in the `Filter`
+             * @see {@link Filter#filterByNumber filterByNumber}
+             * {@link Filter#filterFirst filterFirst}
+             * {@link Filter#filterThird filterThird}
+             * {@link Filter#filterFourth filterFourth}
+             * {@link Filter#filterFifth filterFifth}
+             */
+            alias(this, "filterSecond", this.filterByNumber, 1);
+
+            /**
+             * Gets the third {@link SingleCall} or {@link SingleTouch} from the filter. Is the same as
+             * `{@link Filter#filterByNumber filterByNumber}(2)`.
+             * @name filterThird
+             * @function
+             * @memberof Filter
+             * @instance
+             * @returns {SingleCall|SingleTouch} The third record in the `Filter`
+             * @see {@link Filter#filterByNumber filterByNumber}
+             * {@link Filter#filterFirst filterFirst}
+             * {@link Filter#filterSecond filterSecond}
+             * {@link Filter#filterFourth filterFourth}
+             * {@link Filter#filterFifth filterFifth}
+             */
+            alias(this, "filterThird", this.filterByNumber, 2);
+
+            /**
+             * Gets the fourth {@link SingleCall} or {@link SingleTouch} from the filter. Is the same as
+             * `{@link Filter#filterByNumber filterByNumber}(3)`.
+             * @name filterFourth
+             * @function
+             * @memberof Filter
+             * @instance
+             * @returns {SingleCall|SingleTouch} The fourth record in the `Filter`
+             * @see {@link Filter#filterByNumber filterByNumber}
+             * {@link Filter#filterFirst filterFirst}
+             * {@link Filter#filterSecond filterSecond}
+             * {@link Filter#filterThird filterThird}
+             * {@link Filter#filterFifth filterFifth}
+             */
+            alias(this, "filterFourth", this.filterByNumber, 3);
+
+            /**
+             * Gets the fifth {@link SingleCall} or {@link SingleTouch} from the filter. Is the same as
+             * `{@link Filter#filterByNumber filterByNumber}(4)`.
+             * @name filterFifth
+             * @function
+             * @memberof Filter
+             * @instance
+             * @returns {SingleCall|SingleTouch} The fifth record in the `Filter`
+             * @see {@link Filter#filterByNumber filterByNumber}
+             * {@link Filter#filterFirst filterFirst}
+             * {@link Filter#filterSecond filterSecond}
+             * {@link Filter#filterThird filterThird}
+             * {@link Filter#filterFourth filterFourth}
+             */
+
+            /**
+             * Returns an `Array` of all the arguments passed to the functions in the `Filter`
+             * @name getAllCallArgs
+             * @function
+             * @memberof Filter
+             * @instance
+             * @returns {Array} An `Array` of argument lists, where each argument list is
+             * an `Array` of the arguments that were passed to that call. If a function was called
+             * without arguments the array will empty (length of 0).
+             * @example
+             * new Wrapper(obj, someMethod); // create a new wrapper
+             *
+             * // do some function calls
+             * obj.someMethod("drink", "beer");
+             * obj.someMethod("store", "wine");
+             * obj.someMethod("martini");
+             * obj.someMethod();
+             *
+             * var list = obj.someMethod.callList.getAllCallArgs();
+             * // list is: [["drink", "beer"], ["store", "wine"], ["martini"], [undefined]]
+             */
             alias(this, "getAllCallArgs",
                 this._get, "getAllCallArgs", "function", "argList");
+
+            /**
+             * Returns an `Array` of all the call contexts (`this` values) that the functions in the `Filter` were called with
+             * @name getAllCallContexts
+             * @function
+             * @memberof Filter
+             * @instance
+             * @returns {Array} An `Array` of call contexts / `this` values
+             */
             alias(this, "getAllCallContexts",
                 this._get, "getAllCallContexts", "function", "context");
+
+            /**
+             * Returns an `Array` of all the exceptions (e.g. `throw Error()`) that the functions in the `Filter` threw.
+             * @name getAllExceptions
+             * @function
+             * @memberof Filter
+             * @instance
+             * @returns {Array} An `Array` of exceptions. If no exception was thrown, the value at that position in the array will be `null`.
+             */
             alias(this, "getAllExceptions",
                 this._get, "getAllExceptions", "both", "exception");
+
+            /**
+             * Returns an `Array` of all the returnValues from function calls or property set / get.
+             * @name getAllReturns
+             * @function
+             * @memberof Filter
+             * @instance
+             * @returns {Array} An `Array` of all return values. If a function call didn't return a value, the value at
+             * that location in the array will be `undefined`.
+             */
             alias(this, "getAllReturns",
                 this._get, "getAllReturns", "both", "retVal");
+
+            /**
+             * Returns an `Array` of all the values a property was set to.
+             * @name getAllSetVals
+             * @function
+             * @memberof Filter
+             * @instance
+             * @returns {Array} An `Array` of the values the property was set to.
+             */
             alias(this, "getAllSetVals",
                 this._get, "getAllSetVals", "property", "setVal");
 
-            alias(this, "filterFirst", this.filterByNumber, 0);
-            alias(this, "filterSecond", this.filterByNumber, 1);
-            alias(this, "filterThird", this.filterByNumber, 2);
-            alias(this, "filterFourth", this.filterByNumber, 3);
             alias(this, "filterFifth", this.filterByNumber, 4);
         }
 
@@ -1195,6 +1585,13 @@
             });
         }
 
+        /**
+         * Similar to {@link Filter#filterFirst filterFirst}, this returns the first member of
+         * the `Filter`; however, it also asserts that it is the ONLY member of the filter and will
+         * throw `TypeError` if there is more than one member in the `Filter`.
+         * @returns {SingleCall|SingleTouch} Returns the first member of the `Filter`.
+         * @throws {TypeError} If there is more than one member in the `Filter`.
+         */
         filterOnly() {
             if (this.length !== 1) {
                 throw new TypeError("filterOnly: expected exactly one value");
@@ -1203,6 +1600,14 @@
             return this[0];
         }
 
+        /**
+         * Returns the `SingleCall` or `SingleTouch`
+         * @param {Number} num A number indicating the index of the record to be returned. These are "programming numbers"
+         * not "counting numbers", so if `num` is zero it returns the first record, one for the second record, etc.
+         * @returns {SingleCall|SingleTouch} The record at position `num` in the filter. Same as `callList[num]` or
+         * `touchList[num]` but with some light error checking.
+         * @throws {RangeError} If `num` is less than zero or larger than the size of the `Filter`; or if the `Filter` is empty.
+         */
         filterByNumber(num) {
             validateArgsSingleNumber("filterByNumber", num);
 
@@ -1217,6 +1622,10 @@
             return this[num];
         }
 
+        /**
+         * Similar to {@link Filter#filterFirst filterFirst}, but returns the last record in the `Filter`.
+         * @returns {SingleCall|SingleTouch} Returns the last record in the `Filter`
+         */
         filterLast() {
             if (this.length === 0) {
                 throw new RangeError("filterlast: empty list");
@@ -1282,11 +1691,19 @@
      * on the {@link Wrapper}. Note that triggers are always run in the order that they
      * are added to a `Wrapper`, and any expectations or actions on a trigger are run
      * in the order they were added to the `Trigger`.
+     *
+     * TODO:
+     *     * same expect calls as SingleCall or SingleTouch
+     *     * created on the wrapper
+     *     * not very interesting by themselves
+     *     * customTrigger
+     *     * customAction
+     *
      * @extends {Expect}
      * @example
      * var wrapper = new Wrapper(something);
      * wrapper.triggerAlways()          // every time the wrapper is called...
-     *     .expectArgs("abc", 123)      // ...error if the wrong args are not `"abc"` and `123`...
+     *     .expectArgs("abc", 123)      // ...throws error if the wrong args are not `"abc"` and `123`...
      *     .actionReturn(true);         // ...and always change the return value of the function to `true`
      */
     class Trigger extends Expect {
@@ -1310,8 +1727,8 @@
              * When triggered, this action will change the return value of a function call or property get to the value specified by `retVal`.
              * @name actionReturn
              * @function
-             * @memberof Trigger
              * @instance
+             * @memberof Trigger
              * @param  {any} retVal  The value that will be returned by the function or property when this action is triggered.
              * @return {Trigger}     Returns this `Trigger`, so that further actions or expectations can be chained.
              */
@@ -1323,7 +1740,11 @@
 
             /**
              * Specifies a custom action that will be run when triggered.
-             * @param  {Trigger#actionCustom~requestCallback}    fn  The function to be run when this action is triggered.
+             * @name  actionCustom
+             * @function
+             * @instance
+             * @memberof Trigger
+             * @param  {Trigger~customActionCallback}    fn  The function to be run when this action is triggered.
              * @return {Trigger}         Returns this `Trigger`, so that further actions or expectations can be chained.
              */
             alias(this, "actionCustom",
@@ -1333,9 +1754,8 @@
                 });
             /**
              * The callback
-             * @callback Trigger#actionCustom~requestCallback
+             * @callback Trigger~customActionCallback
              * @param {SingleCall|SingleTouch} current The currently executing function or property touch.
-             * @param {...any} args The arguments that were passed to the function call or property setter.
              */
 
             alias(this, "actionReturnFromArg",
@@ -1413,7 +1833,7 @@
                 });
         }
 
-        run(si) {
+        _run(si) {
             // check trigger to see if it should run
             if (!this.triggerFn.call(this, si)) return;
 
@@ -1536,6 +1956,8 @@
 
     function validateArgsAny() {}
 
+
+    var matcherRegistrySingleton;
     /**
      * A class for matching anything. Really, anything.
      */
@@ -1553,30 +1975,15 @@
                 throw new TypeError("Match: requires a value or type to match");
             }
 
-            this.strict = true;
-            this.matcherList = new Map();
-            this.matcherHierarchy = [];
-            this.extend("number", null, testNumber, diffNumber);
-            this.extend("array", null, testArray, diffArray);
-            this.extend("object", null, testObject, diffObject);
-            this.extend("string", null, testString, diffString);
-            this.extend("null", null, testNull, diffNull);
-            this.extend("boolean", null, testBoolean, diffBoolean);
-            this.extend("undefined", null, testUndef, diffUndef);
-            this.extend("date", "object", testDate, diffDate);
-            this.extend("regexp", "object", testRegex, diffRegex);
-            this.extend("error", "object", testError, diffError);
-            this.extend("SingleCall", "object", testSingleCall, diffSingleCall);
         }
 
-        static value(arg) {
-            return new Match({
-                value: arg
-            });
-        }
-
-        compare(any) {
-            var d = this.diff(this.value, any);
+        /**
+         * Compares a new value to the previously defined value.
+         * @param  {any} value The value to be compared against the original value when the `Match` was created.
+         * @return {Boolean}     Returns `true` if `value` matches the original value; `false` otherwise
+         */
+        compare(value) {
+            var d = Match.diff(this.value, value);
             this.lastDiff = d;
             if (d.length === 0) return true;
             // TODO: if allowUndefined -- filter undefined
@@ -1584,32 +1991,107 @@
             return false;
         }
 
+        /**
+         * Returns the "type registry" singleton which contains a list and hierarchy of all
+         * the different registered types.
+         * @return {Object} The matcherRegistrySingleton
+         * @private
+         */
+        static getMatcherTypeRegistry() {
+            if (typeof matcherRegistrySingleton === "object")
+                return matcherRegistrySingleton;
+
+            matcherRegistrySingleton = {};
+            matcherRegistrySingleton.matcherList = new Map();
+            matcherRegistrySingleton.matcherHierarchy = [];
+            Match.addType("number", null, testNumber, diffNumber);
+            Match.addType("array", null, testArray, diffArray);
+            Match.addType("object", null, testObject, diffObject);
+            Match.addType("string", null, testString, diffString);
+            Match.addType("null", null, testNull, diffNull);
+            Match.addType("boolean", null, testBoolean, diffBoolean);
+            Match.addType("undefined", null, testUndef, diffUndef);
+            Match.addType("date", "object", testDate, diffDate);
+            Match.addType("regexp", "object", testRegex, diffRegex);
+            Match.addType("error", "object", testError, diffError);
+            Match.addType("SingleCall", "object", testSingleCall, diffSingleCall);
+
+            return matcherRegistrySingleton;
+        }
+
+        /**
+         * A convenience class that creates a new Match and sets the value to be matched to `arg`.
+         * @param  {arg} arg The argument to be matched
+         * @return {Match}     The new `Match` instance
+         * @example
+         * var m = Match.value("foo"); // create new `Match` with value set to "foo"
+         * m.compare("foo"); // true
+         */
+        static value(arg) {
+            return new Match({
+                value: arg
+            });
+        }
+
         // compareType
 
-        diff(v1, v2) {
-            var matcher = this.findCommonType(v1, v2);
+        /**
+         * Creates a deep diff between two values. If the arguments are `Objects` or `Arrays`, they are
+         * recurisvely iterated and compared.
+         * @param  {any} value1 The first value to diff.
+         * @param  {any} value2 The second value to diff.
+         * @return {Array}    An `Array` of differences between `value1` and `value2`
+         * @example
+         * Match.diff(
+         *     {a: 1, b: 2, c: 3},
+         *     {a: 1, c: 4}
+         *     );
+         * // returns:
+         * // [{key: "b", src: 2, dst: undefined},
+         * //  {key: "c", src: 3, dst: 4}]
+         */
+        static diff(value1, value2) {
+            var matcher = Match.findCommonType(value1, value2);
             debug("diff: matcher:", matcher);
             if (!matcher) {
                 debug("common type not found, returning diff");
                 // throw new TypeError("diff: can't compare uncommon values");
-                return newDiff(v1, v2);
+                return newDiff(value1, value2);
             }
-            this.lastDiff = matcher.diff.call(this, v1, v2);
-            return this.lastDiff;
+            return matcher.diff(value1, value2);
         }
 
-        getType(any, matcherList) {
+        /**
+         * Returns the most specific 'matcher' that can identify the type
+         * @param  {any} value          The value to get the type for
+         * @param  {Map} [matcherList=matcherRegistrySingleton] The matcher list to retrieve the type from. Mosty used for recursion.
+         * @return {Object}             The previously registered 'matcher' Object
+         * @example
+         * var matcher = Match.getType("foo");
+         * console.log (matcher.name); // "string"
+         *
+         * matcher = Match.getType(true);
+         * console.log (matcher.name); // "boolean"
+         *
+         * matcher = Match.getType(null);
+         * console.log (matcher.name); // "null"
+         *
+         * matcher = Match.getType(undefined);
+         * console.log (matcher.name); // "undefined"
+         */
+        static getType(value, matcherList) {
             if (!matcherList) {
-                matcherList = this.matcherHierarchy;
+                let m = Match.getMatcherTypeRegistry();
+                matcherList = m.matcherHierarchy;
             }
 
             // check for the type in the provided list
             for (let i = 0; i < matcherList.length; i++) {
                 let matcher = matcherList[i];
-                if (matcher.test(any)) {
+                if (matcher.test(value)) {
                     debug("matcher found:", matcher.name);
                     // recursively check any children for the type
-                    let nextType = this.getType(any, matcher.children);
+                    let nextType = Match.getType(value, matcher.children);
                     debug("next type:", nextType);
                     return (nextType ? nextType : matcher);
                 } else {
@@ -1620,16 +2102,29 @@
             return null;
         }
 
-        findCommonType(matcher1, matcher2) {
+        /**
+         * Finds a common type between two matchers or values
+         * @param  {any} matcher1 A matcher or any value that can be converted to a matcher using {@link Match.getType}
+         * @param  {any} matcher2 A matcher or any value that can be converted to a matcher using {@link Match.getType}
+         * @return {Object|null}  The matcher that is common to the type of both `matcher1` and `matcher2`
+         * or `null` if no common type can be found.
+         * @example
+         * var matcher = Match.findCommonType({}, new Error());
+         * console.log (matcher.name); // "object"
+         * var matcher = Match.findCommonType({}, "foo");
+         * console.log (matcher.name); // null
+         * @private
+         */
+        static findCommonType(matcher1, matcher2) {
             // convert values to matchers
-            if (!this.isMatcher(matcher1)) {
+            if (!Match.isMatcher(matcher1)) {
                 debug("findCommonType: converting matcher1 value to matcher:", matcher1);
-                matcher1 = this.getType(matcher1);
+                matcher1 = Match.getType(matcher1);
                 debug("matcher1:", matcher1);
             }
-            if (!this.isMatcher(matcher2)) {
+            if (!Match.isMatcher(matcher2)) {
                 debug("findCommonType: converting matcher2 value to matcher:", matcher2);
-                matcher2 = this.getType(matcher2);
+                matcher2 = Match.getType(matcher2);
                 debug("matcher2:", matcher2);
             }
 
@@ -1664,13 +2159,20 @@
 
             // resolve common type name to matcher object
             if (commonType) {
-                commonType = this.matcherList.get(commonType);
+                let m = Match.getMatcherTypeRegistry();
+                commonType = m.matcherList.get(commonType);
             }
 
             return commonType;
         }
 
-        isMatcher(matcher) {
+        /**
+         * Checks whether an `Object` is a valid matcher
+         * @param  {Object}  matcher The object to check and see if it's a matcher.
+         * @return {Boolean}         `true` if the `Object` is a matcher; `false` otherwise
+         * @private
+         */
+        static isMatcher(matcher) {
             debug("isMatcher:", matcher);
             return (typeof matcher === "object" &&
                 matcher !== null &&
@@ -1680,20 +2182,46 @@
                 Array.isArray(matcher.children) &&
                 (
                     matcher.parent === null ||
-                    this.isMatcher(matcher.parent)
+                    Match.isMatcher(matcher.parent)
                 ));
         }
 
-        extend(name, parentName, testFn, diffFn) {
+        /**
+         * Adds a new type to the type registry
+         * @param {String} name       The name of the type
+         * @param {String|null} parentName The parent of this type. For example, the parent
+         * of `Array` or `Error` is `Object`, since both `Array` and `Error` are objects. Care
+         * must be used in selecting the right parent, or else `getType` may fail and so will
+         * everything else. Use `null` if no parent type exists; however, all conceivable
+         * parent types have already been registered by default.
+         * @param {Function} testFn     A function that when passed a value, will return `true`
+         * if it is of this type and `false` otherwise.
+         * @param {Function} diffFn     A function that when passed two values of this type can
+         * tell the difference between them and return a proper diff `Array`.
+         * @example
+         * function testRegex(rex) {
+         *     if (rex instanceof RegExp) return true;
+         *     return false;
+         * }
+         *
+         * function diffRegex(rex1, rex2) {
+         *     if (rex1.toString() !== rex2.toString()) return newDiff(rex1.toString(), rex2.toString());
+         *     return [];
+         * }
+         *
+         * Match.addType("regexp", "object", testRegex, diffRegex);
+         * @private
+         */
+        static addType(name, parentName, testFn, diffFn) {
             if (typeof name !== "string") {
-                throw new TypeError(`Match.extend: 'name' should be string`);
+                throw new TypeError(`Match.addType: 'name' should be string`);
             }
 
-            if (this.matcherList.has(name)) {
-                throw new TypeError(`Match.extend: '${name}' already exists`);
+            if (matcherRegistrySingleton.matcherList.has(name)) {
+                throw new TypeError(`Match.addType: '${name}' already exists`);
             }
 
-            var parentMatcher = this.matcherList.get(parentName);
+            var parentMatcher = matcherRegistrySingleton.matcherList.get(parentName);
             parentMatcher = parentMatcher || null;
 
             var matcher = {
@@ -1704,17 +2232,13 @@
                 children: []
             };
 
-            this.matcherList.set(name, matcher);
+            matcherRegistrySingleton.matcherList.set(name, matcher);
             if (!parentMatcher) {
-                this.matcherHierarchy.push(matcher);
+                matcherRegistrySingleton.matcherHierarchy.push(matcher);
             } else {
                 parentMatcher.children.push(matcher);
             }
         }
-
-        // getLastDiff() {
-        //     return this.lastDiff;
-        // }
     }
 
     /***************************************************
@@ -1787,7 +2311,7 @@
         // for the combined list of keys, create a list of different keys or different values
         for (let key of keyList) {
             if ((key in o1) && (key in o2)) {
-                let d = this.diff(o1[key], o2[key]);
+                let d = Match.diff(o1[key], o2[key]);
                 addKeyToDiff(d, key);
                 diff = diff.concat(d);
             } else {
@@ -1811,7 +2335,7 @@
         var len = (a1.length > a2.length) ? a1.length : a2.length;
         for (let i = 0; i < len; i++) {
             // recursive diff
-            let d = this.diff(a1[i], a2[i]);
+            let d = Match.diff(a1[i], a2[i]);
             if (d.length > 0) {
                 diff = diff.concat(newDiff(a1[i], a2[i], i));
             }
@@ -1889,10 +2413,10 @@
     }
 
     function diffSingleCall(si1, si2) {
-        var argDiff = addKeyToDiff(this.diff(si1.argList, si2.argList), "argList");
-        var thisDiff = addKeyToDiff(this.diff(si1.context, si2.context), "context");
-        var retDiff = addKeyToDiff(this.diff(si1.retVal, si2.retVal), "retVal");
-        var exDiff = addKeyToDiff(this.diff(si1.exception, si2.exception), "exception");
+        var argDiff = addKeyToDiff(Match.diff(si1.argList, si2.argList), "argList");
+        var thisDiff = addKeyToDiff(Match.diff(si1.context, si2.context), "context");
+        var retDiff = addKeyToDiff(Match.diff(si1.retVal, si2.retVal), "retVal");
+        var exDiff = addKeyToDiff(Match.diff(si1.exception, si2.exception), "exception");
 
         return [].concat(argDiff, thisDiff, retDiff, exDiff);
     }
