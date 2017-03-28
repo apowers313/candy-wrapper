@@ -30,6 +30,19 @@
         ctx[aliasName] = fn.bind(ctx, ...args);
     }
 
+    function killAlias(type, obj, prop) {
+        var myType = (type === "function") ? "FUNCTION" : "PROPERTY";
+        var otherType = (type === "function") ? "PROPERTY" : "FUNCTION";
+        Object.defineProperty(obj, prop, {
+            get: function() {
+                throw new Error(`ERROR: attempting to get ${prop} on ${myType}. Only available on ${otherType}.`);
+            },
+            set: function() {
+                throw new Error(`ERROR: attempting to set ${prop} on ${myType}. Only available on ${otherType}.`);
+            }
+        });
+    }
+
     function walkObject(obj, cb) {
         for (let key in obj) {
             if (!obj.hasOwnProperty(key)) continue;
@@ -211,7 +224,10 @@
             var funcName = this.wrapped.name || "<<anonymous>>";
             debug(`calling wrapper on "${funcName}"`);
 
-            var si = new SingleCall(this, context, argList);
+            var si = new SingleRecord(this, {
+                context: context,
+                argList: argList
+            });
 
             // run pre-call triggers
             this._runTriggerList("pre", si);
@@ -291,7 +307,11 @@
 
         _doSetterGetter(type, val) {
             // create a new single touch instance
-            var st = new SingleTouch(this, type, this.propValue, val);
+            var st = new SingleRecord(this, {
+                getOrSet: type,
+                retVal: this.propValue,
+                setVal: val
+            });
 
             debug(`_doSetterGetter ${type} "${val}"`);
 
@@ -496,6 +516,8 @@
          * @return {Boolean} Returns `true` if the arguments are a Wrapper, `false` otherwise
          */
         static isWrapper(...args) {
+            if (args[0] === undefined) return false;
+
             // called like: isWrapper(fn)
             // checking to see if a function / method is a wrapper
             if (args.length === 1 && typeof args[0] === "function") {
@@ -740,7 +762,7 @@
         }
 
         /**
-         * The typical behavior for expectations called against a {@link Filter}, {@link SingleCall} or {@link SingleTouch}
+         * The typical behavior for expectations called against a {@link Filter}, {@link SingleRecord}
          * is that they will return `true` or `false` immediately. This allows them to be used with assertion libraries,
          * such as [Chai](http://chaijs.com/). Alternatively, `expectReportAllFailures` allows you to run all your expectations
          * and then report all the expectations that did not pass.
@@ -922,7 +944,7 @@
          * @param  {Trigger~triggerCustomCallback} cb The callback function. See
          * {@link Trigger~triggerCustomCallback triggerCustomCallback} for the description of the expected syntax and behavior
          * of the callback.
-         * @return {Trigger}                          The `Trigger` that was created
+         * @return {Trigger}  The `Trigger` that was created
          */
         triggerOnCustom(cb) {
             validateArgsSingleFunction("triggerOnCustom", cb);
@@ -930,6 +952,7 @@
             this.triggerList.push(t);
             return t;
         }
+
         /**
          * This is the callback that is passed to {@link Wrapper#triggerOnCustom triggerOnCustom}. The most obvious thing to point out
          * is that it returns `true` when the {@link Trigger} should execute, and `false` when the `Trigger`
@@ -942,8 +965,7 @@
          * callback is called again just after the wrapped function / setter / getter is called, giving the
          * callback the opportunity to evaluate return values and exceptions.
          *
-         * The first argument to the callback is `curr`, which is a `SingleCall` or `SingleTouch`, depending
-         * on whether the `Wrapper` is wrappign a `function` or a `property`. `curr` has the property `preCall`
+         * The first argument to the callback is `curr`, which is a `SingleRecord`. `curr` has the property `preCall`
          * set to `true` if the callback is being called before the function / getter / setter; and has the
          * property `postCall` that is set to `true` if the callback is being called after the function /
          * getter / setter. `curr` also has the property `curr.wrapper`, which references the {@link Wrapper}.
@@ -953,7 +975,7 @@
          * throw an exception, set `single.exception` to a `new Error()`; however, this is best done through an
          * {@link actionThrowException} anyway.
          * @callback Trigger~triggerCustomCallback
-         * @param {SingleCall|SingleTouch} curr The current function call or property touch.
+         * @param {SingleRecord} curr The current function call or property touch.
          * @returns {Boolean} Returns `true` if the actions and expectations associated with the `Trigger`
          * should run. Returns `false` if this `Trigger` should not be executed.
          */
@@ -966,7 +988,7 @@
         triggerOnSet() {
             this._propOnly();
             var t = new Trigger(this, function(single) {
-                if (single.type === "set") return true;
+                if (single.getOrSet === "set") return true;
                 return false;
             });
             this.triggerList.push(t);
@@ -990,7 +1012,7 @@
 
             var count = 0;
             var t = new Trigger(this, function(single) {
-                if (single.type !== "set") return false;
+                if (single.getOrSet !== "set") return false;
                 var ret = (count === num);
                 if (single.postCall) count++;
                 return ret;
@@ -1002,7 +1024,7 @@
         triggerOnGet() {
             this._propOnly();
             var t = new Trigger(this, function(single) {
-                if (single.type === "get") return true;
+                if (single.getOrSet === "get") return true;
                 return false;
             });
             this.triggerList.push(t);
@@ -1015,7 +1037,7 @@
 
             var count = 0;
             var t = new Trigger(this, function(single) {
-                if (single.type !== "get") return false;
+                if (single.getOrSet !== "get") return false;
                 var ret = (count === num);
                 if (single.postCall) count++;
                 return ret;
@@ -1041,7 +1063,7 @@
 
     /**
      * A class that contains all the `expect` calls that gets mixed in to `Triggers` as well as
-     * `SingleCall` and `SingleTouch`. This class really isn't intended to be used on its own.
+     * `SingleRecord`. This class really isn't intended to be used on its own.
      * @private
      */
     class Expect {
@@ -1054,7 +1076,7 @@
              * @memberof Expect
              * @param  {any} retVal       The value that is expected to be returned from the function call or property getter.
              * @return {Trigger|Boolean}  When called on a {@link Trigger}, the expectation is stored for future evaluation and the `Trigger` value is returned to make this chainable.
-             * When called on a {@link SingleCall} or {@link SingleTouch}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
+             * When called on a {@link SingleRecord}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
              */
             alias(this, "expectReturn",
                 this._expect, "expectReturn", "both", "post", validateArgsSingle,
@@ -1074,7 +1096,7 @@
              * @memberof Expect
              * @param  {...any} args The list of arguments to validate for the function call.
              * @return {Trigger|Boolean}           When called on a {@link Trigger}, the expectation is stored for future evaluation and the `Trigger` value is returned to make this chainable.
-             * When called on a {@link SingleCall} or {@link SingleTouch}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
+             * When called on a {@link SingleRecord}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
              */
             alias(this, "expectCallArgs",
                 this._expect, "expectCallArgs", "function", "pre", validateArgsAny,
@@ -1095,7 +1117,7 @@
              * @memberof Expect
              * @param {Object} context The expected `this` for the function. Is compared by a strict deep-equals.
              * @return {Trigger|Boolean}           When called on a {@link Trigger}, the expectation is stored for future evaluation and the `Trigger` value is returned to make this chainable.
-             * When called on a {@link SingleCall} or {@link SingleTouch}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
+             * When called on a {@link SingleRecord}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
              */
             alias(this, "expectContext",
                 this._expect, "expectContext", "function", "pre", validateArgsSingleObject,
@@ -1117,7 +1139,7 @@
              * @param {Error} exception The `Error` (or class that inherits from `Error`) that is expected to strictly match. A strict
              * comparison between errors evaluates that the `Error.name` and `Error.message` are the exact same.
              * @return {Trigger|Boolean}           When called on a {@link Trigger}, the expectation is stored for future evaluation and the `Trigger` value is returned to make this chainable.
-             * When called on a {@link SingleCall} or {@link SingleTouch}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
+             * When called on a {@link SingleRecord}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
              */
             alias(this, "expectException",
                 this._expect, "expectException", "both", "post", validateArgsSingleException,
@@ -1126,7 +1148,7 @@
                     if (m.compare(single.exception)) {
                         return null;
                     }
-                    console.log ("diff", m.lastDiff);
+                    console.log("diff", m.lastDiff);
                     return "expectException: expectation failed for: " + exception;
                 });
 
@@ -1140,7 +1162,7 @@
              * @memberof Expect
              * @param {any} setVal The value that is expected to be set on the property. An `undefined` value is allowed, but the value `undefined` must be passed explicitly to `expectSetVal`.
              * @return {Trigger|Boolean}           When called on a {@link Trigger}, the expectation is stored for future evaluation and the `Trigger` value is returned to make this chainable.
-             * When called on a {@link SingleCall} or {@link SingleTouch}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
+             * When called on a {@link SingleRecord}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
              */
             alias(this, "expectSetVal",
                 this._expect, "expectSetVal", "property", "post", validateArgsSingle,
@@ -1162,7 +1184,7 @@
              * @memberof Expect
              * @param {TYPEGOESHERE} NAMEGOESHERE DESCRIPTION GOES HERE
              * @return {Trigger|Boolean}           When called on a {@link Trigger}, the expectation is stored for future evaluation and the `Trigger` value is returned to make this chainable.
-             * When called on a {@link SingleCall} or {@link SingleTouch}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
+             * When called on a {@link SingleRecord}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
              */
             alias(this, "expectCustom",
                 this._expect, "expectCustom", "both", "post", validateArgsFirstFunction,
@@ -1181,8 +1203,7 @@
         }
 
         _getCurrCallOrDefer(name, ...args) {
-            if (this instanceof SingleCall) return this;
-            if (this instanceof SingleTouch) return this;
+            if (this instanceof SingleRecord) return this;
             if (this instanceof Trigger && this.currentCall) return this.currentCall;
             return this._addDeferredAction(name, args);
         }
@@ -1282,12 +1303,12 @@
              * @function
              * @memberof Filter
              * @instance
-             * @returns {Filter} Returns a `Filter` containing just the `SingleTouch` records where a property was set.
+             * @returns {Filter} Returns a `Filter` containing just the `SingleRecord` records where a property was set.
              */
             alias(this, "filterPropSet",
                 this._filter, "filterSet", "property",
                 function(element) {
-                    if (element.type === "set") return true;
+                    if (element.getOrSet === "set") return true;
                 });
 
             /**
@@ -1297,12 +1318,12 @@
              * @function
              * @memberof Filter
              * @instance
-             * @returns {Filter} Returns a `Filter` containing just the `SingleTouch` records when the property was gotten.
+             * @returns {Filter} Returns a `Filter` containing just the `SingleRecord` records when the property was gotten.
              */
             alias(this, "filterPropGet",
                 this._filter, "filterGet", "property",
                 function(element) {
-                    if (element.type === "get") return true;
+                    if (element.getOrSet === "get") return true;
                 });
 
             /**
@@ -1311,9 +1332,9 @@
              * @function
              * @memberof Filter
              * @instance
-             * @param {any} setVal If `setVal` strictly matches the value of a `SingleTouch` where the property was set, the record
+             * @param {any} setVal If `setVal` strictly matches the value of a `SingleRecord` where the property was set, the record
              * will be included in the results.
-             * @returns {Filter} Returns a `Filter` containing just the `SingleTouch` records that are of type `set` and have a
+             * @returns {Filter} Returns a `Filter` containing just the `SingleRecord` records that are of type `set` and have a
              * matching `setVal`.
              */
             alias(this, "filterPropSetByVal",
@@ -1417,13 +1438,13 @@
                 });
 
             /**
-             * Gets the first {@link SingleCall} or {@link SingleTouch} from the filter. Is the same as
+             * Gets the first {@link SingleRecord} from the filter. Is the same as
              * `{@link Filter#filterByNumber filterByNumber}(0)`.
              * @name filterFirst
              * @function
              * @memberof Filter
              * @instance
-             * @returns {SingleCall|SingleTouch} The first record in the `Filter`
+             * @returns {SingleRecord} The first record in the `Filter`
              * @see {@link Filter#filterByNumber filterByNumber}
              * {@link Filter#filterSecond filterSecond}
              * {@link Filter#filterThird filterThird}
@@ -1433,13 +1454,13 @@
             alias(this, "filterFirst", this.filterByNumber, 0);
 
             /**
-             * Gets the second {@link SingleCall} or {@link SingleTouch} from the filter. Is the same as
+             * Gets the second {@link SingleRecord} from the filter. Is the same as
              * `{@link Filter#filterByNumber filterByNumber}(1)`.
              * @name filterSecond
              * @function
              * @memberof Filter
              * @instance
-             * @returns {SingleCall|SingleTouch} The second record in the `Filter`
+             * @returns {SingleRecord} The second record in the `Filter`
              * @see {@link Filter#filterByNumber filterByNumber}
              * {@link Filter#filterFirst filterFirst}
              * {@link Filter#filterThird filterThird}
@@ -1449,13 +1470,13 @@
             alias(this, "filterSecond", this.filterByNumber, 1);
 
             /**
-             * Gets the third {@link SingleCall} or {@link SingleTouch} from the filter. Is the same as
+             * Gets the third {@link SingleRecord} from the filter. Is the same as
              * `{@link Filter#filterByNumber filterByNumber}(2)`.
              * @name filterThird
              * @function
              * @memberof Filter
              * @instance
-             * @returns {SingleCall|SingleTouch} The third record in the `Filter`
+             * @returns {SingleRecord} The third record in the `Filter`
              * @see {@link Filter#filterByNumber filterByNumber}
              * {@link Filter#filterFirst filterFirst}
              * {@link Filter#filterSecond filterSecond}
@@ -1465,13 +1486,13 @@
             alias(this, "filterThird", this.filterByNumber, 2);
 
             /**
-             * Gets the fourth {@link SingleCall} or {@link SingleTouch} from the filter. Is the same as
+             * Gets the fourth {@link SingleRecord} from the filter. Is the same as
              * `{@link Filter#filterByNumber filterByNumber}(3)`.
              * @name filterFourth
              * @function
              * @memberof Filter
              * @instance
-             * @returns {SingleCall|SingleTouch} The fourth record in the `Filter`
+             * @returns {SingleRecord} The fourth record in the `Filter`
              * @see {@link Filter#filterByNumber filterByNumber}
              * {@link Filter#filterFirst filterFirst}
              * {@link Filter#filterSecond filterSecond}
@@ -1481,13 +1502,13 @@
             alias(this, "filterFourth", this.filterByNumber, 3);
 
             /**
-             * Gets the fifth {@link SingleCall} or {@link SingleTouch} from the filter. Is the same as
+             * Gets the fifth {@link SingleRecord} from the filter. Is the same as
              * `{@link Filter#filterByNumber filterByNumber}(4)`.
              * @name filterFifth
              * @function
              * @memberof Filter
              * @instance
-             * @returns {SingleCall|SingleTouch} The fifth record in the `Filter`
+             * @returns {SingleRecord} The fifth record in the `Filter`
              * @see {@link Filter#filterByNumber filterByNumber}
              * {@link Filter#filterFirst filterFirst}
              * {@link Filter#filterSecond filterSecond}
@@ -1589,7 +1610,7 @@
          * Similar to {@link Filter#filterFirst filterFirst}, this returns the first member of
          * the `Filter`; however, it also asserts that it is the ONLY member of the filter and will
          * throw `TypeError` if there is more than one member in the `Filter`.
-         * @returns {SingleCall|SingleTouch} Returns the first member of the `Filter`.
+         * @returns {SingleRecord} Returns the first member of the `Filter`.
          * @throws {TypeError} If there is more than one member in the `Filter`.
          */
         filterOnly() {
@@ -1601,10 +1622,10 @@
         }
 
         /**
-         * Returns the `SingleCall` or `SingleTouch`
+         * Returns the `SingleRecord` at the position `num` in the `Filter`
          * @param {Number} num A number indicating the index of the record to be returned. These are "programming numbers"
          * not "counting numbers", so if `num` is zero it returns the first record, one for the second record, etc.
-         * @returns {SingleCall|SingleTouch} The record at position `num` in the filter. Same as `callList[num]` or
+         * @returns {SingleRecord} The record at position `num` in the filter. Same as `callList[num]` or
          * `touchList[num]` but with some light error checking.
          * @throws {RangeError} If `num` is less than zero or larger than the size of the `Filter`; or if the `Filter` is empty.
          */
@@ -1624,7 +1645,7 @@
 
         /**
          * Similar to {@link Filter#filterFirst filterFirst}, but returns the last record in the `Filter`.
-         * @returns {SingleCall|SingleTouch} Returns the last record in the `Filter`
+         * @returns {SingleRecord} Returns the last record in the `Filter`
          */
         filterLast() {
             if (this.length === 0) {
@@ -1650,38 +1671,65 @@
     }
 
     /**
-     * A representation of a single `get` or `set` on an property.
-     * @extends {Expect}
+     * A single historical record of when a function or property was accessed.
+     * @borrows Expect#expectCallArgs as expectCallArgs
+     * @borrows Expect#expectContext as expectContext
+     * @borrows Expect#expectCustom as expectCustom
+     * @borrows Expect#expectException as expectException
+     * @borrows Expect#expectReturn as expectReturn
+     * @borrows Expect#expectSetVal as expectSetVal
      */
-    class SingleTouch extends Expect {
-        constructor(wrapper, type, retVal, setVal, exception) {
+    class SingleRecord extends Expect {
+        constructor(wrapper, desc) {
             super();
 
-            this.wrapper = wrapper;
-            this.type = type;
-            this.setVal = setVal;
-            this.retVal = retVal;
-            this.exception = exception || null;
-        }
-    }
+            if(!Wrapper.isWrapper(wrapper)) {
+                throw new TypeError("SingleRecord constructor: expected 'wrapper' argument to be of type Wrapper");
+            }
 
-    /**
-     * A representation of a single function call.
-     * @extends {Expect}
-     */
-    class SingleCall extends Expect {
-        constructor(wrapper, context, argList, retVal, exception) {
-            super();
+            if (typeof desc !== "object") {
+                throw new TypeError("SingleRecord constructor: expected desc to be of type Object");
+            }
 
-            // this.calledWithNew = context.new && context.new.target;
+            // common properties
             this.wrapper = wrapper;
+            this.type = wrapper.type;
             this.preCall = false;
             this.postCall = false;
-            this.context = context;
-            this.argList = argList;
-            this.retVal = retVal;
-            this.exception = exception || null;
+            this.retVal = desc.retVal;
+            this.exception = desc.exception || null;
+
+            if (this.type === "function") {
+                return this._functionConstructor(desc);
+            }
+
+            if (this.type === "property") {
+                return this._propertyConstructor(desc);
+            }
+
+            // XXX: not reached
+        }
+
+        _functionConstructor(desc) {
+            this.context = desc.context;
+            this.argList = desc.argList;
+
+            killAlias("function", this, "getOrSet");
+            killAlias("function", this, "setVal");
+
             this.callback = {};
+
+            return this;
+        }
+
+        _propertyConstructor(desc) {
+            this.getOrSet = desc.getOrSet;
+            this.setVal = desc.setVal;
+
+            killAlias("property", this, "context");
+            killAlias("property", this, "argList");
+
+            return this;
         }
     }
 
@@ -1693,7 +1741,7 @@
      * in the order they were added to the `Trigger`.
      *
      * TODO:
-     *     * same expect calls as SingleCall or SingleTouch
+     *     * same expect calls as SingleRecord
      *     * created on the wrapper
      *     * not very interesting by themselves
      *     * customTrigger
@@ -1714,7 +1762,7 @@
                 throw new TypeError("Trigger constructor: expected first argument to be of type Wrapper");
             }
 
-            if(typeof triggerFn !== "function") {
+            if (typeof triggerFn !== "function") {
                 throw new TypeError("Trigger constructor: expected second argument to be of type Function");
             }
 
@@ -1755,7 +1803,7 @@
             /**
              * The callback
              * @callback Trigger~customActionCallback
-             * @param {SingleCall|SingleTouch} current The currently executing function or property touch.
+             * @param {SingleRecord} current The currently executing function or property touch.
              */
 
             alias(this, "actionReturnFromArg",
@@ -2014,7 +2062,6 @@
             Match.addType("date", "object", testDate, diffDate);
             Match.addType("regexp", "object", testRegex, diffRegex);
             Match.addType("error", "object", testError, diffError);
-            Match.addType("SingleCall", "object", testSingleCall, diffSingleCall);
 
             return matcherRegistrySingleton;
         }
@@ -2375,11 +2422,6 @@
         return [];
     }
 
-    function testSingleCall(si) {
-        if (si instanceof SingleCall) return true;
-        return false;
-    }
-
     function testUndef(u) {
         if (u === undefined) return true;
         return false;
@@ -2412,21 +2454,12 @@
         return ret;
     }
 
-    function diffSingleCall(si1, si2) {
-        var argDiff = addKeyToDiff(Match.diff(si1.argList, si2.argList), "argList");
-        var thisDiff = addKeyToDiff(Match.diff(si1.context, si2.context), "context");
-        var retDiff = addKeyToDiff(Match.diff(si1.retVal, si2.retVal), "retVal");
-        var exDiff = addKeyToDiff(Match.diff(si1.exception, si2.exception), "exception");
-
-        return [].concat(argDiff, thisDiff, retDiff, exDiff);
-    }
-
     // Just return a value to define the module export.
     // This example returns an object, but the module
     // can return a function as the exported value.
     return {
         Wrapper: Wrapper,
-        SingleCall: SingleCall,
+        SingleRecord: SingleRecord,
         Match: Match,
         Trigger: Trigger,
         ExpectError: ExpectError

@@ -15,7 +15,7 @@ function depends(mod) {
     var Wrapper = CandyWrapper.Wrapper;
     var Match = CandyWrapper.Match;
     var Trigger = CandyWrapper.Trigger;
-    var SingleCall = CandyWrapper.SingleCall;
+    var SingleRecord = CandyWrapper.SingleRecord;
     var ExpectError = CandyWrapper.ExpectError;
 
     describe("requested new feature list", function() {
@@ -708,8 +708,13 @@ function depends(mod) {
             assert.isNotOk(Wrapper.isWrapper(testProps, "missing"), "exepcted not a wrapper");
 
             assert.throws(function() {
+                Wrapper.isWrapper("foo");
+            }, TypeError, "isWrapper: unsupported arguments");
+
+            assert.doesNotThrow(function() {
                 Wrapper.isWrapper();
             }, TypeError, "isWrapper: unsupported arguments");
+
         });
 
         it("can get a Wrapper from a property", function() {
@@ -767,6 +772,34 @@ function depends(mod) {
         it("can reset wrapper");
     });
 
+    describe("single record", function() {
+        it("doesn't allow cross-access", function() {
+            var w = new Wrapper();
+            var r = new SingleRecord(w, {});
+
+            assert.throws(function() {
+                r.setVal = "set";
+            }, Error, "ERROR: attempting to set setVal on FUNCTION. Only available on PROPERTY.");
+
+            assert.throws(function() {
+                let ret = r.setVal;
+                return ret; // make linter happy
+            }, Error, "ERROR: attempting to get setVal on FUNCTION. Only available on PROPERTY.");
+        });
+
+        it("constructor throws on bad args", function() {
+            var w = new Wrapper();
+
+            assert.throws(function() {
+                new SingleRecord();
+            }, TypeError, "SingleRecord constructor: expected 'wrapper' argument to be of type Wrapper");
+
+            assert.throws(function() {
+                new SingleRecord(w);
+            }, TypeError, "SingleRecord constructor: expected desc to be of type Object");
+        });
+    });
+
     describe("filter", function() {
         it("can get by call number", function() {
             var ret;
@@ -778,7 +811,7 @@ function depends(mod) {
             w();
             w();
             ret = w.callList.filterByNumber(0);
-            assert.instanceOf(ret, SingleCall);
+            assert.instanceOf(ret, SingleRecord);
             w.callList.filterByNumber(1);
             w.callList.filterByNumber(2);
             assert.throws(function() {
@@ -786,7 +819,7 @@ function depends(mod) {
             }, RangeError);
             w();
             ret = w.callList.filterByNumber(3);
-            assert.instanceOf(ret, SingleCall);
+            assert.instanceOf(ret, SingleRecord);
         });
 
         it("can select only property gets", function() {
@@ -815,7 +848,7 @@ function depends(mod) {
             assert.strictEqual(getList.length, 0);
             assert.isArray(setList);
             assert.strictEqual(setList.length, 1);
-            assert.strictEqual(setList[0].type, "set");
+            assert.strictEqual(setList[0].getOrSet, "set");
             assert.strictEqual(setList[0].setVal, "gone");
             assert.strictEqual(setList[0].retVal, "gone");
             assert.isNull(setList[0].exception);
@@ -830,7 +863,7 @@ function depends(mod) {
             assert.strictEqual(getList.length, 1);
             assert.isArray(setList);
             assert.strictEqual(setList.length, 1);
-            assert.strictEqual(getList[0].type, "get");
+            assert.strictEqual(getList[0].getOrSet, "get");
             assert.isUndefined(getList[0].setVal);
             assert.strictEqual(getList[0].retVal, "gone");
             assert.isNull(getList[0].exception);
@@ -844,7 +877,7 @@ function depends(mod) {
             assert.strictEqual(getList.length, 1);
             assert.isArray(setList);
             assert.strictEqual(setList.length, 2);
-            assert.strictEqual(setList[1].type, "set");
+            assert.strictEqual(setList[1].getOrSet, "set");
             assert.strictEqual(setList[1].setVal, "more");
             assert.strictEqual(setList[1].retVal, "more");
             assert.isNull(setList[1].exception);
@@ -859,7 +892,7 @@ function depends(mod) {
             assert.strictEqual(getList.length, 2);
             assert.isArray(setList);
             assert.strictEqual(setList.length, 2);
-            assert.strictEqual(getList[1].type, "get");
+            assert.strictEqual(getList[1].getOrSet, "get");
             assert.isUndefined(getList[1].setVal);
             assert.strictEqual(getList[1].retVal, "more");
             assert.isNull(getList[1].exception);
@@ -1189,7 +1222,7 @@ function depends(mod) {
 
             // success
             var ret = w.callList.filterByNumber(0);
-            assert.instanceOf(ret, SingleCall);
+            assert.instanceOf(ret, SingleRecord);
         });
 
         it("can filter property by number");
@@ -1204,12 +1237,12 @@ function depends(mod) {
 
             w("beer");
             var ret = w.callList.filterFirst();
-            assert.instanceOf(ret, SingleCall);
+            assert.instanceOf(ret, SingleRecord);
             assert.deepEqual(ret.argList, ["beer"]);
 
             w("wine");
             ret = w.callList.filterFirst();
-            assert.instanceOf(ret, SingleCall);
+            assert.instanceOf(ret, SingleRecord);
             assert.deepEqual(ret.argList, ["beer"]);
         });
 
@@ -1223,12 +1256,12 @@ function depends(mod) {
 
             w("beer");
             var ret = w.callList.filterLast();
-            assert.instanceOf(ret, SingleCall);
+            assert.instanceOf(ret, SingleRecord);
             assert.deepEqual(ret.argList, ["beer"]);
 
             w("wine");
             ret = w.callList.filterLast();
-            assert.instanceOf(ret, SingleCall);
+            assert.instanceOf(ret, SingleRecord);
             assert.deepEqual(ret.argList, ["wine"]);
         });
     });
@@ -3084,22 +3117,6 @@ function depends(mod) {
                 src: "this is a new error",
                 dst: "blurp"
             }]);
-        });
-
-        it("can diff single invocations", function() {
-            // constructor(context, argList, retVal, exception)
-            var si = new SingleCall({}, [1, 2, 3]);
-            var m = new Match({
-                value: si
-            });
-
-            // same
-            var ret;
-            var si2 = new SingleCall({}, [1, 2, 3]);
-            ret = Match.diff(m.value, si2);
-            assert.isArray(ret);
-            assert.strictEqual(ret.length, 0);
-            assert.deepEqual(ret, []);
         });
 
         it("can diff undefined", function() {
