@@ -1,6 +1,6 @@
 {
   "name": "candy-wrapper",
-  "version": "0.0.1",
+  "version": "0.5.0",
   "description": "A sinon.js-like wrapper for functions that creates stubs, spys, mocks, etc.",
   "main": "main.js",
   "directories": {
@@ -10,7 +10,7 @@
     "test": "npm run testnode",
     "testbrowsers": "grunt default",
     "testnode": "istanbul cover _mocha",
-    "docs:create": "jsdoc -c ./.jsdoc-conf.json",
+    "docs:create": "rm -rf \"\" ./docs && jsdoc -c ./.jsdoc-conf.json",
     "docs:publish": "gh-pages --silent --repo https://$GH_TOKEN@github.com/apowers313/candy-wrapper.git --dist docs"
   },
   "keywords": [
@@ -33,7 +33,7 @@
     "url": "git+https://github.com/apowers313/candy-wrapper.git"
   },
   "author": "Adam Powers",
-  "license": "UNLICENSED",
+  "license": "BSD-3-Clause",
   "bugs": {
     "url": "https://github.com/apowers313/candy-wrapper/issues",
     "email": "apowers@ato.ms"
