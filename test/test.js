@@ -1630,7 +1630,7 @@ function depends(mod) {
             assert.isOk(ret);
 
             // fail
-            var ret = w.touchList
+            ret = w.touchList
                 .filterFirst()
                 .expectSetVal("wine");
             assert.isBoolean(ret);
@@ -1884,7 +1884,7 @@ function depends(mod) {
             });
 
             // pass
-            var w = new Wrapper();
+            new Wrapper();
             w.triggerAlways()
                 .expectContext({
                     location: "home"
@@ -2790,9 +2790,6 @@ function depends(mod) {
         });
 
         it("can get type of number", function() {
-            var m = new Match({
-                value: 5
-            });
             var type = Match.getType(5);
             assert.strictEqual(type.name, "number");
         });
@@ -2989,9 +2986,6 @@ function depends(mod) {
 
         it("can get type of date", function() {
             var now = new Date();
-            var m = new Match({
-                value: now
-            });
 
             var matcher = Match.getType(now);
             assert.isObject(matcher);
@@ -3153,7 +3147,6 @@ function depends(mod) {
         it("can convert a diff to a string");
 
         it("cannot extend an existing name", function() {
-            var m = Match.value("10");
 
             // missing name
             assert.throws(function() {
