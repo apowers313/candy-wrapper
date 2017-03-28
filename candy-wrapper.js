@@ -234,11 +234,14 @@
 
             // run the wrapped function
             var ret, exception;
-            try {
-                ret = this.wrapped.apply(context, argList);
-            } catch (ex) {
-                exception = ex;
+            if(this.config.callUnderlying) { // option to turn on / off whether the function gets called
+                try {
+                    ret = this.wrapped.apply(context, argList);
+                } catch (ex) {
+                    exception = ex;
+                }
             }
+
             si.retVal = ret;
             si.exception = exception;
 
@@ -654,8 +657,9 @@
          */
         configDefault() {
             this.config = {
-                expectThrowOnTrigger: true,
-                expectThrow: false
+                expectThrowsOnTrigger: true,
+                expectThrows: false,
+                callUnderlying: true
             };
         }
 
@@ -762,6 +766,40 @@
         }
 
         /**
+         * By default, the wrapped function or properter setter / getter will get called when the `Wrapper` gets called.
+         * This configuration option allows disabling calling of the underlying function or property setter / getter.
+         * @param  {Boolean} callUnderlying If `true`, future calls to the `Wrapper` will invoke the underlying function or
+         * proprty setter / getter. If `false`, future calls to the `Wrapper` will **NOT** invoke the underlying function or
+         * proprty setter / getter.
+         */
+        configCallUnderlying(callUnderlying) {
+            validateArgsSingleBoolean ("configCallUnderlying", callUnderlying);
+            this.config.callUnderlying = callUnderlying;
+        }
+
+        /**
+         * Configures whether or not {@link Trigger Triggers} will throw an {@link ExpectError} immediately if the expectation
+         * fails.
+         * @param  {Boolean} doesThrow If `true` the expectation will throw an `ExpectError` immediately if the expecation fails.
+         * If `false`, it will save the failure message to be retrieved later with {@link expectReportAllFailures}.
+         */
+        configExpectThrowsOnTrigger(doesThrow) {
+            validateArgsSingleBoolean ("configExpectThrowsOnTrigger", doesThrow);
+            this.config.expectThrowsOnTrigger = doesThrow;
+        }
+
+        /**
+         * By default, failed expectations will not throw on {@link Filter Filters}, but they will fail on {@link Trigger Triggers}.
+         * `configExpectThrows` can be used to configure a `Wrapper` so that all of its expectations will throw an {@link ExpectError}.
+         * @param  {Boolean} doesThrow If `true` all expect functions will throw an {@link ExpectError} immediately upon failure. If
+         * `false`, expect functions will maintain their default behavior.
+         */
+        configExpectThrows(doesThrow) {
+            validateArgsSingleBoolean ("configExpectThrows", doesThrow);
+            this.config.expectThrows = doesThrow;
+        }
+
+        /**
          * The typical behavior for expectations called against a {@link Filter}, {@link SingleRecord}
          * is that they will return `true` or `false` immediately. This allows them to be used with assertion libraries,
          * such as [Chai](http://chaijs.com/). Alternatively, `expectReportAllFailures` allows you to run all your expectations
@@ -784,7 +822,7 @@
          *
          * Note that the default behavior for {@link Trigger}s is to immediately throw an `ExpectError` if the expectation
          * fails. This prevents them from adding expectation failures to the list for future reporting. This behavior may
-         * be changed by calling {@link configExpectThrowOnTrigger}. Likewise, if {@link configExpectThrow} has been set
+         * be changed by calling {@link configExpectThrowsOnTrigger}. Likewise, if {@link configExpectThrows} has been set
          * so that expecations always throw, there will be nothing cached for future validation.
          * @param  {Boolean} clear If `truthy`, the list of previous exception results will be cleared out. If absent or
          * `falsey` the results will continue to be added to as new expectations are run.
@@ -1176,21 +1214,28 @@
 
             // returns string or null
             /**
-             * DESCRIPTION GOES HERE
+             * Evaluates the callback function
              * @name expectCustom
              * @function
              * @instance
              * @todo fix description and param
              * @memberof Expect
-             * @param {TYPEGOESHERE} NAMEGOESHERE DESCRIPTION GOES HERE
+             * @param {SingleRecord~customExpectCallback} cb Callback function that will determine whether the expecation passes or fails. See {@link SingleRecord~customExpectCallback customExpectCallback} for more details.
              * @return {Trigger|Boolean}           When called on a {@link Trigger}, the expectation is stored for future evaluation and the `Trigger` value is returned to make this chainable.
              * When called on a {@link SingleRecord}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
              */
             alias(this, "expectCustom",
                 this._expect, "expectCustom", "both", "post", validateArgsFirstFunction,
-                function(single, fn, ...args) {
-                    return fn.call(this, single, ...args);
+                function(single, cb, ...args) {
+                    return cb.call(this, single, ...args);
                 });
+
+            /**
+             * This is a description of the callback used by {@link expectCustom}.
+             * @callback SingleRecord~customExpectCallback
+             * @param {SingleRecord} curr The current function call or property / set get.
+             * @return {null|String} `null` if expectation was successful. Returns `String` containing the message for the failed expectation otherwise.
+             */
         }
 
         _addDeferredAction(name, argList) {
@@ -1213,8 +1258,8 @@
 
             if (!passed) {
                 // see if the config says we should throw
-                if ((this instanceof Trigger && this.wrapper.config.expectThrowOnTrigger) ||
-                    this.wrapper.config.expectThrow) {
+                if ((this instanceof Trigger && this.wrapper.config.expectThrowsOnTrigger) ||
+                    this.wrapper.config.expectThrows) {
                     throw new ExpectError(message);
                 }
 
@@ -1747,7 +1792,12 @@
      *     * customTrigger
      *     * customAction
      *
-     * @extends {Expect}
+     * @borrows Expect#expectCallArgs as expectCallArgs
+     * @borrows Expect#expectContext as expectContext
+     * @borrows Expect#expectCustom as expectCustom
+     * @borrows Expect#expectException as expectException
+     * @borrows Expect#expectReturn as expectReturn
+     * @borrows Expect#expectSetVal as expectSetVal
      * @example
      * var wrapper = new Wrapper(something);
      * wrapper.triggerAlways()          // every time the wrapper is called...
@@ -1946,6 +1996,13 @@
         if (args.length !== 1 ||
             !(args[0] instanceof Error)) {
             throw new TypeError(`${name}: expected a single argument of type Error`);
+        }
+    }
+
+    function validateArgsSingleBoolean(name, ...args) {
+        if (args.length !== 1 ||
+            typeof args[0] !== "boolean") {
+            throw new TypeError(`${name}: expected a single argument of type Boolean`);
         }
     }
 

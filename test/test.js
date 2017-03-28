@@ -768,8 +768,104 @@ function depends(mod) {
     });
 
     describe("config", function() {
-        it("can restore wrapped function");
-        it("can reset wrapper");
+        it("to throw on expect", function() {
+            var w = new Wrapper();
+
+            w("beer");
+
+            // should not throw by default
+            assert.doesNotThrow(function() {
+                w.callList.filterFirst().expectCallArgs("wine");
+            });
+            assert.throws(function() {
+                w.expectReportAllFailures(true);
+            }, ExpectError, "1 expectation(s) failed:\n          expectCallArgs: expectation failed for: wine\n");
+
+            // configure to throw
+            w.configExpectThrows(true);
+            assert.throws(function() {
+                w.callList.filterFirst().expectCallArgs("wine");
+            }, ExpectError, "expectCallArgs: expectation failed for: wine");
+            assert.doesNotThrow(function() {
+                w.expectReportAllFailures(true);
+            });
+
+            // configure to not throw
+            w.configExpectThrows(false);
+            assert.doesNotThrow(function() {
+                w.callList.filterFirst().expectCallArgs("wine");
+            });
+            assert.throws(function() {
+                w.expectReportAllFailures(true);
+            }, ExpectError, "1 expectation(s) failed:\n          expectCallArgs: expectation failed for: wine\n");
+
+            assert.throws(function() {
+                w.configExpectThrows();
+            }, TypeError, "configExpectThrows: expected a single argument of type Boolean");
+
+        });
+
+        it("to not throw on trigger expect", function() {
+            var w = new Wrapper();
+
+            w.triggerAlways()
+                .expectCallArgs("beer");
+
+            // expect should throw by default
+            assert.throws(function() {
+                w("wine");
+            }, ExpectError, "expectCallArgs: expectation failed for: beer");
+
+            // turn off throwing on trigger expects
+            w.configExpectThrowsOnTrigger(false);
+            assert.doesNotThrow(function() {
+                w("wine");
+            }, ExpectError, "expectCallArgs: expectation failed for: beer");
+            assert.throws(function() {
+                w.expectReportAllFailures(true);
+            }, ExpectError, "1 expectation(s) failed:\n          expectCallArgs: expectation failed for: beer\n");
+
+            // turn off throwing on trigger expects
+            w.configExpectThrowsOnTrigger(true);
+            assert.throws(function() {
+                w("wine");
+            }, ExpectError, "expectCallArgs: expectation failed for: beer");
+
+            assert.throws(function() {
+                w.configExpectThrowsOnTrigger();
+            }, TypeError, "configExpectThrowsOnTrigger: expected a single argument of type Boolean");
+        });
+
+        it("to not call wrapped function", function() {
+            var called = false;
+            var testFunc = function() {
+                called = true;
+            };
+
+            testFunc = new Wrapper(testFunc);
+
+            // doesn't get called
+            testFunc.configCallUnderlying(false);
+            assert.isFalse(called);
+            testFunc();
+            assert.isFalse(called);
+
+            // gets called
+            called = false;
+            testFunc.configCallUnderlying(true);
+            assert.isFalse(called);
+            testFunc();
+            assert.isTrue(called);
+
+            assert.throws(function() {
+                testFunc.configCallUnderlying();
+            }, TypeError, "configCallUnderlying: expected a single argument of type Boolean");
+
+            assert.throws(function() {
+                testFunc.configCallUnderlying("foo");
+            }, TypeError, "configCallUnderlying: expected a single argument of type Boolean");
+
+        });
     });
 
     describe("single record", function() {
