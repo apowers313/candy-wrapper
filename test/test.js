@@ -17,6 +17,7 @@ function depends(mod) {
     var Trigger = CandyWrapper.Trigger;
     var SingleRecord = CandyWrapper.SingleRecord;
     var ExpectError = CandyWrapper.ExpectError;
+    var Sandbox = CandyWrapper.Sandbox;
 
     describe("requested new feature list", function() {
         it("can detect when a function has been invoked with 'new()'"); // Proxy.handler.construct()?
@@ -351,6 +352,92 @@ function depends(mod) {
         });
         it("mirrors defineProperty values");
         it("mirrors function name, argument length, and argument list");
+    });
+
+    describe("rewrap", function() {
+        it("returns same function", function() {
+            var testFunc = function sillyName(a, b, c) {
+                a = b = c; // make linter happy
+            };
+            testFunc = new Wrapper(testFunc);
+            assert.isTrue(Wrapper.isWrapper(testFunc));
+            testFunc.hiddenKey = "shhh";
+
+            // rewrap the function
+            var rewrappedTestFunc;
+            assert.doesNotThrow(function() {
+                rewrappedTestFunc = new Wrapper(testFunc);
+            });
+
+            assert.strictEqual(rewrappedTestFunc.hiddenKey, "shhh");
+            assert.strictEqual(testFunc.chainable, rewrappedTestFunc);
+            assert.isTrue(Wrapper.isWrapper(rewrappedTestFunc));
+            assert.strictEqual(testFunc, rewrappedTestFunc);
+        });
+
+        it("can rewrap method", function() {
+            var called = false;
+            var testObj = {
+                goBowling: function() {
+                    called = true;
+                }
+            };
+
+            new Wrapper(testObj, "goBowling");
+            assert.isFalse(called);
+            testObj.goBowling();
+            assert.isTrue(called);
+            testObj.goBowling.hiddenKey = "shhh";
+
+            new Wrapper(testObj, "goBowling");
+            called = false;
+            assert.isFalse(called);
+            testObj.goBowling();
+            assert.isTrue(called);
+            assert.strictEqual(testObj.goBowling.hiddenKey, "shhh");
+        });
+
+        it("can rewrap property", function() {
+            var testObj = {
+                beer: "yummy"
+            };
+
+            var w1 = new Wrapper(testObj, "beer");
+            var w2 = new Wrapper(testObj, "beer");
+            assert.strictEqual(w1, w2);
+            assert.strictEqual(w1.wrapped, w2.wrapped);
+        });
+
+        it("can config to throw error on rewrap", function() {
+            var testFunc = function sillyName(a, b, c) {
+                a = b = c; // make linter happy
+            };
+
+            testFunc = new Wrapper(testFunc);
+            testFunc.hiddenKey = "shhh";
+
+            // shouldn't throw by default
+            assert.doesNotThrow(function() {
+                new Wrapper(testFunc);
+            }, Error, "Function or property already wrapped: rewrapping not allowed.");
+
+            // throws
+            testFunc.configAllowRewrap(false);
+            assert.throws(function() {
+                new Wrapper(testFunc);
+            });
+
+            // doesn't throw
+            testFunc.configAllowRewrap(true);
+            assert.doesNotThrow(function() {
+                new Wrapper(testFunc);
+            });
+
+            // test args
+            assert.throws(function() {
+                testFunc.configAllowRewrap([1, 2, 3]);
+            }, TypeError, "configAllowRewrap: expected a single argument of type Boolean");
+        });
     });
 
     describe("unwrap", function() {
@@ -707,14 +794,11 @@ function depends(mod) {
             // non-existant property
             assert.isNotOk(Wrapper.isWrapper(testProps, "missing"), "exepcted not a wrapper");
 
-            assert.throws(function() {
-                Wrapper.isWrapper("foo");
-            }, TypeError, "isWrapper: unsupported arguments");
+            var ret = Wrapper.isWrapper("foo");
+            assert.isFalse(ret);
 
-            assert.doesNotThrow(function() {
-                Wrapper.isWrapper();
-            }, TypeError, "isWrapper: unsupported arguments");
-
+            ret = Wrapper.isWrapper();
+            assert.isFalse(ret);
         });
 
         it("can get a Wrapper from a property", function() {
@@ -1136,6 +1220,8 @@ function depends(mod) {
                         throw new RangeError("missed target");
                     case 5:
                         throw new Error("out of beer");
+                    case 6:
+                        return;
                 }
             };
             testFunc = new Wrapper(testFunc);
@@ -1154,9 +1240,12 @@ function depends(mod) {
             try {
                 testFunc();
             } catch (e) {}
+            try {
+                testFunc();
+            } catch (e) {}
 
             assert.isArray(testFunc.callList);
-            assert.strictEqual(testFunc.callList.length, 5);
+            assert.strictEqual(testFunc.callList.length, 6);
 
             // filter by "out of beer" exceptions
             var list;
@@ -1168,6 +1257,10 @@ function depends(mod) {
             assert.strictEqual(list[1].exception.message, "out of beer");
             assert.strictEqual(list[2].exception.name, "Error");
             assert.strictEqual(list[2].exception.message, "out of beer");
+
+            // non-error
+            list = testFunc.callList.filterByException(null);
+            assert.isNull(list[0].exception);
 
             // non-match
             list = testFunc.callList.filterByException(new Error("wine")); // XXX: wrong error type
@@ -1725,23 +1818,89 @@ function depends(mod) {
                 .actionThrowException(new TypeError("two"));
             w.triggerOnGetNumber(2)
                 .actionThrowException(new RangeError("three"));
+            w.triggerOnGetNumber(3)
+                .actionThrowException(null);
 
             var ret;
+
+            // first get
             assert.throws(function() {
                 ret = testObj.beer;
             }, Error, "one");
             assert.isOk(w.touchList.filterByNumber(0).expectException(new Error("one")));
             assert.isNotOk(w.touchList.filterByNumber(0).expectException(new TypeError("beer")));
+
+            // second get
             assert.throws(function() {
                 ret = testObj.beer;
             }, TypeError, "two");
             assert.isOk(w.touchList.filterByNumber(1).expectException(new TypeError("two")));
             assert.isNotOk(w.touchList.filterByNumber(1).expectException(new Error("one")));
+
+            // third get
             assert.throws(function() {
                 ret = testObj.beer;
             }, RangeError, "three");
             assert.isOk(w.touchList.filterByNumber(2).expectException(new RangeError("three")));
             assert.isNotOk(w.touchList.filterByNumber(2).expectException(new TypeError("beer")));
+
+            // fourth get
+            assert.doesNotThrow(function() {
+                ret = testObj.beer;
+            });
+            assert.isOk(w.touchList.filterByNumber(3).expectException(null));
+            assert.isNotOk(w.touchList.filterByNumber(3).expectException(new TypeError("beer")));
+        });
+
+        it("function exception", function() {
+            var w = new Wrapper();
+            w.triggerOnCallNumber(0)
+                .actionThrowException(new Error("one"));
+            w.triggerOnCallNumber(1)
+                .actionThrowException(new TypeError("two"));
+            w.triggerOnCallNumber(2)
+                .actionThrowException(new RangeError("three"));
+            w.triggerOnCallNumber(3)
+                .actionThrowException(null);
+
+            // first call
+            assert.throws(function() {
+                w();
+            }, Error, "one");
+            assert.isOk(w.callList.filterByNumber(0).expectException(new Error("one")));
+            assert.isNotOk(w.callList.filterByNumber(0).expectException(new TypeError("beer")));
+
+            // second call
+            assert.throws(function() {
+                w();
+            }, TypeError, "two");
+            assert.isOk(w.callList.filterByNumber(1).expectException(new TypeError("two")));
+            assert.isNotOk(w.callList.filterByNumber(1).expectException(new Error("one")));
+
+            // third call
+            assert.throws(function() {
+                w();
+            }, RangeError, "three");
+            assert.isOk(w.callList.filterByNumber(2).expectException(new RangeError("three")));
+            assert.isNotOk(w.callList.filterByNumber(2).expectException(new TypeError("beer")));
+
+            // fourth call
+            assert.doesNotThrow(function() {
+                w();
+            });
+            assert.isOk(w.callList.filterByNumber(3).expectException(null));
+            assert.isNotOk(w.callList.filterByNumber(3).expectException(new TypeError("beer")));
+
+            // clear exception
+            var testFunc = function() {
+                throw new Error("shouldn't error");
+            };
+            testFunc = new Wrapper(testFunc);
+            testFunc.triggerAlways()
+                .actionThrowException(null);
+            assert.doesNotThrow(function() {
+                testFunc();
+            });
         });
 
         it("property set val", function() {
@@ -1755,15 +1914,13 @@ function depends(mod) {
             var ret = w.touchList
                 .filterFirst()
                 .expectSetVal("gone");
-            assert.isBoolean(ret);
-            assert.isOk(ret);
+            assert.isTrue(ret);
 
             // fail
             ret = w.touchList
                 .filterFirst()
                 .expectSetVal("wine");
-            assert.isBoolean(ret);
-            assert.isNotOk(ret);
+            assert.isFalse(ret);
         });
 
         it("does exception", function() {
@@ -1780,15 +1937,22 @@ function depends(mod) {
             var ret = testFunc.callList
                 .filterFirst()
                 .expectException(new Error("test"));
-            assert.isBoolean(ret);
-            assert.isOk(ret);
+            assert.isTrue(ret);
 
             // failed expect
             ret = testFunc.callList
                 .filterFirst()
                 .expectException(new TypeError("beer"));
-            assert.isBoolean(ret);
-            assert.isNotOk(ret);
+            assert.isFalse(ret);
+
+            // no exception
+            var w = new Wrapper();
+            w();
+            ret = w.callList
+                .filterFirst()
+                .expectException(null);
+            w.expectReportAllFailures(true);
+            assert.isTrue(ret);
         });
 
         it("call custom", function() {
@@ -2270,30 +2434,82 @@ function depends(mod) {
                         return;
                 }
             };
+
+            // trigger on exception
             testFunc = new Wrapper(testFunc);
             var run = false;
             testFunc.triggerOnException(new TypeError("wine"))
                 .actionCustom(function foo() {
+                    console.log ("CUSTOM ACTION RUNNING");
                     run = true;
                 });
 
+            // first call, no exception
             run = false;
             assert.doesNotThrow(function() {
                 testFunc();
             });
-            assert.isNotOk(run);
+            assert.isFalse(run);
 
+            // second call, exception
             run = false;
             assert.throws(function() {
                 testFunc();
             }, TypeError, "wine");
-            assert.isOk(run);
+            assert.isTrue(run);
 
+            // third call, no exception
             run = false;
             assert.doesNotThrow(function() {
                 testFunc();
             });
-            assert.isNotOk(run);
+            assert.isFalse(run);
+        });
+
+        it("can trigger when no exception", function() {
+            var count = 0;
+            var testFunc = function() {
+                count++;
+                switch (count) {
+                    case 1:
+                        return;
+                    case 2:
+                        throw new TypeError("wine");
+                    case 3:
+                        return;
+                }
+            };
+
+            // trigger on no exception
+            var run = false;
+            count = 0;
+            testFunc = new Wrapper(testFunc);
+            testFunc.triggerOnException(null)
+                .actionCustom(function foo(curr) {
+                    if(!curr.postCall) return;
+                    run = true;
+                });
+
+            // first call, no exception
+            run = false;
+            assert.doesNotThrow(function() {
+                testFunc();
+            });
+            assert.isTrue(run);
+
+            // second call, exception
+            run = false;
+            assert.throws(function() {
+                testFunc();
+            }, TypeError, "wine");
+            assert.isFalse(run);
+
+            // third call, no exception
+            run = false;
+            assert.doesNotThrow(function() {
+                testFunc();
+            });
+            assert.isTrue(run);
         });
 
         it("can trigger on return", function() {
@@ -2909,6 +3125,166 @@ function depends(mod) {
 
     describe("trigger expects", function() {
         it("can chain expects");
+    });
+
+    describe("sandbox", function() {
+        it ("can create sandbox", function() {
+            new Sandbox();
+        });
+
+        it("can add wrappers to Sandbox", function() {
+            var sb = new Sandbox();
+            var testFunc = function() {};
+            var testObj = {
+                beer: "yummy",
+                goBowling: function() {}
+            };
+
+            // empty wrapper
+            var w1 = sb.newWrapper();
+            assert.isTrue(Wrapper.isWrapper(w1));
+
+            // function
+            testFunc = sb.newWrapper(testFunc);
+            assert.isTrue(Wrapper.isWrapper(testFunc));
+
+            // method
+            var w2 = sb.newWrapper(testObj, "goBowling");
+            assert.isTrue(Wrapper.isWrapper(testObj, "goBowling"));
+
+            // property
+            var w3 = sb.newWrapper(testObj, "beer");
+            assert.isTrue(Wrapper.isWrapper(testObj, "beer"));
+
+            assert.instanceOf(sb.wrapperList, Set);
+            assert.strictEqual(sb.wrapperList.size, 4);
+
+            sb.destroy();
+
+            assert.throws(function() {
+                w1();
+            }, Error, "Calling Wrapper after it has been unwrapped");
+            assert.isTrue(w1.unwrapped);
+            assert.isTrue(testFunc.unwrapped);
+            assert.isTrue(w2.unwrapped);
+            assert.isNull(Wrapper.getWrapperFromProperty(testObj, "beer"));
+        });
+
+        it("can add wrapped object to Sandbox", function() {
+            var testObj = {
+                beer: "yummy",
+                goBowling: function bowl(a, b, c, d) {
+                    a = b = c = d; // make linter happy
+                },
+                notWrapped: true,
+                goFishing: function fish(a, b, c) {
+                    a = b = c;
+                },
+                rabbitHole: {
+                    deep: {
+                        deeper: {
+                            deepest: {
+                                location: "wonderland",
+                                eatMe: function() {
+                                    this.check1 = true;
+                                },
+                                drinkMe: function() {
+                                    this.check2 = true;
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+
+            var sb = new Sandbox();
+            sb.newWrapper(testObj);
+
+            assert.isTrue(Wrapper.isWrapper(testObj, "beer"));
+            assert.isTrue(Wrapper.isWrapper(testObj, "goBowling"));
+            assert.isTrue(Wrapper.isWrapper(testObj, "notWrapped"));
+            assert.isTrue(Wrapper.isWrapper(testObj, "goFishing"));
+            assert.isTrue(Wrapper.isWrapper(testObj.rabbitHole.deep.deeper.deepest, "location"));
+            assert.isTrue(Wrapper.isWrapper(testObj.rabbitHole.deep.deeper.deepest, "eatMe"));
+            assert.isTrue(Wrapper.isWrapper(testObj.rabbitHole.deep.deeper.deepest, "drinkMe"));
+
+            assert.instanceOf(sb.wrapperList, Set);
+            assert.strictEqual(sb.wrapperList.size, 7);
+        });
+
+        it("has singleton methods", function() {
+            var sb1 = Sandbox.singletonStart();
+            var sb2 = Sandbox.singletonGetCurrent();
+
+            // start returns the current singleton
+            assert.strictEqual(sb1, sb2);
+
+            // can't do multiple starts
+            assert.throws(function() {
+                Sandbox.singletonStart();
+            }, Error, "Sandbox.singletonStart: already started");
+
+            // end kills wrappers
+            var w = sb1.newWrapper();
+            assert.isTrue(Wrapper.isWrapper(w));
+            Sandbox.singletonEnd();
+            assert.isTrue(w.unwrapped);
+
+            // no current
+            assert.throws(function() {
+                Sandbox.singletonGetCurrent();
+            }, Error, "Sandbox.singletonGetCurrent: not started yet");
+
+            // can't end without start
+            assert.throws(function() {
+                Sandbox.singletonEnd();
+            }, Error, "Sandbox.singletonEnd: not started yet");
+        });
+
+        it("can test", function() {
+            function mochaIt(str, fn) {
+                fn.call({context: "mocha"});
+            }
+
+            var w;
+            mochaIt("test", Sandbox.test(function() {
+                assert.strictEqual(this.context, "mocha");
+                assert.isObject(this.sandbox);
+                w = this.sandbox.newWrapper();
+            }));
+
+            assert.isTrue(w.unwrapped);
+        });
+
+        it("test works with done()", function() {
+            var called = false;
+            function mochaDone() {
+                called = true;
+            }
+
+            function mochaIt(str, fn) {
+                fn.call({context: "mocha"}, mochaDone);
+            }
+
+            mochaIt("test", Sandbox.test(function(mochaDone) {
+                mochaDone();
+            }));
+
+            assert.isTrue(called);
+        });
+
+        it("real sandbox test", Sandbox.test(function() {
+            assert.isObject(this.sandbox);
+            var w = this.sandbox.newWrapper();
+            assert.isTrue(Wrapper.isWrapper(w));
+        }));
+
+        it("real sandbox test with done()", Sandbox.testAsync(function(done) {
+            assert.isObject(this.sandbox);
+            var w = this.sandbox.newWrapper();
+            assert.isTrue(Wrapper.isWrapper(w));
+            done();
+        }));
     });
 
     describe("match", function() {

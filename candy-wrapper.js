@@ -70,6 +70,7 @@
      *     * triggers
      *     * callList / touchList / Filters
      *     * configuration
+     *     * rewrapping behavior
      *     * examples
      *
      * Signatures for Wrapper:
@@ -90,6 +91,11 @@
 
             if (args[0] === null) {
                 throw new TypeError("Wrapper: bad arguments to constructor. RTFM.");
+            }
+
+            // if already wrapped, warn and return the existing Wrapper
+            if (Wrapper.isWrapper(...args)) {
+                return this._rewrap(...args);
             }
 
             // constructed like: wrapper()
@@ -167,6 +173,38 @@
             throw new TypeError("Wrapper: bad arguments to constructor. RTFM.");
         }
 
+        _rewrap(...args) {
+            var oldWrapper;
+
+            // _rewrap(func)
+            if (args.length === 1 && typeof args[0] === "function") {
+                oldWrapper = args[0];
+            }
+
+            // _rewrap(obj, method)
+            // _rewrap(obj, property)
+            // _rewrap(obj, method, func)
+            // _rewrap(obj, property, func)
+            if ((args.length === 2 || args.length === 3) &&
+                typeof args[0] === "object" &&
+                typeof args[1] === "string") {
+                let obj = args[0];
+                let key = args[1];
+                if (typeof obj[key] === "function") {
+                    oldWrapper = obj[key];
+                } else {
+                    oldWrapper = Wrapper.getWrapperFromProperty(obj, key);
+                }
+            }
+
+            if (!oldWrapper.config.allowRewrap) {
+                throw new Error("Function or property already wrapped: rewrapping not allowed. Use configAllowRewrap(true) if you would like to enable rewrapping.");
+            }
+
+            // could check isWrapper here... but I'm not sure that's necessary
+            return oldWrapper.chainable;
+        }
+
         _callConstructor(origFn, wrappedFn) {
             /** @lends Wrapper# */
             this.type = "function";
@@ -233,8 +271,8 @@
             this._runTriggerList("pre", si);
 
             // run the wrapped function
-            var ret, exception;
-            if(this.config.callUnderlying) { // option to turn on / off whether the function gets called
+            var ret, exception = null;
+            if (this.config.callUnderlying) { // option to turn on / off whether the function gets called
                 try {
                     ret = this.wrapped.apply(context, argList);
                 } catch (ex) {
@@ -516,7 +554,7 @@
          * new Wrapper(testObject, "meth");
          * Wrapper.isWrapper(testObject, "meth"); // true
          *
-         * @return {Boolean} Returns `true` if the arguments are a Wrapper, `false` otherwise
+         * @return {Boolean} Returns `true` if the arguments are a Wrapper, `false` otherwise.
          */
         static isWrapper(...args) {
             if (args[0] === undefined) return false;
@@ -554,7 +592,7 @@
                 return (Wrapper.isWrapper(desc.set) && Wrapper.isWrapper(desc.get));
             }
 
-            throw new TypeError("isWrapper: unsupported arguments");
+            return false;
         }
 
         /**
@@ -659,7 +697,8 @@
             this.config = {
                 expectThrowsOnTrigger: true,
                 expectThrows: false,
-                callUnderlying: true
+                callUnderlying: true,
+                allowRewrap: true
             };
         }
 
@@ -766,6 +805,19 @@
         }
 
         /**
+         * Determines whether wrapping a `Wrapper` should be allowed. Default is `true`, meaning that any attempt to wrap a
+         * function or property that is already wrapped will result in the currently-in-place `Wrapper` being returned (a new
+         * `Wrapper` will not be created). By passing `false` to `configAllowRewrap`, any attempt to rewrap a funciton or
+         * property will result in an `Error` being thrown.
+         * @param  {Boolean} allow If `true` rewrapping will be allowed. If `false` an error will be thrown when attempting to
+         * rewrap.
+         */
+        configAllowRewrap(allow) {
+            validateArgsSingleBoolean("configAllowRewrap", allow);
+            this.config.allowRewrap = allow;
+        }
+
+        /**
          * By default, the wrapped function or properter setter / getter will get called when the `Wrapper` gets called.
          * This configuration option allows disabling calling of the underlying function or property setter / getter.
          * @param  {Boolean} callUnderlying If `true`, future calls to the `Wrapper` will invoke the underlying function or
@@ -773,7 +825,7 @@
          * proprty setter / getter.
          */
         configCallUnderlying(callUnderlying) {
-            validateArgsSingleBoolean ("configCallUnderlying", callUnderlying);
+            validateArgsSingleBoolean("configCallUnderlying", callUnderlying);
             this.config.callUnderlying = callUnderlying;
         }
 
@@ -784,7 +836,7 @@
          * If `false`, it will save the failure message to be retrieved later with {@link expectReportAllFailures}.
          */
         configExpectThrowsOnTrigger(doesThrow) {
-            validateArgsSingleBoolean ("configExpectThrowsOnTrigger", doesThrow);
+            validateArgsSingleBoolean("configExpectThrowsOnTrigger", doesThrow);
             this.config.expectThrowsOnTrigger = doesThrow;
         }
 
@@ -795,7 +847,7 @@
          * `false`, expect functions will maintain their default behavior.
          */
         configExpectThrows(doesThrow) {
-            validateArgsSingleBoolean ("configExpectThrows", doesThrow);
+            validateArgsSingleBoolean("configExpectThrows", doesThrow);
             this.config.expectThrows = doesThrow;
         }
 
@@ -943,13 +995,14 @@
         /**
          * Creates a {@link Trigger} on the `Wrapper` that executes whenever the exception matching `err` is thrown
          * by the wrapped function / getter / setter.
-         * @param  {Error} err Any `Error` (or class that inherits from `Error`, such as `TypeError`, `RangeError`, or
+         * @param  {Error|null} err Any `Error` (or class that inherits from `Error`, such as `TypeError`, `RangeError`, or
          * custom `Error`s). If `err` exactly matches the error thrown then this trigger will execute. Exactly matching
-         * an `Error` requires that the `Error.name` and `Error.message` are strictly equal.
+         * an `Error` requires that the `Error.name` and `Error.message` are strictly equal. If `err` is `null`, this `Trigger` will
+         * execute when there was no error.
          * @return {Trigger}   The `Trigger` that was created.
          */
         triggerOnException(err) {
-            validateArgsSingleException("triggerOnException", err);
+            validateArgsSingleExceptionOrNull("triggerOnException", err);
             var m = Match.value(err);
             var t = new Trigger(this, function(single) {
                 var ret = m.compare(single.exception);
@@ -1174,19 +1227,19 @@
              * @instance
              * @todo fix description and param
              * @memberof Expect
-             * @param {Error} exception The `Error` (or class that inherits from `Error`) that is expected to strictly match. A strict
-             * comparison between errors evaluates that the `Error.name` and `Error.message` are the exact same.
+             * @param {Error|null} exception The `Error` (or class that inherits from `Error`) that is expected to strictly match. A strict
+             * comparison between errors evaluates that the `Error.name` and `Error.message` are the exact same. If `exception` is `null`, it
+             * will expecct that there was no `Error` thrown.
              * @return {Trigger|Boolean}           When called on a {@link Trigger}, the expectation is stored for future evaluation and the `Trigger` value is returned to make this chainable.
              * When called on a {@link SingleRecord}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
              */
             alias(this, "expectException",
-                this._expect, "expectException", "both", "post", validateArgsSingleException,
+                this._expect, "expectException", "both", "post", validateArgsSingleExceptionOrNull,
                 function(single, exception) {
                     var m = Match.value(exception);
                     if (m.compare(single.exception)) {
                         return null;
                     }
-                    console.log("diff", m.lastDiff);
                     return "expectException: expectation failed for: " + exception;
                 });
 
@@ -1446,15 +1499,16 @@
              * @function
              * @memberof Filter
              * @instance
-             * @param {Error} exception An `Error` (or any class that inherits from `Error`) that will be
-             * strictly matched.
+             * @param {Error|null} exception An `Error` (or any class that inherits from `Error`) that will be
+             * strictly matched. If `exception` is `null` the filter will include all records that did not throw
+             * an `Error`.
              * @returns {Filter} A `Filter` containing the function calls or property set / get that threw an
              * `Error` that matches `exception`.
              */
             alias(this, "filterByException",
                 this._filter, "filterByException", "both",
                 function(element, index, array, ...args) {
-                    validateArgsSingleException("filterByException", ...args);
+                    validateArgsSingleExceptionOrNull("filterByException", ...args);
                     var exception = args[0];
 
                     var m = Match.value(exception);
@@ -1728,7 +1782,7 @@
         constructor(wrapper, desc) {
             super();
 
-            if(!Wrapper.isWrapper(wrapper)) {
+            if (!Wrapper.isWrapper(wrapper)) {
                 throw new TypeError("SingleRecord constructor: expected 'wrapper' argument to be of type Wrapper");
             }
 
@@ -1875,7 +1929,7 @@
                 });
 
             alias(this, "actionThrowException",
-                this._action, "actionThrowException", "both", "post", validateArgsSingleException,
+                this._action, "actionThrowException", "both", "post", validateArgsSingleExceptionOrNull,
                 function(curr, err) {
                     curr.exception = err;
                 });
@@ -1992,11 +2046,11 @@
         }
     }
 
-    function validateArgsSingleException(name, ...args) {
-        if (args.length !== 1 ||
-            !(args[0] instanceof Error)) {
-            throw new TypeError(`${name}: expected a single argument of type Error`);
-        }
+    function validateArgsSingleExceptionOrNull(name, ...args) {
+        if (args.length === 1 && (args[0] instanceof Error)) return;
+        if (args.length === 1 && (args[0] === null)) return;
+
+        throw new TypeError(`${name}: expected a single argument of type Error`);
     }
 
     function validateArgsSingleBoolean(name, ...args) {
@@ -2060,6 +2114,91 @@
     }
 
     function validateArgsAny() {}
+
+    var sandboxSingleton;
+    class Sandbox {
+        constructor() {
+            this.wrapperList = new Set();
+            this.config = {
+                injectProperty: "sandbox"
+            };
+        }
+
+        static singletonStart() {
+            if (typeof sandboxSingleton === "object") {
+                throw new Error("Sandbox.singletonStart: already started");
+            }
+            sandboxSingleton = new Sandbox();
+            return sandboxSingleton;
+        }
+
+        static singletonGetCurrent() {
+            if (typeof sandboxSingleton !== "object") {
+                throw new Error("Sandbox.singletonGetCurrent: not started yet");
+            }
+
+            return sandboxSingleton;
+        }
+
+        static singletonEnd() {
+            if (typeof sandboxSingleton !== "object") {
+                throw new Error("Sandbox.singletonEnd: not started yet");
+            }
+
+            sandboxSingleton.destroy();
+            sandboxSingleton = undefined;
+        }
+
+        // it ("does a test", Sandbox.test(function() {
+        // }));
+        static test(fn) {
+            return function(...args) {
+                var sb = new Sandbox();
+                this.sandbox = sb;
+
+                fn.call(this, ...args);
+
+                sb.destroy();
+            };
+        }
+
+        static testAsync(fn) {
+            return function(done, ...args) {
+                var sb = new Sandbox();
+                this.sandbox = sb;
+
+                fn.call(this, done, ...args);
+
+                sb.destroy();
+            };
+        }
+
+        newWrapper(...args) {
+            var w = new Wrapper(...args);
+
+            if (args.length === 1 &&
+                typeof args[0] === "object") {
+                // if wrapped everything in an object, find everything and add it to our list
+                walkObject(args[0], (obj, key) => {
+                    if (Wrapper.isWrapper(obj, key)) {
+                        this.wrapperList.add(obj[key]);
+                    }
+                });
+            } else {
+                // add single wrapper (single function, property, method) to list
+                this.wrapperList.add(w);
+            }
+
+            return w;
+        }
+
+        destroy() {
+            for (let w of this.wrapperList) {
+                w.configUnwrap();
+            }
+            this.wrapperList.length = 0;
+        }
+    }
 
 
     var matcherRegistrySingleton;
@@ -2519,7 +2658,8 @@
         SingleRecord: SingleRecord,
         Match: Match,
         Trigger: Trigger,
-        ExpectError: ExpectError
+        ExpectError: ExpectError,
+        Sandbox: Sandbox
     };
 }));
 
