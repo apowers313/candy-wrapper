@@ -1,3 +1,5 @@
+// "use strict";
+
 // UMD returnExports design pattern
 (function(root, factory) {
     if (typeof define === "function" && define.amd) {
@@ -58,29 +60,47 @@
     var wrapperCookieKey = "uniquePlaceToKeepAGuidForCandyWrapper";
 
     /**
-     * Creates a new function or property wrapper -- a spy, stub, mock, etc.
+     * `Wrapper` is the main class for candy-wrapper. A wrapper goes around an existing function, method, or property
+     * enabling you to monitor the behavior of the underlying wrapped thing or optionally changing the behavior of
+     * the wrapped thing when you want to. If you are new to candy-wrapper, or wrappers in general, you may want to
+     * check out the {@tutorial getting-started} tutorial.
      *
-     * Below are all the different forms of the contructor,
-     * which are basically syntactic sugar for creating wrappers
+     * Below are all the different forms of the contructor, which are basically syntactic sugar for creating wrappers
      * around lots of different kinds of things
      *
+     * ``` js
+     * // creates a wrapper around an object's method
+     * new Wrapper(obj, method);
+     *
+     * // createa a wrapper around an object's property
+     * new Wrapper(obj, property);
+     *
+     * // creates a wrapper around a function and returns the new wrapped function
+     * // calling the old, unwrapped function doesn't trigger the wrapper
+     * var func = new Wrapper(func);
+     *
+     * // creates a new wrapped empty, anonymous function
+     * var stub = new Wrapper();
+     *
+     * // recursively wraps every property and method in an object
+     * new Wrapper(obj);
+     *
+     * // wraps a method but calls `func` instead of the underlying method
+     * new Wrapper(obj, method, func);
+     *
+     * // wraps a property but cals `func` instead of the setter / getter for the property
+     * new Wrapper(obj, property, func)
+     * ```
+     *
+     * Once you have wrapped a function or property, there are two main ways to work with it. One is through the `historyList`
+     * which will.
      * TODO:
-     *     * what is a wrapper
      *     * function vs. property wrappers; differences in behavior
      *     * triggers
-     *     * callList / touchList / Filters
+     *     * historyList / historyList / Filters
      *     * configuration
      *     * rewrapping behavior
      *     * examples
-     *
-     * Signatures for Wrapper:
-     *      new Wrapper()
-     *      new Wrapper(obj)
-     *      new Wrapper(func)
-     *      new Wrapper(obj, method)
-     *      new Wrapper(obj, property)
-     *      new Wrapper(obj, method, func)
-     *      new Wrapper(obj, property, func)
      *
      * @extends {Function}
      */
@@ -205,53 +225,23 @@
             return oldWrapper.chainable;
         }
 
+        _commonConstructor(type) {
+            /** @lends Wrapper# */
+            /** @type {Filter} A list of all the every time the `Wrapper` was used */
+            this.historyList = new Filter(this);
+            /** @type {String} The type of this Wrapper object. Options are "property" or "function". */
+            this.type = type;
+        }
+
         _callConstructor(origFn, wrappedFn) {
             /** @lends Wrapper# */
-            this.type = "function";
-            this.callList = new Filter(this);
+            this._commonConstructor("function");
             this.orig = origFn;
             wrappedFn = wrappedFn || origFn;
             this.wrapped = wrappedFn;
             this.chainable = new Proxy(this, {
                 apply: (target, context, argList) => this._doCall(target, context, argList)
             });
-
-            /**
-             * Validates that the Wrapper was called `count` times.
-             * @param   {Number} count  The number of times the Wrapper should have been called.
-             * @returns {Boolean}       Returns `true` if  Wrapper was called `count` times, `false` otherwise.
-             * @memberOf WrapperCall
-             * @instance
-             */
-            alias(this, "expectCallCount", this._Count, "expectCallCount", this.callList);
-            alias(this, "expectCallCountRange", this._CountRange, "expectCallCountRange", this.callList);
-            alias(this, "expectCallCountMin", this._CountMin, "expectCallCountMin", this.callList);
-            alias(this, "expectCallCountMax", this._CountMax, "expectCallCountMax", this.callList);
-            alias(this, "expectCallNever", this.expectCallCount, 0);
-            /**
-             * Expects Wrapper to be called exactly once. Same as {@link expectCallCount} (1)
-             * @method expectCallOnce
-             * @returns {Boolean} Returns `true` if the wrapper was called exactly once, `false` otherwise.
-             * @memberOf WrapperCall
-             * @instance
-             */
-            alias(this, "expectCallOnce", this.expectCallCount, 1);
-            /**
-             * Expects Wrapper to be called exactly once. Same as expectCallCount(2)
-             * @method expectCallTwice
-             * @returns {Boolean} Returns `true` if the wrapper was called exactly twice, `false` otherwise.
-             * @memberOf WrapperCall
-             * @instance
-             */
-            alias(this, "expectCallTwice", this.expectCallCount, 2);
-            /**
-             * Expects Wrapper to be called exactly once. Same as expectCallCount(3)
-             * @method expectCallThrice
-             * @returns {Boolean} Returns `true` if the wrapper was called exactly three times, `false` otherwise.
-             * @memberOf WrapperCall
-             * @instance
-             */
-            alias(this, "expectCallThrice", this.expectCallCount, 3);
 
             this.configDefault();
             this.configReset();
@@ -289,7 +279,7 @@
 
             // save call
             si.postCall = si.preCall = true; // in the future evaulate both pre and post calls
-            this.callList.push(si);
+            this.historyList.push(si);
 
             // throw the exception...
             if (si.exception) throw si.exception;
@@ -306,6 +296,7 @@
 
         _propConstructor(obj, prop, fn) {
             /** @lends Wrapper# */
+            this._commonConstructor("property");
 
             /** @type {Object} The results of `getOwnPropertyDescriptor` on the original property, saved so that it can be restored later. */
             this.origPropDesc = Object.getOwnPropertyDescriptor(obj, prop);
@@ -313,10 +304,6 @@
             this.propValue = this.origPropDesc.value;
             /** @type {Function} An optional custom function that will be called when getting or setting the property. */
             this.setterGetterFn = fn;
-            /** @type {String} The type of this Wrapper object. Options are "property" or "function". */
-            this.type = "property";
-            /** @type {Filter} A list of all the touches (gets / sets) on the property. */
-            this.touchList = new Filter(this);
 
             // create a proxy for the setter / getters
             /** @type {Proxy.<Wrapper>} The thing that is returned representing the Wrapped and is intended to be used for chainable Wrapper calls */
@@ -375,7 +362,7 @@
             debug("final st", st);
 
             // save this touch for future reference
-            this.touchList.push(st);
+            this.historyList.push(st);
 
             // always return the value
             debug("settergetter returning", st.retVal);
@@ -422,111 +409,6 @@
             if (this.type !== "function") {
                 throw new Error(`${callerName} is only supported for FUNCTION wrappers`);
             }
-        }
-
-        /**
-         * Expects that `arr` has `count` members. Serves as the basis of
-         * {@link expectCallCount}, {@link expectTouchCount} and similar Expect functions.
-         * @param  {String} name  Name of the calling function, for any errors that are thrown.
-         * @param  {Array} arr    The array to count the members of.
-         * @param  {Number} count  How many members are expected to be in the `arr`
-         * @return {Boolean}      Returns `true` if `arr` has `count` members, `false` otherwise
-         * @private
-         */
-        _Count(name, arr, count) {
-            if (typeof name !== "string") {
-                throw new TypeError("_Count: expected 'name' to be string");
-            }
-
-            if (!Array.isArray(arr)) {
-                throw new TypeError(`${name}: expected 'arr' to be of type Array`);
-            }
-
-            if (typeof count !== "number") {
-                throw new TypeError(`${name}: expected 'count' to be of type Number`);
-            }
-
-            return (arr.length === count);
-        }
-
-        /**
-         * Expects that `arr` has `count` members. Serves as the basis of
-         * {@link expectCallCountRange}, {@link expectTouchCountRange} and similar Expect functions.
-         * @param  {String} name  Name of the calling function, for any errors that are thrown.
-         * @param  {Array} arr    The array to count the members of.
-         * @param  {Number} min   How the miniumum number of members expected to be in the `arr`
-         * @param  {Number} max   The maximum number of members expected to be in the `arr`
-         * @return {Boolean}      Returns `true` if `arr` has `count` members, `false` otherwise
-         * @private
-         */
-        _CountRange(name, arr, min, max) {
-            if (typeof name !== "string") {
-                throw new TypeError("_CountRange: expected 'name' to be string");
-            }
-
-            if (!Array.isArray(arr)) {
-                throw new TypeError(`${name}: expected 'arr' to be of type Array`);
-            }
-
-            if (typeof min !== "number") {
-                throw new TypeError(`${name}: expected 'min' to be of type Number`);
-            }
-
-            if (typeof max !== "number") {
-                throw new TypeError(`${name}: expected 'max' to be of type Number`);
-            }
-
-            return ((arr.length >= min) && (arr.length <= max));
-        }
-
-        /**
-         * Expects that `arr` has at least `count` members. Serves as the basis of
-         * {@link expectCallCountMin}, {@link expectTouchCountMin} and similar Expect functions.
-         * @param  {String} name  Name of the calling function, for any errors that are thrown.
-         * @param  {Array} arr    The array to count the members of.
-         * @param  {Number} min   How least number of members that are expected to be in the `arr`
-         * @return {Boolean}      Returns `true` if `arr` has at least `count` members, `false` otherwise
-         * @private
-         */
-        _CountMin(name, arr, min) {
-            if (typeof name !== "string") {
-                throw new TypeError("_CountMin: expected 'name' to be string");
-            }
-
-            if (!Array.isArray(arr)) {
-                throw new TypeError(`${name}: expected 'arr' to be of type Array`);
-            }
-
-            if (typeof min !== "number") {
-                throw new TypeError(`${name}: expected 'min' to be of type Number`);
-            }
-
-            return (arr.length >= min);
-        }
-
-        /**
-         * Expects that `arr` has at most`count` members. Serves as the basis of
-         * {@link expectCallCountMax}, {@link expectTouchCountMax} and similar Expect functions.
-         * @param  {String} name  Name of the calling function, for any errors that are thrown.
-         * @param  {Array} arr    The array to count the members of.
-         * @param  {Number} max   The maximum number of members that are expected to be in the `arr`
-         * @return {Boolean}      Returns `true` if `arr` has less than `count` members, `false` otherwise
-         * @private
-         */
-        _CountMax(name, arr, max) {
-            if (typeof name !== "string") {
-                throw new TypeError("_CountMax: expected 'name' to be string");
-            }
-
-            if (!Array.isArray(arr)) {
-                throw new TypeError(`${name}: expected 'arr' to be of type Array`);
-            }
-
-            if (typeof max !== "number") {
-                throw new TypeError(`${name}: expected 'max' to be of type Number`);
-            }
-
-            return (arr.length <= max);
         }
 
         /**
@@ -738,11 +620,11 @@
         }
 
         _configCallReset() {
-            this.callList.length = 0;
+            this.historyList.length = 0;
         }
 
         _configPropReset() {
-            this.touchList.length = 0;
+            this.historyList.length = 0;
         }
 
         /**
@@ -926,7 +808,7 @@
          */
         triggerOnArgs(...args) {
             this._funcOnly();
-            var m = Match.value([...args]);
+            var m = Match.value(args);
             var t = new Trigger(this, function(single) {
                 return m.compare(single.argList);
             });
@@ -952,7 +834,7 @@
          */
         triggerOnContext(context) {
             this._funcOnly();
-            validateArgsSingleObject("triggerOnContext", context);
+            validateArgsSingle("triggerOnContext", context);
             var m = Match.value(context);
             var t = new Trigger(this, function(single) {
                 var ret = m.compare(single.context);
@@ -1211,7 +1093,7 @@
              * When called on a {@link SingleRecord}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
              */
             alias(this, "expectContext",
-                this._expect, "expectContext", "function", "pre", validateArgsSingleObject,
+                this._expect, "expectContext", "function", "pre", validateArgsSingle,
                 function(single, context) {
                     var m = Match.value(context);
                     if (m.compare(single.context)) {
@@ -1306,21 +1188,21 @@
             return this._addDeferredAction(name, args);
         }
 
-        _softAssert(message) {
+        static _softAssert(ctx, message) {
             var passed = (message === null) ? true : false;
 
             if (!passed) {
                 // see if the config says we should throw
-                if ((this instanceof Trigger && this.wrapper.config.expectThrowsOnTrigger) ||
-                    this.wrapper.config.expectThrows) {
+                if ((ctx instanceof Trigger && ctx.wrapper.config.expectThrowsOnTrigger) ||
+                    ctx.wrapper.config.expectThrows) {
                     throw new ExpectError(message);
                 }
 
                 // otherwise store the message for future reference
-                this.wrapper.expectMessageList.push(message);
+                ctx.wrapper.expectMessageList.push(message);
             }
 
-            this.wrapper.expectPassed = this.wrapper.expectPassed && passed;
+            ctx.wrapper.expectPassed = ctx.wrapper.expectPassed && passed;
             return passed;
         }
 
@@ -1357,7 +1239,7 @@
             if (!runNow) return this;
             // test the expect
             var msg = fn.call(this, curr, ...args);
-            var passed = this._softAssert(msg);
+            var passed = Expect._softAssert(this, msg);
 
             return passed;
         }
@@ -1376,7 +1258,7 @@
     }
 
     /**
-     * Methods for filtering the `callList` or `touchList` of a {@link Wrapper}.
+     * Methods for filtering the `historyList` or `historyList` of a {@link Wrapper}.
      *
      * TODO:
      *     * concept of a Filter; extends an Array with some syntactic sugar built in
@@ -1447,7 +1329,7 @@
 
             /**
              * Returns the members of the `Filter` that were function calls with arguments matching `...args`.
-             * @name filterCallByArgs
+             * @name filterByCallArgs
              * @function
              * @memberof Filter
              * @instance
@@ -1465,10 +1347,10 @@
              * obj.someMethod("martini");
              *
              * // returns a Filter with the two calls above that match `args[0] === "drink"` and `args[1] === "beer"`
-             * obj.someMethod.callList.filterCallByArgs("drink", "beer");
+             * obj.someMethod.historyList.filterByCallArgs("drink", "beer");
              */
-            alias(this, "filterCallByArgs",
-                this._filter, "filterCallByArgs", "function",
+            alias(this, "filterByCallArgs",
+                this._filter, "filterByCallArgs", "function",
                 function(element, index, array, ...args) {
                     var m = Match.value([...args]);
                     return m.compare(element.argList);
@@ -1476,17 +1358,17 @@
 
             /**
              * Returns the members of the `Filter` that were function calls with a `this` context that matches the `context` argument.
-             * @name filterCallByContext
+             * @name filterByCallContext
              * @function
              * @memberof Filter
              * @instance
              * @param {Object} context The context that the `this` value of the function will be evaluated against.
              * @returns {Filter} A `Filter` containing the function calls where the `this` strictly and deeply matched `context`.
              */
-            alias(this, "filterCallByContext",
-                this._filter, "filterCallByContext", "function",
+            alias(this, "filterByCallContext",
+                this._filter, "filterByCallContext", "function",
                 function(element, index, array, ...args) {
-                    validateArgsSingleObject("filterCallByContext", ...args);
+                    validateArgsSingle("filterByCallContext", ...args);
                     var context = args[0];
 
                     var m = Match.value(context);
@@ -1633,7 +1515,7 @@
              * obj.someMethod("martini");
              * obj.someMethod();
              *
-             * var list = obj.someMethod.callList.getAllCallArgs();
+             * var list = obj.someMethod.historyList.getAllCallArgs();
              * // list is: [["drink", "beer"], ["store", "wine"], ["martini"], [undefined]]
              */
             alias(this, "getAllCallArgs",
@@ -1724,8 +1606,8 @@
          * Returns the `SingleRecord` at the position `num` in the `Filter`
          * @param {Number} num A number indicating the index of the record to be returned. These are "programming numbers"
          * not "counting numbers", so if `num` is zero it returns the first record, one for the second record, etc.
-         * @returns {SingleRecord} The record at position `num` in the filter. Same as `callList[num]` or
-         * `touchList[num]` but with some light error checking.
+         * @returns {SingleRecord} The record at position `num` in the filter. Same as `historyList[num]` or
+         * `historyList[num]` but with some light error checking.
          * @throws {RangeError} If `num` is less than zero or larger than the size of the `Filter`; or if the `Filter` is empty.
          */
         filterByNumber(num) {
@@ -1752,6 +1634,73 @@
             }
 
             return this[this.length - 1];
+        }
+
+        /**
+         * Expects that `Filter` has `count` members.
+         * @param  {Number} num  How many members are expected to be in the `Filter`
+         * @return {Boolean}      Returns `true` if `Filter` has `count` records, `false` otherwise
+         */
+        expectCount(num) {
+            validateArgsSingleNumber("expectCount", num);
+
+            var msg = null;
+            var passed = (this.length === num);
+            if (!passed) msg = `expectCount: expected exactly ${num}`;
+
+            return Expect._softAssert(this, msg);
+        }
+
+        /**
+         * Expects that `Filter` has `count` members.
+         * @param  {Number} min   How the miniumum number of members expected to be in the `Filter`
+         * @param  {Number} max   The maximum number of members expected to be in the `Filter`
+         * @return {Boolean}      Returns `true` if `Filter` has `count` records, `false` otherwise
+         */
+        expectCountRange(min, max) {
+            if (typeof min !== "number") {
+                throw new TypeError("expectCountRange: expected 'min' to be of type Number");
+            }
+
+            if (typeof max !== "number") {
+                throw new TypeError("expectCountRange: expected 'max' to be of type Number");
+            }
+
+            var msg = null;
+            var passed = ((this.length >= min) && (this.length <= max));
+            if (!passed) msg = `expectCountRange: expected no more than ${min} and fewer than ${max}`;
+
+            return Expect._softAssert(this, msg);
+        }
+
+        /**
+         * Expects that `Filter` has at least `min` members.
+         * @param  {Number} min   How least number of members that are expected to be in the `Filter`
+         * @return {Boolean}      Returns `true` if `arr` has at least `count` records, `false` otherwise
+         */
+        expectCountMin(min) {
+            validateArgsSingleNumber("expectCountMin", min);
+
+            var msg = null;
+            var passed = (this.length >= min);
+            if (!passed) msg = `expectCountMin: expected no more than ${min}`;
+
+            return Expect._softAssert(this, msg);
+        }
+
+        /**
+         * Expects that `Filter` has at most `max` members.
+         * @param  {Number} max   The maximum number of members that are expected to be in the `Filter`
+         * @return {Boolean}      Returns `true` if `Filter` has less than `count` members, `false` otherwise
+         */
+        expectCountMax(max) {
+            validateArgsSingleNumber("expectCountMax", max);
+
+            var msg = null;
+            var passed = (this.length <= max);
+            if (!passed) msg = `expectCountMax: expected no more than ${max}`;
+
+            return Expect._softAssert(this, msg);
         }
 
         // All(expectName, ...args) {
@@ -1973,7 +1922,7 @@
                 });
 
             alias(this, "actionCallbackContext",
-                this._action, "actionCallbackContext", "function", "post", validateArgsSingleObject,
+                this._action, "actionCallbackContext", "function", "post", validateArgsSingle,
                 function(curr, context) {
                     curr.callback.context = context;
                 });
@@ -2039,13 +1988,6 @@
     /***************************************************
      * helper functions for validating arguments
      ****************************************************/
-    function validateArgsSingleObject(name, ...args) {
-        if (args.length !== 1 ||
-            typeof args[0] !== "object") {
-            throw new TypeError(`${name}: expected a single argument of type Object`);
-        }
-    }
-
     function validateArgsSingleExceptionOrNull(name, ...args) {
         if (args.length === 1 && (args[0] instanceof Error)) return;
         if (args.length === 1 && (args[0] === null)) return;
@@ -2204,15 +2146,75 @@
     var matcherRegistrySingleton;
     /**
      * A class for matching anything. Really, anything.
+     *
+     * Matching has two major flavors: matching by "value", where two things are strictly compared to
+     * see if they are they exact same; and matching by "type", where something is compared to a class
+     * of things to see if it belongs to that class.
+     *
+     * Examples of comparison by value are `3 === 3`, or `{a: 1} === {a: 1}`. You'll note that the latter
+     * doesn't really work with strict equals, so comparisons need to be a bit more sophisticated. To that
+     * end, objects and arrays are recursively compared for a strict match using `Match.value`. To help out with this are a
+     * number of registered types that can spot the differences between things. Looking at the `Match.addType`
+     * and `Match.getType` static methods, these help to register handlers for specific data types. Most
+     * data types are already registered, but feel free to add your own (or create a library of types and
+     * share with friends!). These registered types create {@link Diff Diffs} that represent the one-or-more
+     * differences between two items.
+     *
+     * Examples of comparison by type are `3 === "string"` or `{a: 1} === "object"`. You can use `Match.type`
+     * to compare something to it's type, again using the built-in types or the types of your own choosing.
+     *
+     * A `Match` object contains an original value or type and is ready to compare to anything passed to it
+     * using the `compare()` method. This makes matches easy to pass around, such as passing them as arguments
+     * to functions that do comparison.
+     * @example
+     * var matchVal = Match.value("bob");
+     * matchVal.compare("bob"); // true
+     * matchVal.compare("sally"); // false
+     * matchVal.compare(undefined); // false
+     *
+     * matchVal = Match.value(undefined);
+     * matchVal.compare(undefined); // true
+     *
+     * var matchType = Match.type("number");
+     * matchType.compare(3); // true
+     * matchType.compare(42); // true
+     * matchType.compare("test"); // false
+     * matchType.compare("3"); // false
+     *
+     * console.log (Match.getType("foo").name); // "string"
+     * console.log (Match.getType(12).name); // "number"
+     * console.log (Match.getType(true).name); // "boolean"
+     * console.log (Match.getType(null).name); // "null"
+     * console.log (Match.getType(new Error()).name); // "error"
+     * console.log (Match.getType(new Date()).name); // "date"
+     * console.log (Match.getType([1, 2, 3]).name); // "array"
+     * console.log (Match.getType({a: 1}).name); // "object"
      */
     class Match {
         constructor(opts) {
             opts = opts || {};
             // if !opts throw
             if (opts.hasOwnProperty("value")) {
+                // if the value is a Match, just use that instead
+                if (opts.value instanceof Match) {
+                    return opts.value;
+                }
+
                 this.value = opts.value;
-                // } else if (opts.type) {
-                //     this.type = opts.type;
+                this.matchType = "value";
+            } else if (opts.hasOwnProperty("type")) {
+                if (typeof opts.type !== "string") {
+                    throw new TypeError ("Match constructor: expected type name to be of type String");
+                }
+
+                // make sure the type exists in the registry
+                var reg = Match.getMatcherTypeRegistry();
+                if (!reg.matcherList.has(opts.type)) {
+                    throw new TypeError (`Match constructor: type '${opts.type}' hasn't be registered`);
+                }
+
+                this.typeStr = opts.type;
+                this.matchType = "type";
                 // } else if (opts.custom) {
                 //     this.custom = opts.custom;
             } else {
@@ -2227,9 +2229,24 @@
          * @return {Boolean}     Returns `true` if `value` matches the original value; `false` otherwise
          */
         compare(value) {
-            var d = Match.diff(this.value, value);
-            this.lastDiff = d;
-            if (d.length === 0) return true;
+            // matching by explicit value
+            if (this.matchType === "value") {
+                var d = Match.diff(this.value, value);
+                this.lastDiff = d;
+                if (d.length === 0) return true;
+            }
+
+            // matching by type
+            if(this.matchType === "type") {
+                var type = Match.getType(value);
+
+                // match any parent types of the value
+                // for example, an "Error" is an "Object"; however, an "Object" is not an "Error"
+                while (type.parent && type.name !== this.typeStr) type = type.parent;
+
+                return (this.typeStr === type.name);
+            }
+
             // TODO: if allowUndefined -- filter undefined
 
             return false;
@@ -2249,12 +2266,12 @@
             matcherRegistrySingleton.matcherList = new Map();
             matcherRegistrySingleton.matcherHierarchy = [];
             Match.addType("number", null, testNumber, diffNumber);
-            Match.addType("array", null, testArray, diffArray);
             Match.addType("object", null, testObject, diffObject);
             Match.addType("string", null, testString, diffString);
             Match.addType("null", null, testNull, diffNull);
             Match.addType("boolean", null, testBoolean, diffBoolean);
             Match.addType("undefined", null, testUndef, diffUndef);
+            Match.addType("array", "object", testArray, diffArray);
             Match.addType("date", "object", testDate, diffDate);
             Match.addType("regexp", "object", testRegex, diffRegex);
             Match.addType("error", "object", testError, diffError);
@@ -2276,7 +2293,21 @@
             });
         }
 
-        // compareType
+        /**
+         * A convenience class that creates a new Match and sets the type to be matched to `arg`.
+         * @param  {arg} arg The type to be matched. Built-in types include: "object", "array", "string",
+         * "number", "boolean", "number", "null", "undefined", "date", "regexp", and "error".
+         * @return {Match}     The new `Match` instance
+         * @example
+         * var m = Match.type("boolean"); // create new `Match` with value set to "foo"
+         * m.compare(false); // true
+         * m.compare("test"); // false
+         */
+        static type(arg) {
+            return new Match({
+                type: arg
+            });
+        }
 
         /**
          * Creates a deep diff between two values. If the arguments are `Objects` or `Arrays`, they are
@@ -2285,21 +2316,32 @@
          * @param  {any} value2 The second value to diff.
          * @return {Array}    An `Array` of differences between `value1` and `value2`
          * @example
-         * Match.diff(
+         *  (
          *     {a: 1, b: 2, c: 3},
          *     {a: 1, c: 4}
          *     );
          * // returns:
-         * // [{key: "b", src: 2, dst: undefined},
-         * //  {key: "c", src: 3, dst: 4}]
+         * // [{key: ".b", src: 2, dst: undefined},
+         * //  {key: ".c", src: 3, dst: 4}]
          */
         static diff(value1, value2) {
+            // if the first value is a Match create a type-based diff
+            if (value1 instanceof Match) {
+                let matched = value1.compare(value2);
+                let diff = new Diff("type-match");
+                if (!matched && value1.matchType === "type") {
+                    diff.addDiff(value1, value2);
+                }
+                return diff;
+            }
+
+            // console.log ("value2 match?", value2 instanceof Match);
             var matcher = Match.findCommonType(value1, value2);
             debug("diff: matcher:", matcher);
             if (!matcher) {
                 debug("common type not found, returning diff");
                 // throw new TypeError("diff: can't compare uncommon values");
-                return newDiff(value1, value2);
+                return new Diff("type-mismatch").addDiff(value1, value2);
             }
             return matcher.diff(value1, value2);
         }
@@ -2343,6 +2385,59 @@
             }
 
             return null;
+        }
+
+        /**
+         * Adds a new type to the type registry
+         * @param {String} name       The name of the type
+         * @param {String|null} parentName The parent of this type. For example, the parent
+         * of `Array` or `Error` is `Object`, since both `Array` and `Error` are objects. Care
+         * must be used in selecting the right parent, or else `getType` may fail and so will
+         * everything else. Use `null` if no parent type exists; however, all conceivable
+         * parent types have already been registered by default.
+         * @param {Function} testFn     A function that when passed a value, will return `true`
+         * if it is of this type and `false` otherwise.
+         * @param {Function} diffFn     A function that when passed two values of this type can
+         * tell the difference between them and return a proper diff `Array`.
+         * @example
+         * function testRegex(rex) {
+         *     if (rex instanceof RegExp) return true;
+         *     return false;
+         * }
+         *
+         * function diffRegex(rex1, rex2) {
+         *     if (rex1.toString() !== rex2.toString()) return newDiff(rex1.toString(), rex2.toString());
+         *     return [];
+         * }
+         *
+         * Match.addType("regexp", "object", testRegex, diffRegex);
+         */
+        static addType(name, parentName, testFn, diffFn) {
+            if (typeof name !== "string") {
+                throw new TypeError(`Match.addType: 'name' should be string`);
+            }
+
+            if (matcherRegistrySingleton.matcherList.has(name)) {
+                throw new TypeError(`Match.addType: '${name}' already exists`);
+            }
+
+            var parentMatcher = matcherRegistrySingleton.matcherList.get(parentName);
+            parentMatcher = parentMatcher || null;
+
+            var matcher = {
+                name: name,
+                test: testFn,
+                diff: diffFn,
+                parent: parentMatcher,
+                children: []
+            };
+
+            matcherRegistrySingleton.matcherList.set(name, matcher);
+            if (!parentMatcher) {
+                matcherRegistrySingleton.matcherHierarchy.push(matcher);
+            } else {
+                parentMatcher.children.push(matcher);
+            }
         }
 
         /**
@@ -2428,59 +2523,58 @@
                     Match.isMatcher(matcher.parent)
                 ));
         }
+    }
+
+    /**
+     * A class for storing diff results and subsequently turning them in to strings.
+     * @private
+     */
+    class Diff extends Array {
+        constructor(name) {
+            super();
+
+            Object.defineProperty(this, "diffType", {
+                configurable: false,
+                enumerable: false,
+                value: name,
+                writable: false
+            });
+        }
 
         /**
-         * Adds a new type to the type registry
-         * @param {String} name       The name of the type
-         * @param {String|null} parentName The parent of this type. For example, the parent
-         * of `Array` or `Error` is `Object`, since both `Array` and `Error` are objects. Care
-         * must be used in selecting the right parent, or else `getType` may fail and so will
-         * everything else. Use `null` if no parent type exists; however, all conceivable
-         * parent types have already been registered by default.
-         * @param {Function} testFn     A function that when passed a value, will return `true`
-         * if it is of this type and `false` otherwise.
-         * @param {Function} diffFn     A function that when passed two values of this type can
-         * tell the difference between them and return a proper diff `Array`.
-         * @example
-         * function testRegex(rex) {
-         *     if (rex instanceof RegExp) return true;
-         *     return false;
-         * }
-         *
-         * function diffRegex(rex1, rex2) {
-         *     if (rex1.toString() !== rex2.toString()) return newDiff(rex1.toString(), rex2.toString());
-         *     return [];
-         * }
-         *
-         * Match.addType("regexp", "object", testRegex, diffRegex);
-         * @private
+         * Adds a new diff to the diff collection.
+         * @param {any} v1  The first value, typically the 'original' value, that didn't match.
+         * @param {any} v2  The second value that didn't match.
+         * @param {String} [key] The Object or Array property or index, generically described as a "key".
+         * Includes any decorators such as bracket or dot notation.
          */
-        static addType(name, parentName, testFn, diffFn) {
-            if (typeof name !== "string") {
-                throw new TypeError(`Match.addType: 'name' should be string`);
-            }
-
-            if (matcherRegistrySingleton.matcherList.has(name)) {
-                throw new TypeError(`Match.addType: '${name}' already exists`);
-            }
-
-            var parentMatcher = matcherRegistrySingleton.matcherList.get(parentName);
-            parentMatcher = parentMatcher || null;
-
-            var matcher = {
-                name: name,
-                test: testFn,
-                diff: diffFn,
-                parent: parentMatcher,
-                children: []
+        addDiff(v1, v2, key) {
+            var ret = {
+                src: v1,
+                dst: v2
             };
-
-            matcherRegistrySingleton.matcherList.set(name, matcher);
-            if (!parentMatcher) {
-                matcherRegistrySingleton.matcherHierarchy.push(matcher);
-            } else {
-                parentMatcher.children.push(matcher);
+            if (key !== undefined) {
+                ret.key = key;
             }
+            this.push(ret);
+
+            return this;
+        }
+
+        /**
+         * Converts the diff to an array of descriptive strings that explain why two things are different.
+         * @return {Array.<String>} One string in the array for each difference.
+         */
+        getDiffsAsStrings() {
+            var msgList = [];
+
+            for (let val of this) {
+                    let key = val.key;
+                    if (key) msgList.push(`At ${key}: Expected: '${val.src}'; Got: '${val.dst}'`);
+                    else msgList.push(`Expected: '${val.src}'; Got: '${val.dst}'`);
+            }
+
+            return msgList;
         }
     }
 
@@ -2488,31 +2582,15 @@
      * helper functions for testing various data types
      ****************************************************/
 
-    function newDiff(v1, v2, key) {
-        if (key !== undefined) {
-            return [{
-                key: key,
-                src: v1,
-                dst: v2
-            }];
-        } else {
-            return [{
-                src: v1,
-                dst: v2
-            }];
-        }
-
-    }
-
     function testNumber(n) {
         if (typeof n === "number") return true;
         return false;
     }
 
     function diffNumber(n1, n2) {
-        if (n1 !== n2) return newDiff(n1, n2);
+        if (n1 !== n2) return new Diff("number").addDiff(n1, n2);
 
-        return [];
+        return new Diff("number");
     }
 
     function testString(s) {
@@ -2521,9 +2599,9 @@
     }
 
     function diffString(s1, s2) {
-        if (s1 !== s2) return newDiff(s1, s2);
+        if (s1 !== s2) return new Diff("string").addDiff(s1, s2);
 
-        return [];
+        return new Diff("string");
     }
 
     function testObject(o) {
@@ -2531,16 +2609,8 @@
         return false;
     }
 
-    function addKeyToDiff(d, key) {
-        for (let i = 0; i < d.length; i++) {
-            d[i].key = key;
-        }
-
-        return d;
-    }
-
     function diffObject(o1, o2) {
-        var diff = [];
+        var diff = new Diff("object");
 
         // make a list of all the keys between the two objects
         var keyList = new Set();
@@ -2554,11 +2624,13 @@
         // for the combined list of keys, create a list of different keys or different values
         for (let key of keyList) {
             if ((key in o1) && (key in o2)) {
-                let d = Match.diff(o1[key], o2[key]);
-                addKeyToDiff(d, key);
-                diff = diff.concat(d);
+                let childDiff = Match.diff(o1[key], o2[key]);
+                for (let childDiffMember of childDiff) {
+                    let newKey = childDiffMember.key ? key + childDiffMember.key : key;
+                    diff.addDiff(childDiffMember.src, childDiffMember.dst, "." + newKey);
+                }
             } else {
-                diff = diff.concat(newDiff(o1[key], o2[key], key));
+                diff.addDiff(o1[key], o2[key], "." + key);
             }
         }
 
@@ -2572,15 +2644,16 @@
     }
 
     function diffArray(a1, a2) {
-        var diff = [];
+        var diff = new Diff("array");
 
         // for the longer of the arrays, create a list of different values
         var len = (a1.length > a2.length) ? a1.length : a2.length;
         for (let i = 0; i < len; i++) {
             // recursive diff
-            let d = Match.diff(a1[i], a2[i]);
-            if (d.length > 0) {
-                diff = diff.concat(newDiff(a1[i], a2[i], i));
+            let childDiff = Match.diff(a1[i], a2[i]);
+            for (let childDiffMember of childDiff) {
+                let newKey = childDiffMember.key ? `[${i}]` + childDiffMember.key : `[${i}]`;
+                diff.addDiff(childDiffMember.src, childDiffMember.dst, newKey);
             }
         }
 
@@ -2595,7 +2668,7 @@
     function diffNull() {
         // guaranteed that both n1 and n2 are of type "null"
         // since there's no different types of null, there can be no real diff here
-        return [];
+        return new Diff("null");
     }
 
     function testBoolean(b) {
@@ -2604,8 +2677,8 @@
     }
 
     function diffBoolean(b1, b2) {
-        if (b1 !== b2) return newDiff(b1, b2);
-        return [];
+        if (b1 !== b2) return new Diff("boolean").addDiff(b1, b2);
+        return new Diff("boolean");
     }
 
     function testDate(d) {
@@ -2614,8 +2687,8 @@
     }
 
     function diffDate(d1, d2) {
-        if (d1.getTime() !== d2.getTime()) return newDiff(d1, d2);
-        return [];
+        if (d1.getTime() !== d2.getTime()) return new Diff("date").addDiff(d1, d2);
+        return new Diff("date");
     }
 
     function testUndef(u) {
@@ -2626,7 +2699,7 @@
     function diffUndef() {
         // guaranteed that both n1 and n2 are of type "undefined"
         // since there's no different types of undefined, there can be no real diff here
-        return [];
+        return new Diff("undefined");
     }
 
     function testRegex(rex) {
@@ -2635,8 +2708,8 @@
     }
 
     function diffRegex(rex1, rex2) {
-        if (rex1.toString() !== rex2.toString()) return newDiff(rex1.toString(), rex2.toString());
-        return [];
+        if (rex1.toString() !== rex2.toString()) return new Diff("regexp").addDiff(rex1.toString(), rex2.toString());
+        return new Diff("regexp");
     }
 
     function testError(e) {
@@ -2644,10 +2717,10 @@
     }
 
     function diffError(e1, e2) {
-        var ret = [];
-        if (e1.name !== e2.name) ret = ret.concat(addKeyToDiff(newDiff(e1.name, e2.name), "name"));
-        if (e1.message !== e2.message) ret = ret.concat(addKeyToDiff(newDiff(e1.message, e2.message), "message"));
-        return ret;
+        var diff = new Diff("error");
+        if (e1.name !== e2.name) diff.addDiff(e1.name, e2.name, "name");
+        if (e1.message !== e2.message) diff.addDiff(e1.message, e2.message, "message");
+        return diff;
     }
 
     // Just return a value to define the module export.
@@ -2659,7 +2732,8 @@
         Match: Match,
         Trigger: Trigger,
         ExpectError: ExpectError,
-        Sandbox: Sandbox
+        Sandbox: Sandbox,
+        Filter: Filter
     };
 }));
 
