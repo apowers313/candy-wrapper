@@ -1,3 +1,4 @@
+[![Stories in Ready](https://badge.waffle.io/apowers313/candy-wrapper.png?label=ready&title=Ready)](https://waffle.io/apowers313/candy-wrapper)
 Work in progress. Please don't use.
 
 ![##candy-wrapper](https://cdn.rawgit.com/apowers313/candy-wrapper/2e325ece/img/candy-wrapper-full-logo-1116x200.png?raw=true)
