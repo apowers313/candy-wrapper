@@ -4,18 +4,25 @@ Work in progress. Please don't use.
 
 [![Build Status](https://travis-ci.org/apowers313/candy-wrapper.svg?branch=master)](https://travis-ci.org/apowers313/candy-wrapper)
 [![Coverage Status](https://coveralls.io/repos/github/apowers313/candy-wrapper/badge.svg?branch=master)](https://coveralls.io/github/apowers313/candy-wrapper?branch=master)
+[![Stories in Ready](https://badge.waffle.io/apowers313/candy-wrapper.png?label=ready&title=Ready)](https://waffle.io/apowers313/candy-wrapper)
 
 <!-- [![Sauce Test Status](https://saucelabs.com/browser-matrix/apowers313.svg)](https://saucelabs.com/u/apowers313) -->
 
 [Full API Documentation Available Here!](https://apowers313.github.io/candy-wrapper)
 
-This library is similar to the wonderful [Sinon](http://sinonjs.org/) and can be used for creating stubs, spys, and mocks for testing. The API has been re-invented to be consistent and re-use code across all those functionalities.
+Questions, comments, bugs, suggestions, contributions, etc. are welcomed. Please submit an [issue on GitHub](https://github.com/apowers313/candy-wrapper/issues).
 
-The primary interfaces are Wrapper, Expect, Trigger, and Action.
+## Overview
+
+This library provides the ability to wrap functions or properties so that you can monitor their behavior without changing it. Wrappers also allow you to decide when and how you want to change the behavior of a function or property. Candy-wrapper is similar to wonderful libraries like [Sinon](http://sinonjs.org/) and [shimmer](https://www.npmjs.com/package/shimmer) and can be used for creating stubs, spys, and mocks for testing and monkey patching in production environments. The motivation behind creating candy-wrapper was that other libraries were too hard to learn, had inconsistent APIs, or generally couldn't do the things I needed to do with a wrapper. Hopefully candy-wrapper does everything anyone could ever hope for from a wrapper, or can be easily expanded to add new functionality.
+
+The primary interfaces are Wrapper, Expect, Trigger, and Action:
 * [Wrappers](https://apowers313.github.io/candy-wrapper/Wrapper.html) wrap a function or property, so that when the Wrapper is called, so is the underlying function or property.
 * You can use [Expect](https://apowers313.github.io/candy-wrapper/Expect.html) to examine what happened with a Wrapper, such as seeing what args were passed to it or what the return value was.
 * [Triggers](https://apowers313.github.io/candy-wrapper/Trigger.html) get called just before or just after a function call, providing the opportunity validate Expects or perform Actions.
-* Actions can do things like change arguments recieved by the wrapped function or change the value returned to the caller.
+* Actions, which are part of Triggers, can do things like change arguments recieved by the wrapped function or change the value returned to the caller.
+
+If you are new to wrappers or candy-wrapper, a good place to start is the [Getting Started Tutorial](https://apowers313.github.io/candy-wrapper/tutorial-getting-started.html).
 
 ## ES6
 Note that this library currently makes exensive use of the features of [JavaScript ES6](http://www.ecma-international.org/ecma-262/6.0/), notably [Proxies](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy), [classes](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Classes), [template literals](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals), [rest parameters](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/rest_parameters), and the [spread operator](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Spread_operator). For information about which platforms currently support ES6, see the [ES6 compatibility table](https://kangax.github.io/compat-table/es6/). It has been tested against Node 6 and seems to run on the latest versions of Chrome and Firefox.
@@ -51,7 +58,7 @@ Install:
 
 Use:
 
-```
+``` html
 <script>
 var Wrapper = CandyWrapper.Wrapper;
 </script>
@@ -86,13 +93,13 @@ try { // gobble up the exception from no arguments
 square(3);
 square(5);
 
-square.callList.filterFirst().expectReturn(4); // true
-square.callList.filterSecond().expectReturn(16); // true
-square.callList.filterThird().expectException(new TypeError ("expected argument to be Number")); // true
-square.callList.filterFourth().expectReturn(10); // false, actually returned 9
-square.callList.filterFifth().expectReturn(23); // false, actually returned 25
+square.historyList.filterFirst().expectReturn(4); // true
+square.historyList.filterSecond().expectReturn(16); // true
+square.historyList.filterThird().expectException(new TypeError ("expected argument to be Number")); // true
+square.historyList.filterFourth().expectReturn(10); // false, actually returned 9
+square.historyList.filterFifth().expectReturn(23); // false, actually returned 25
 
-square.expectValidateAll();
+square.expectReportAllFailures();
 // ExpectError: 2 expectation(s) failed:
 //     expectReturn: expectation failed for: 10
 //     expectReturn: expectation failed for: 23
