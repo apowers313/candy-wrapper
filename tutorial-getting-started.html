@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Tutorial: Getting Started - Documentation</title>
+
+    <script src="scripts/prettify/prettify.js"></script>
+    <script src="scripts/prettify/lang-css.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc.css">
+</head>
+<body>
+
+<input type="checkbox" id="nav-trigger" class="nav-trigger" />
+<label for="nav-trigger" class="navicon-button x">
+  <div class="navicon"></div>
+</label>
+
+<label for="nav-trigger" class="overlay"></label>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="ExpectError.html">ExpectError</a></li><li><a href="Filter.html">Filter</a><ul class='methods'><li data-type='method'><a href="Filter.html#expectCount">expectCount</a></li><li data-type='method'><a href="Filter.html#expectCountMax">expectCountMax</a></li><li data-type='method'><a href="Filter.html#expectCountMin">expectCountMin</a></li><li data-type='method'><a href="Filter.html#expectCountRange">expectCountRange</a></li><li data-type='method'><a href="Filter.html#filterByCallArgs">filterByCallArgs</a></li><li data-type='method'><a href="Filter.html#filterByCallContext">filterByCallContext</a></li><li data-type='method'><a href="Filter.html#filterByException">filterByException</a></li><li data-type='method'><a href="Filter.html#filterByNumber">filterByNumber</a></li><li data-type='method'><a href="Filter.html#filterByReturn">filterByReturn</a></li><li data-type='method'><a href="Filter.html#filterFifth">filterFifth</a></li><li data-type='method'><a href="Filter.html#filterFirst">filterFirst</a></li><li data-type='method'><a href="Filter.html#filterFourth">filterFourth</a></li><li data-type='method'><a href="Filter.html#filterLast">filterLast</a></li><li data-type='method'><a href="Filter.html#filterOnly">filterOnly</a></li><li data-type='method'><a href="Filter.html#filterPropGet">filterPropGet</a></li><li data-type='method'><a href="Filter.html#filterPropSet">filterPropSet</a></li><li data-type='method'><a href="Filter.html#filterPropSetByVal">filterPropSetByVal</a></li><li data-type='method'><a href="Filter.html#filterSecond">filterSecond</a></li><li data-type='method'><a href="Filter.html#filterThird">filterThird</a></li><li data-type='method'><a href="Filter.html#getAllCallArgs">getAllCallArgs</a></li><li data-type='method'><a href="Filter.html#getAllCallContexts">getAllCallContexts</a></li><li data-type='method'><a href="Filter.html#getAllExceptions">getAllExceptions</a></li><li data-type='method'><a href="Filter.html#getAllReturns">getAllReturns</a></li><li data-type='method'><a href="Filter.html#getAllSetVals">getAllSetVals</a></li></ul></li><li><a href="Match.html">Match</a><ul class='methods'><li data-type='method'><a href="Match.html#.addType">addType</a></li><li data-type='method'><a href="Match.html#.diff">diff</a></li><li data-type='method'><a href="Match.html#.getType">getType</a></li><li data-type='method'><a href="Match.html#.type">type</a></li><li data-type='method'><a href="Match.html#.value">value</a></li><li data-type='method'><a href="Match.html#compare">compare</a></li></ul></li><li><a href="SingleRecord.html">SingleRecord</a><ul class='methods'><li data-type='method'><a href="SingleRecord.html#.expectCallArgs">expectCallArgs</a></li><li data-type='method'><a href="SingleRecord.html#.expectContext">expectContext</a></li><li data-type='method'><a href="SingleRecord.html#.expectCustom">expectCustom</a></li><li data-type='method'><a href="SingleRecord.html#.expectException">expectException</a></li><li data-type='method'><a href="SingleRecord.html#.expectReturn">expectReturn</a></li><li data-type='method'><a href="SingleRecord.html#.expectSetVal">expectSetVal</a></li></ul></li><li><a href="Trigger.html">Trigger</a><ul class='methods'><li data-type='method'><a href="Trigger.html#.expectCallArgs">expectCallArgs</a></li><li data-type='method'><a href="Trigger.html#.expectContext">expectContext</a></li><li data-type='method'><a href="Trigger.html#.expectCustom">expectCustom</a></li><li data-type='method'><a href="Trigger.html#.expectException">expectException</a></li><li data-type='method'><a href="Trigger.html#.expectReturn">expectReturn</a></li><li data-type='method'><a href="Trigger.html#.expectSetVal">expectSetVal</a></li><li data-type='method'><a href="Trigger.html#actionCustom">actionCustom</a></li><li data-type='method'><a href="Trigger.html#actionReturn">actionReturn</a></li></ul></li><li><a href="Wrapper.html">Wrapper</a><ul class='methods'><li data-type='method'><a href="Wrapper.html#.getWrapperFromProperty">getWrapperFromProperty</a></li><li data-type='method'><a href="Wrapper.html#.isWrapper">isWrapper</a></li><li data-type='method'><a href="Wrapper.html#.unwrap">unwrap</a></li><li data-type='method'><a href="Wrapper.html#configAllowRewrap">configAllowRewrap</a></li><li data-type='method'><a href="Wrapper.html#configCallUnderlying">configCallUnderlying</a></li><li data-type='method'><a href="Wrapper.html#configDefault">configDefault</a></li><li data-type='method'><a href="Wrapper.html#configExpectThrows">configExpectThrows</a></li><li data-type='method'><a href="Wrapper.html#configExpectThrowsOnTrigger">configExpectThrowsOnTrigger</a></li><li data-type='method'><a href="Wrapper.html#configReset">configReset</a></li><li data-type='method'><a href="Wrapper.html#configUnwrap">configUnwrap</a></li><li data-type='method'><a href="Wrapper.html#expectReportAllFailures">expectReportAllFailures</a></li><li data-type='method'><a href="Wrapper.html#triggerAlways">triggerAlways</a></li><li data-type='method'><a href="Wrapper.html#triggerOnArgs">triggerOnArgs</a></li><li data-type='method'><a href="Wrapper.html#triggerOnCallNumber">triggerOnCallNumber</a></li><li data-type='method'><a href="Wrapper.html#triggerOnContext">triggerOnContext</a></li><li data-type='method'><a href="Wrapper.html#triggerOnCustom">triggerOnCustom</a></li><li data-type='method'><a href="Wrapper.html#triggerOnException">triggerOnException</a></li><li data-type='method'><a href="Wrapper.html#triggerOnReturn">triggerOnReturn</a></li><li data-type='method'><a href="Wrapper.html#triggerOnSet">triggerOnSet</a></li></ul></li></ul><h3>Tutorials</h3><ul><li><a href="tutorial-getting-started.html">Getting Started</a></li></ul>
+</nav>
+
+<div id="main">
+    
+    <h1 class="page-title">Tutorial: Getting Started</h1>
+    
+
+    <section>
+
+<header>
+    
+
+    <h2>Getting Started</h2>
+</header>
+
+<article>
+    <p>If you have never used wrappers or candy-wrapper before, this is a good place to start. It will give you an overview of what a <code>Wrapper</code> is and how you can use them for lots of different things. Reading this tutorial shouldn't take more than five minutes and will give you a new tool for testing and development.</p>
+<h2>What is a Wrapper?</h2><p><a href="Wrapper.html">Wrapper</a> is the main class for candy-wrapper. A wrapper goes around an existing function, method, or property
+enabling you to monitor the behavior of the underlying wrapped thing, and optionally changing the behavior of
+the wrapped thing when you want to. Let's start with looking at how to create a <code>Wrapper</code>:</p>
+<pre class="prettyprint source lang-js"><code>var myObject = {
+    name: &quot;Daisy&quot;,
+    dance: function() {
+         console.log (&quot;Look at me! I'm dancing!&quot;);
+    }
+}
+
+new Wrapper(myObject, &quot;name&quot;);
+new Wrapper(myObject, &quot;dance&quot;);
+
+console.log (myObject.name); // &quot;Daisy&quot;
+myObject.dance(); // &quot;Look at me! I'm dancing!&quot;</code></pre><p>The code above creates a wrapper around the <code>name</code> property and around the <code>dance</code> method, but it doesn't modify their behavior. So, what's different? Now you can review the history of every time a wrapper is called or optionally change the
+perceived behavior of the wrapped thing. The next couple sections will walk you through how to do that.</p>
+<h2>Wrapper History</h2><p>Every <code>Wrapper</code> has a history of how it has been called in it's <code>historyList</code>. This allows you to look at how the function has been called. I created this new object that, in theory,
+should raise <code>num</code> to the <code>exponent</code>. For example, if <code>num</code> is 3 and <code>exponent</code> is 2, the result should be 3<sup>2</sup> = 9. It's basically a harder to use version of <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/pow">Math.pow()</a>, but it will allow us to play around with viewing the history of both <code>exponent</code> and <code>pow</code>.</p>
+<pre class="prettyprint source lang-js"><code>var powerObject = {
+    exponent: 2,
+    pow: function(num) {
+         var ret = 1;
+
+         for (let i = 0; i &lt; this.exponent; i++) ret *= num;
+
+         return ret;
+    }
+};</code></pre><p>Let's start by wrapping the powerObject. There are two ways to do this. The first is to wrap everything in the object:</p>
+<pre class="prettyprint source lang-js"><code>new Wrapper(powerObject, &quot;exponent&quot;);
+new Wrapper(powerObject, &quot;pow&quot;);</code></pre><p>That looks just like how we did it in the previous section. But there's an easier way too:</p>
+<pre class="prettyprint source lang-js"><code>new Wrapper(powerObject);</code></pre><p>That just wrapped ALL the properties and methods on the object. In this case it makes two lines of code into one, but with large objects it could be pretty handy.</p>
+<p>Now let's get on to the meat of this section: does my <code>powerObject</code> work the way I expect? Let's find out by looking at the historyList:</p>
+<pre class="prettyprint source lang-js"><code>powerObject.pow(3);
+powerObject.pow(5);
+
+console.log(powerObject.pow.historyList[0].retVal); // 3^2 = 9
+console.log(powerObject.pow.historyList[1].retVal); // 5^2 = 25</code></pre><p>Every time <code>powerObject.pow()</code> it added a new <a href="SingleRecord.html">SingleRecord</a> to the <code>historyList</code> <code>Array</code>. <code>powerObject.pow()</code> behaves the exact same, but the <code>Wrapper</code> allows us to look at what happened every time it was called.</p>
+<p>That's one way of looking at the calls to <code>powerObject.pow()</code>, but it's not very easy to read. Here is another way of checking out the history of <code>powerObject.pow()</code>:</p>
+<pre class="prettyprint source lang-js"><code>powerObject.pow(3);
+powerObject.pow(5);
+
+powerObject.pow
+    .filterFirst()
+    .expectReturn(9); // true
+powerObject.pow
+    .filterSecond()
+    .expectReturn(25); // true</code></pre><p>There are two things going on there. First, the <code>historyList</code> is actually a <a href="Filter.html">Filter</a> and <code>Filters</code> provide some convenient ways of accessing specific items in the <code>historyList</code>. The <code>filterFirst()</code> function is essentially the same as <code>historyList[0]</code>, but as we will see later there are other filters that allow more sophisticated ways of what's in the <code>historyList</code>.</p>
+<p>The second thing that's going on is the use of the <code>expectReturn()</code> method. Every <a href="SingleRecord.html">SingleRecord</a> in the <code>historyList</code> has a set of expectation methods on it, allowing you to check whether your expectations for that call have been met. The expectations return <code>true</code> or <code>false</code> depending on whether the expectation was met. You can use these expectations with your favorite assertion library, like <a href="http://chaijs.com/">Chai</a>. Or if you want to throw an <code>Error</code> when expectations aren't met, you can do this:</p>
+<pre class="prettyprint source lang-js"><code>powerObject.pow(3);
+powerObject.pow(5);
+
+powerObject.pow
+    .filterFirst()
+    .expectReturn(13); // false
+powerObject.pow
+    .expectReportAllFailures();
+// throws an error:
+// ExpectError: 1 expectation(s) failed: ...</code></pre><p>Well, that's easy. Just add all the expectations you want and check them all at the end to get a list of how many and which ones failed.</p>
+<p>Of course, this all works with properties as well. Let's look at that:</p>
+<pre class="prettyprint source lang-js"><code>powerObject.exponent = 3;
+
+powerObject.pow
+    .filterFirst()
+    .expectSetVal(3); // true</code></pre><p>That's just the tip of the iceberg -- there are all kinds of <a href="Filter.html">Filters</a> and <a href="SingleRecord.html">expectations</a> that you can play around with. Before you start experimenting more, it is worth pointing out that there is a pattern to how the expectations and filters are named.</p>
+<ul>
+<li>Return - the return value from a function or property get.</li>
+<li>Exception - the <code>Error</code> that was thrown by a function or property get / set, or <code>null</code> for no <code>Error</code>.</li>
+<li>CallArgs - the arguments passed to a function.</li>
+<li>SetVal - the value that a property was set to.</li>
+<li>CallContext - the <code>this</code> value of a function.</li>
+</ul>
+<p>These are used repeatedly throughout the APIs. So if you want to filter a <code>historyList</code> by what arguments were used to call the function, you can do <code>filterByCallArgs</code>. And if you expect that the arguments to a function call were a certain value, you can use <code>expectCallArgs</code>.</p>
+<p>Now that you know how to look at the history of a function or property, let's look at how to change it's behavior.</p>
+<h2>Changing Wrapper Behavior</h2><p>You will notice that in our previous example, our <code>powerObject.pow()</code> wasn't very smart -- it doesn't check to see if <code>num</code> is a proper value:</p>
+<pre class="prettyprint source lang-js"><code>var powerObject = {
+    exponent: 2,
+    pow: function(num) {
+         var ret = 1;
+
+         for (let i = 0; i &lt; this.exponent; i++) ret *= num;
+
+         return ret;
+    }
+};</code></pre><p>Using <a href="Trigger.html">Triggers</a> we can change the behavior of the wrapper:</p>
+<pre class="prettyprint source lang-js"><code>powerObject.pow
+    .triggerAlways()
+    .expectCallArgs(Match.type(Number))</code></pre><h2>Configuring a Wrapper</h2>
+</article>
+
+</section>
+
+</div>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.3</a> on Thu Mar 30 2017 06:17:21 GMT+0000 (UTC) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+</footer>
+
+<script>prettyPrint();</script>
+<script src="scripts/linenumber.js"></script>
+</body>
+</html>
