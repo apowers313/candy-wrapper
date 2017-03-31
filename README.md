@@ -1,4 +1,4 @@
-Work in progress. Please don't use.
+**This project is currently in BETA. APIs may be subject to frequent change prior to the 1.0 release. Please use very strict versioning in your `package.json` if you choose to use candy-wrapper at this time.**
 
 ![##candy-wrapper](https://cdn.rawgit.com/apowers313/candy-wrapper/2e325ece/img/candy-wrapper-full-logo-1116x200.png?raw=true)
 
