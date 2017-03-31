@@ -1,6 +1,6 @@
 {
   "name": "candy-wrapper",
-  "version": "0.5.0",
+  "version": "0.8.0",
   "description": "A sinon.js-like wrapper for functions that creates stubs, spys, mocks, etc.",
   "main": "main.js",
   "directories": {
@@ -26,7 +26,10 @@
     "duck",
     "patch",
     "patching",
-    "candy"
+    "candy",
+    "shimmer",
+    "monkeypatch",
+    "rewire"
   ],
   "repository": {
     "type": "git",
