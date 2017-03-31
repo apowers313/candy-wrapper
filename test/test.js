@@ -16,19 +16,9 @@ function depends(mod) {
     var Match = CandyWrapper.Match;
     var Trigger = CandyWrapper.Trigger;
     var Filter = CandyWrapper.Filter;
-    var SingleRecord = CandyWrapper.SingleRecord;
+    var Operation = CandyWrapper.Operation;
     var ExpectError = CandyWrapper.ExpectError;
     var Sandbox = CandyWrapper.Sandbox;
-
-    describe("requested new feature list", function() {
-        it("can detect when a function has been invoked with 'new()'"); // Proxy.handler.construct()?
-        it("can wrap a function generator");
-        it("can add new / custom expect... or action... methods");
-        it("can match by type");
-        it("has a Spy class");
-        it("has a Stub class");
-        it("has a Mock class");
-    });
 
     describe("example", function() {
         it("spy on square", function() {
@@ -72,7 +62,7 @@ function depends(mod) {
             var fakeDb = {};
             fakeDb.getUser = new Wrapper();
             fakeDb.listUsers = new Wrapper();
-            fakeDb.getUser.triggerOnArgs("apowers")
+            fakeDb.getUser.triggerOnCallArgs("apowers")
                 .actionReturn({
                     username: "apowers",
                     firstName: "Adam",
@@ -916,10 +906,10 @@ function depends(mod) {
         });
     });
 
-    describe("single record", function() {
+    describe("operation", function() {
         it("doesn't allow cross-access", function() {
             var w = new Wrapper();
-            var r = new SingleRecord(w, {});
+            var r = new Operation(w, {});
 
             assert.throws(function() {
                 r.setVal = "set";
@@ -935,16 +925,22 @@ function depends(mod) {
             var w = new Wrapper();
 
             assert.throws(function() {
-                new SingleRecord();
-            }, TypeError, "SingleRecord constructor: expected 'wrapper' argument to be of type Wrapper");
+                new Operation();
+            }, TypeError, "Operation constructor: expected 'wrapper' argument to be of type Wrapper");
 
             assert.throws(function() {
-                new SingleRecord(w);
-            }, TypeError, "SingleRecord constructor: expected desc to be of type Object");
+                new Operation(w);
+            }, TypeError, "Operation constructor: expected desc to be of type Object");
         });
     });
 
     describe("filter", function() {
+        it("constructor throws on bad args", function() {
+            assert.throws(function() {
+                new Filter();
+            }, TypeError, "Filter constructor: expected first argument to be of type Wrapper");
+        });
+
         it("can get by call number", function() {
             var ret;
             var w = new Wrapper();
@@ -955,7 +951,7 @@ function depends(mod) {
             w();
             w();
             ret = w.historyList.filterByNumber(0);
-            assert.instanceOf(ret, SingleRecord);
+            assert.instanceOf(ret, Operation);
             w.historyList.filterByNumber(1);
             w.historyList.filterByNumber(2);
             assert.throws(function() {
@@ -963,7 +959,7 @@ function depends(mod) {
             }, RangeError);
             w();
             ret = w.historyList.filterByNumber(3);
-            assert.instanceOf(ret, SingleRecord);
+            assert.instanceOf(ret, Operation);
         });
 
         it("can select only property gets", function() {
@@ -1258,9 +1254,6 @@ function depends(mod) {
             assert.strictEqual(list.length, 0);
         });
 
-        it("throws when filtering propertys by call filters");
-        it("throws when filtering calls by property filters");
-
         it("can chain filters", function() {
             var count = 0;
             var testFunc = function() {
@@ -1375,10 +1368,8 @@ function depends(mod) {
 
             // success
             var ret = w.historyList.filterByNumber(0);
-            assert.instanceOf(ret, SingleRecord);
+            assert.instanceOf(ret, Operation);
         });
-
-        it("can filter property by number");
 
         it("can filter first", function() {
             var w = new Wrapper();
@@ -1390,12 +1381,12 @@ function depends(mod) {
 
             w("beer");
             var ret = w.historyList.filterFirst();
-            assert.instanceOf(ret, SingleRecord);
+            assert.instanceOf(ret, Operation);
             assert.deepEqual(ret.argList, ["beer"]);
 
             w("wine");
             ret = w.historyList.filterFirst();
-            assert.instanceOf(ret, SingleRecord);
+            assert.instanceOf(ret, Operation);
             assert.deepEqual(ret.argList, ["beer"]);
         });
 
@@ -1409,13 +1400,54 @@ function depends(mod) {
 
             w("beer");
             var ret = w.historyList.filterLast();
-            assert.instanceOf(ret, SingleRecord);
+            assert.instanceOf(ret, Operation);
             assert.deepEqual(ret.argList, ["beer"]);
 
             w("wine");
             ret = w.historyList.filterLast();
-            assert.instanceOf(ret, SingleRecord);
+            assert.instanceOf(ret, Operation);
             assert.deepEqual(ret.argList, ["wine"]);
+        });
+
+        it("is chainable", function() {
+            var w = new Wrapper();
+
+            w.triggerOnCallNumber(0)
+                .actionReturn(true);
+            w.triggerOnCallNumber(1)
+                .actionReturn(false);
+            w.triggerOnCallNumber(2)
+                .actionReturn(true);
+            w.triggerOnCallNumber(3)
+                .actionReturn(false);
+            w.triggerOnCallNumber(4)
+                .actionReturn(true);
+            w.triggerOnCallNumber(5)
+                .actionReturn(false);
+
+            w("beer");
+            w("beer");
+            w("wine");
+            w("wine");
+            w("beer");
+            w("beer");
+
+            var beerList, trueList, exceptionList;
+            // get all calls with argument === beer
+            beerList = w.historyList.filterByCallArgs("beer");
+            assert.strictEqual(beerList.length, 4);
+
+            // get all return values === true
+            trueList = beerList.filterByReturn(true);
+            assert.strictEqual(trueList.length, 2);
+
+            // get all non-exceptions
+            exceptionList = trueList.filterByException(null);
+            assert.strictEqual(exceptionList.length, 2);
+
+            // get all exceptions
+            exceptionList = trueList.filterByException(new Error("foo"));
+            assert.strictEqual(exceptionList.length, 0);
         });
     });
 
@@ -1586,7 +1618,53 @@ function depends(mod) {
             assert.deepEqual(list[4], "wine");
         });
 
-        it("get acts like a filter"); // TODO: make sure you can filter then get
+        it("get can act on chained filter", function() {
+            var w = new Wrapper();
+
+            w.triggerOnCallNumber(0)
+                .actionReturn(true);
+            w.triggerOnCallNumber(1)
+                .actionReturn(false);
+            w.triggerOnCallNumber(2)
+                .actionReturn(true);
+            w.triggerOnCallNumber(3)
+                .actionReturn(false);
+            w.triggerOnCallNumber(4)
+                .actionReturn(true);
+            w.triggerOnCallNumber(5)
+                .actionReturn(false);
+
+            w("beer");
+            w("beer");
+            w("wine");
+            w("wine");
+            w("beer");
+            w("beer");
+
+            // get all calls with argument === beer
+            // var beerList = w.historyList.filterByCallArgs("beer");
+            // assert.strictEqual(beerList.length, 4);
+            // var beerRets = beerList.getAllReturns();
+            // assert.strictEqual(beerRets.length, 4);
+
+            // get all return values === true
+            var trueList = w.historyList.filterByReturn(true);
+            assert.strictEqual(trueList.length, 3);
+            var trueArgs = trueList.getAllCallArgs();
+            assert.strictEqual(trueArgs.length, 3);
+
+            // get all non-exceptions
+            var exceptionList = trueList.filterByException(null);
+            assert.strictEqual(exceptionList.length, 3);
+
+            // get all exceptions
+            exceptionList = trueList.filterByException(new Error("foo"));
+            assert.strictEqual(exceptionList.length, 0);
+        });
+
+        it("throws when filtering propertys by call filters");
+        it("throws when filtering calls by property filters");
+        it("can filter property by number");
         it("can get all return values with an property");
         it("can get all exceptions with a function");
         it("can get all exceptions with an property");
@@ -2369,11 +2447,11 @@ function depends(mod) {
         it("can trigger on args", function() {
             var w = new Wrapper();
 
-            w.triggerOnArgs("beer")
+            w.triggerOnCallArgs("beer")
                 .actionReturn("yum!");
-            w.triggerOnArgs("water")
+            w.triggerOnCallArgs("water")
                 .actionReturn("refreshing!");
-            w.triggerOnArgs()
+            w.triggerOnCallArgs()
                 .actionReturn("all gone");
 
             // triggers
@@ -2395,7 +2473,7 @@ function depends(mod) {
         it("can trigger on context", function() {
             var w = new Wrapper();
 
-            w.triggerOnContext({
+            w.triggerOnCallContext({
                     special: true
                 })
                 .actionReturn("I feel special");
@@ -2448,7 +2526,6 @@ function depends(mod) {
             var run = false;
             testFunc.triggerOnException(new TypeError("wine"))
                 .actionCustom(function foo() {
-                    console.log("CUSTOM ACTION RUNNING");
                     run = true;
                 });
 
@@ -2946,27 +3023,40 @@ function depends(mod) {
             testFunc = new Wrapper(testFunc);
 
             testFunc.triggerAlways()
-                .actionReturnPromise();
+                .actionReturnResolvedPromise();
 
             var ret1 = testFunc();
             assert.instanceOf(ret1, Promise);
 
             testFunc.triggerAlways()
-                .actionReturnPromise("foo");
+                .actionReturnResolvedPromise("foo");
 
             var ret2 = testFunc();
             assert.instanceOf(ret2, Promise);
 
             assert.throws(function() {
                 testFunc.triggerAlways()
-                    .actionReturnPromise(1, 2);
+                    .actionReturnResolvedPromise(1, 2);
             }, TypeError, "expected exactly one or two args");
+
+            var ret3;
+            assert.doesNotThrow(function() {
+                let w = new Wrapper();
+                w.triggerAlways()
+                    .actionReturnResolvedPromise(new Error("error message"));
+                ret3 = w();
+            });
 
             return ret1.then((v) => {
                 assert.strictEqual(v, "sleepy");
                 return ret2;
             }).then((v) => {
                 assert.strictEqual(v, "foo");
+                return ret3;
+            }).then(function(val) {
+                assert.instanceOf(val, Error);
+                assert.strictEqual(val.name, "Error");
+                assert.strictEqual(val.message, "error message");
             });
         });
 
@@ -2977,7 +3067,7 @@ function depends(mod) {
             testFunc = new Wrapper(testFunc);
 
             testFunc.triggerAlways()
-                .actionRejectPromise();
+                .actionReturnRejectedPromise();
 
             var ret1;
             assert.doesNotThrow(function() {
@@ -2987,12 +3077,12 @@ function depends(mod) {
 
             assert.throws(function() {
                 testFunc.triggerAlways()
-                    .actionRejectPromise("test");
+                    .actionReturnRejectedPromise("test");
             }, TypeError, "expected first argument to be of type Error, or no arguments");
 
             assert.throws(function() {
                 testFunc.triggerAlways()
-                    .actionRejectPromise(new Error("test"), 2);
+                    .actionReturnRejectedPromise(new Error("test"), 2);
             }, TypeError, "expected first argument to be of type Error, or no arguments");
 
             return ret1.then(
@@ -3012,7 +3102,7 @@ function depends(mod) {
             testFunc = new Wrapper(testFunc);
 
             testFunc.triggerAlways()
-                .actionRejectPromise(new Error("foo"));
+                .actionReturnRejectedPromise(new Error("foo"));
 
             var ret1;
             assert.doesNotThrow(function() {
@@ -3947,10 +4037,10 @@ function depends(mod) {
 
             var list;
             // strings
-            list = w.historyList.filterByReturn(Match.type("string"));
-            assert.strictEqual(list.length, 2);
-            assert.strictEqual(list[0].retVal, "beer");
-            assert.strictEqual(list[1].retVal, "wine");
+            // list = w.historyList.filterByReturn(Match.type("string"));
+            // assert.strictEqual(list.length, 2);
+            // assert.strictEqual(list[0].retVal, "beer");
+            // assert.strictEqual(list[1].retVal, "wine");
 
             // undefined
             list = w.historyList.filterByReturn(Match.type("undefined"));

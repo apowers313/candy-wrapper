@@ -93,19 +93,77 @@
      * ```
      *
      * Once you have wrapped a function or property, there are two main ways to work with it. One is through the `historyList`
-     * which will.
-     * TODO:
-     *     * function vs. property wrappers; differences in behavior
-     *     * triggers
-     *     * historyList / historyList / Filters
-     *     * configuration
-     *     * rewrapping behavior
-     *     * examples
+     * which contains all the historical calls to the `Wrapper`. The other is through {@link Trigger Triggers} which can change
+     * the behavior of the `Wrapper` as well as validating expectations every time the `Wrapper` is called. The `historyList` is
+     * a {@link Filter} array of all the calls that have been made, where each call is represented as a {@link Operation}.
+     * `Filters` have a number of convenience methods that make it easier to manipulate the `historyList` and select only the
+     * `Operations` that you are interested in validating.
      *
+     * Likewise, `Triggers` are executed on the `Operation` as it is being used during the call. A `Trigger` has the opportunity
+     * to set the arguments or context for functions or the set value for properties before the wrapped function or property is
+     * called, and `Triggers` are called a second time to modify the return value or exceptions that are thrown after the wrapped
+     * function or property has executed. `Triggers` can be created on a `Wrapper` using the methods that start with `trigger` and
+     * `Triggers` are evaluated in the order they are defined on the `Wrapper`.
+     *
+     * `Wrappers` also hhave a number of configuration functions that define their behavior, such as when attempting to "rewrap"
+     * the same function or property. The `config` functions enable you to modify these behaviors. By default, rewrapping a function
+     * or property will return the existing `Wrapper` without throwing an error and without reseting any of the `Triggers` or
+     * `historyList`.
+     *
+     * Note that the `Wrapper` class is generic to wrapping both functions and properties; however, not all methods are equally
+     * applicable to functions and properties. It does not make any sense to specify a "set value" for a function, nor does it make
+     * any sense to supply a "context" (`this` value) for a property. When attempting to use a function-specific method on a
+     * wrapped property, the method will detect this and throw an `Error` immediately; and the same is true for attempting to use
+     * property-specific methods on functions.
+     *
+     * Here are some example of how to use a `Wrapper`:
+     *
+     * ``` js
+     * // a simple test object
+     * var myDrone = {
+     *     name: "DJI",
+     *     fly: function(direction) {
+     *         return true;
+     *     }
+     * }
+     *
+     * new Wrapper(myDrone, "name");
+     * new Wrapper(myDrone, "fly");
+     *
+     * myDrone.fly("north");
+     * myDrone.fly("west");
+     *
+     * // evaluating previous calls through the 'historyList' and 'Filters'
+     * myDrone.fly.historyList.filterFirst().expectCallArgs("north"); // true
+     * myDrone.fly.historyList.filterFirst().expectCallArgs("east"); // false
+     * myDrone.fly.expectReportAllFailtures(); // throws an error about the "east" expecation failing
+     *
+     * // modifying behavior using 'Triggers'
+     * myDrone.fly.triggerOnCallArgs("east").actionReturn(false); // will return 'false' when called with "east"
+     * myDrone.fly("east"); // false
+     * myDrone.fly("west"); // true (the default return value)
+     *
+     * // working with properties
+     * myDrone.name.triggerOnSet().actionThrowException(new Error("do not set the name"));
+     * myDrone.name = "Bob"; // throws Error: "do not set the name"
+     * var ret = myDrone.name; // ret = "DJI"
+     *
+     * // rewrapping
+     * var flyWrapper = new Wrapper(myDrone, "fly"); // doesn't change anything, just returns the original wrapper
+     * flyWrapper.configAllowRewrap(false); // disallow rewrapping
+     * new Wrapper(myDrone, "fly"); // throws an error
+     *
+     * // these sorts of things won't work
+     * myDrone.fly.triggerOnSet()... // throws an error -- functions don't have 'set'
+     * myDrone.fly.triggerOnCallContext()... // throws an error -- properties don't have 'this' values
+     * ```
      * @extends {Function}
      */
     class Wrapper extends Function {
 
+        /**
+         * Creates a new `Wrapper` instance.
+         */
         constructor(...args) {
             super();
 
@@ -125,12 +183,6 @@
             }
 
             // constructed like: wrapper(obj)
-            /**
-             * Recursively wrap all properties and methods of an object
-             * @param  {Object} obj Object to be wrapped
-             * @return {Object}    Returns an object with all methods and propertys wrapped
-             * @constructor
-             */
             if (args.length === 1 && typeof args[0] === "object") {
                 var obj = args[0];
                 walkObject(obj, function(obj, key) {
@@ -140,13 +192,6 @@
             }
 
             // constructed like: wrapper(func)
-            /**
-             * Puts a wrapper around a function and returns it
-             * @param  {Function} fn Function to be wrapped
-             * @return {Wrapper}    Returns the a Proxy for a Wrapper around the function
-             * @constructs
-             * @memberof Wrapper
-             */
             if (args.length === 1 && typeof args[0] === "function") {
                 debug("wrapping function:", args[0].name);
                 return this._callConstructor(args[0]);
@@ -252,7 +297,7 @@
             var funcName = this.wrapped.name || "<<anonymous>>";
             debug(`calling wrapper on "${funcName}"`);
 
-            var si = new SingleRecord(this, {
+            var si = new Operation(this, {
                 context: context,
                 argList: argList
             });
@@ -334,8 +379,8 @@
         }
 
         _doSetterGetter(type, val) {
-            // create a new single touch instance
-            var st = new SingleRecord(this, {
+            // create a new Operation for this property
+            var st = new Operation(this, {
                 getOrSet: type,
                 retVal: this.propValue,
                 setVal: val
@@ -361,7 +406,7 @@
             this._runTriggerList("post", st);
             debug("final st", st);
 
-            // save this touch for future reference
+            // save this property Operation for future reference
             this.historyList.push(st);
 
             // always return the value
@@ -370,18 +415,18 @@
             return st.retVal;
         }
 
-        _runTriggerList(preOrPost, single) {
+        _runTriggerList(preOrPost, op) {
             if (preOrPost === "pre") {
-                single.postCall = !(single.preCall = true); // only evalute pre calls
+                op.postCall = !(op.preCall = true); // only evalute pre calls
             } else { // post
-                single.postCall = !(single.preCall = false); // only evaluate post calls
+                op.postCall = !(op.preCall = false); // only evaluate post calls
             }
 
             debug(`_runTriggerList ${preOrPost}`, this.triggerList);
 
             for (let idx in this.triggerList) {
                 let trigger = this.triggerList[idx];
-                trigger._run(single);
+                trigger._run(op);
             }
         }
 
@@ -585,7 +630,7 @@
         }
 
         /**
-         * Resets the wrapper to its default state. Clears out all records of previous calls,
+         * Resets the wrapper to its default state. Clears out all {@link Operation} records of previous calls,
          * expected behaviors, pass / fail results, etc. This does not reset any configuration options,
          * which {@link configDefault} can be used for.
          * @return {Wrapper} Returns the Wrapper object so that this call can be chained
@@ -734,7 +779,7 @@
         }
 
         /**
-         * The typical behavior for expectations called against a {@link Filter}, {@link SingleRecord}
+         * The typical behavior for expectations called against a {@link Filter}, {@link Operation}
          * is that they will return `true` or `false` immediately. This allows them to be used with assertion libraries,
          * such as [Chai](http://chaijs.com/). Alternatively, `expectReportAllFailures` allows you to run all your expectations
          * and then report all the expectations that did not pass.
@@ -800,17 +845,17 @@
          * var w = new Wrapper(obj, "method");
          *
          * // create a trigger that executes whenever the arguments exactly "beer"
-         * w.triggerOnArgs("drink", "beer")
+         * w.triggerOnCallArgs("drink", "beer")
          *      .actionReturn("yum!");
          *
          * // call the wrapped method and see what happens...
          * obj.method("drink", "beer") // returns "yum!"
          */
-        triggerOnArgs(...args) {
+        triggerOnCallArgs(...args) {
             this._funcOnly();
             var m = Match.value(args);
-            var t = new Trigger(this, function(single) {
-                return m.compare(single.argList);
+            var t = new Trigger(this, function(op) {
+                return m.compare(op.argList);
             });
             this.triggerList.push(t);
             return t;
@@ -826,18 +871,18 @@
          * var w = new Wrapper(obj, "method");
          *
          * // create a trigger that executes whenever the arguments exactly "beer"
-         * w.triggerOnContext({location: "home"})
+         * w.triggerOnCallContext({location: "home"})
          *      .actionThrowException(new Error("You should be at work right now."));
          *
          * // call the wrapped method and see what happens...
          * obj.method.call({location: "home"}, "hi mom") // throws "You should be at work right now."
          */
-        triggerOnContext(context) {
+        triggerOnCallContext(context) {
             this._funcOnly();
-            validateArgsSingle("triggerOnContext", context);
+            validateArgsSingle("triggerOnCallContext", context);
             var m = Match.value(context);
-            var t = new Trigger(this, function(single) {
-                var ret = m.compare(single.context);
+            var t = new Trigger(this, function(op) {
+                var ret = m.compare(op.context);
                 return ret;
             });
             this.triggerList.push(t);
@@ -865,9 +910,9 @@
             this._funcOnly();
             validateArgsSingleNumber("triggerOnCallNumber", num);
             var count = 0;
-            var t = new Trigger(this, function(single) {
+            var t = new Trigger(this, function(op) {
                 var ret = (count === num);
-                if (single.postCall) count++;
+                if (op.postCall) count++;
                 return ret;
             });
             this.triggerList.push(t);
@@ -886,8 +931,8 @@
         triggerOnException(err) {
             validateArgsSingleExceptionOrNull("triggerOnException", err);
             var m = Match.value(err);
-            var t = new Trigger(this, function(single) {
-                var ret = m.compare(single.exception);
+            var t = new Trigger(this, function(op) {
+                var ret = m.compare(op.exception);
                 return ret;
             });
             this.triggerList.push(t);
@@ -904,8 +949,8 @@
         triggerOnReturn(retVal) {
             validateArgsSingle("triggerOnReturn", retVal);
             var m = Match.value(retVal);
-            var t = new Trigger(this, function(single) {
-                var ret = m.compare(single.retVal);
+            var t = new Trigger(this, function(op) {
+                var ret = m.compare(op.retVal);
                 return ret;
             });
             this.triggerList.push(t);
@@ -938,7 +983,7 @@
          * callback is called again just after the wrapped function / setter / getter is called, giving the
          * callback the opportunity to evaluate return values and exceptions.
          *
-         * The first argument to the callback is `curr`, which is a `SingleRecord`. `curr` has the property `preCall`
+         * The first argument to the callback is `curr`, which is a `Operation`. `curr` has the property `preCall`
          * set to `true` if the callback is being called before the function / getter / setter; and has the
          * property `postCall` that is set to `true` if the callback is being called after the function /
          * getter / setter. `curr` also has the property `curr.wrapper`, which references the {@link Wrapper}.
@@ -948,7 +993,7 @@
          * throw an exception, set `single.exception` to a `new Error()`; however, this is best done through an
          * {@link actionThrowException} anyway.
          * @callback Trigger~triggerCustomCallback
-         * @param {SingleRecord} curr The current function call or property touch.
+         * @param {Operation} curr The current function call or property set / get.
          * @returns {Boolean} Returns `true` if the actions and expectations associated with the `Trigger`
          * should run. Returns `false` if this `Trigger` should not be executed.
          */
@@ -957,6 +1002,17 @@
          * Creates a {@link Trigger} on the `Wrapper` that executes whenever a property is set. Only valid for
          * `Wrappers` around a property.
          * @return {Trigger} The `Trigger` that was created.
+         * @example
+         * var myObj = {
+         *     name: "Bob"
+         * }
+         *
+         * new Wrapper(myObj, "name");
+         * myObj.name.triggerOnSet()
+         *     .actionThrowException(new Error("BOOM!"));
+         *
+         * var ret = myObj.name; // doesn't throw
+         * myObj.name = "Mary"; // throws "BOOM!"
          */
         triggerOnSet() {
             this._propOnly();
@@ -968,6 +1024,12 @@
             return t;
         }
 
+        /**
+         * Creates a {@link Trigger} on the `Wrapper` that executes when a property is set to the value
+         * corresponding to `setVal`
+         * @param  {any} setVal When a property is set to this value, the `Trigger` will execute.
+         * @return {Trigger} The `Trigger` that was created.
+         */
         triggerOnSetVal(setVal) {
             this._propOnly();
             validateArgsSingle("triggerOnSetVal", setVal);
@@ -979,6 +1041,13 @@
             return t;
         }
 
+        /**
+         * Creates a {@link Trigger} on the `Wrapper` that executes the `Nth` time that the property is
+         * assigned to, where `Nth` corresponds to `num`
+         * @param  {Number} num The `Nth` assignment that will cause this `Trigger` to execute. Note that
+         * `0` would be the first assignment, `1` the second, etc.
+         * @return {Trigger} The `Trigger` that was created.
+         */
         triggerOnSetNumber(num) {
             this._propOnly();
             validateArgsSingleNumber("triggerOnSetNumber", num);
@@ -994,6 +1063,21 @@
             return t;
         }
 
+        /**
+         * Creates a {@link Trigger} on the `Wrapper` that executes when the value of the property is retrieved.
+         * @return {Trigger} The `Trigger` that was created.
+         * @example
+         * var myObj = {
+         *     name: "Bob"
+         * }
+         *
+         * new Wrapper(myObj, "name");
+         * myObj.name.triggerOnGet()
+         *     .actionThrowException(new Error("BOOM!"));
+         *
+         * myObj.name = "Mary"; // doesn't throw
+         * var ret = myObj.name; // throws "BOOM!"
+         */
         triggerOnGet() {
             this._propOnly();
             var t = new Trigger(this, function(single) {
@@ -1004,6 +1088,26 @@
             return t;
         }
 
+        /**
+         * Creates a {@link Trigger} on the `Wrapper` that executes the `Nth` time that the property value
+         * is retrieved.
+         * @param  {number} num The `Nth` get that will cause this `Trigger` to execute. Note that
+         * `0` would be the first assignment, `1` the second, etc.
+         * @return {Trigger} The `Trigger` that was created.
+         * @example
+         * var myObj = {
+         *     name: "Bob"
+         * }
+         *
+         * new Wrapper(myObj, "name");
+         * myObj.name.triggerOnGetNumber(2)
+         *     .actionThrowException(new Error("BOOM!"));
+         *
+         * var ret;
+         * ret = myObj.name; // doesn't throw
+         * ret = myObj.name; // doesn't throw
+         * ret = myObj.name; // throws "BOOM!"
+         */
         triggerOnGetNumber(num) {
             this._propOnly();
             validateArgsSingleNumber("triggerOnGetNumber", num);
@@ -1019,6 +1123,26 @@
             return t;
         }
 
+        /**
+         * Creates a {@link Trigger} on the `Wrapper` that execuates the `Nth` time that the property is set
+         * OR get.
+         * @param  {Number} num The `Nth` get that will cause this `Trigger` to execute. Note that
+         * `0` would be the first assignment, `1` the second, etc.
+         * @return {Trigger} The `Trigger` that was created.
+         * @example
+         * var myObj = {
+         *     name: "Bob"
+         * }
+         *
+         * new Wrapper(myObj, "name");
+         * myObj.name.triggerOnTouchNumber(2)
+         *     .actionThrowException(new Error("BOOM!"));
+         *
+         * var ret;
+         * ret = myObj.name; // doesn't throw
+         * myObj.name = "Mary"; // doesn't throw
+         * ret = myObj.name; // throws "BOOM!"
+         */
         triggerOnTouchNumber(num) {
             this._propOnly();
             validateArgsSingleNumber("triggerOnTouchNumber", num);
@@ -1036,7 +1160,7 @@
 
     /**
      * A class that contains all the `expect` calls that gets mixed in to `Triggers` as well as
-     * `SingleRecord`. This class really isn't intended to be used on its own.
+     * `Operation`. This class really isn't intended to be used on its own.
      * @private
      */
     class Expect {
@@ -1049,7 +1173,7 @@
              * @memberof Expect
              * @param  {any} retVal       The value that is expected to be returned from the function call or property getter.
              * @return {Trigger|Boolean}  When called on a {@link Trigger}, the expectation is stored for future evaluation and the `Trigger` value is returned to make this chainable.
-             * When called on a {@link SingleRecord}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
+             * When called on a {@link Operation}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
              */
             alias(this, "expectReturn",
                 this._expect, "expectReturn", "both", "post", validateArgsSingle,
@@ -1069,7 +1193,7 @@
              * @memberof Expect
              * @param  {...any} args The list of arguments to validate for the function call.
              * @return {Trigger|Boolean}           When called on a {@link Trigger}, the expectation is stored for future evaluation and the `Trigger` value is returned to make this chainable.
-             * When called on a {@link SingleRecord}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
+             * When called on a {@link Operation}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
              */
             alias(this, "expectCallArgs",
                 this._expect, "expectCallArgs", "function", "pre", validateArgsAny,
@@ -1090,7 +1214,7 @@
              * @memberof Expect
              * @param {Object} context The expected `this` for the function. Is compared by a strict deep-equals.
              * @return {Trigger|Boolean}           When called on a {@link Trigger}, the expectation is stored for future evaluation and the `Trigger` value is returned to make this chainable.
-             * When called on a {@link SingleRecord}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
+             * When called on a {@link Operation}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
              */
             alias(this, "expectContext",
                 this._expect, "expectContext", "function", "pre", validateArgsSingle,
@@ -1113,7 +1237,7 @@
              * comparison between errors evaluates that the `Error.name` and `Error.message` are the exact same. If `exception` is `null`, it
              * will expecct that there was no `Error` thrown.
              * @return {Trigger|Boolean}           When called on a {@link Trigger}, the expectation is stored for future evaluation and the `Trigger` value is returned to make this chainable.
-             * When called on a {@link SingleRecord}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
+             * When called on a {@link Operation}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
              */
             alias(this, "expectException",
                 this._expect, "expectException", "both", "post", validateArgsSingleExceptionOrNull,
@@ -1135,7 +1259,7 @@
              * @memberof Expect
              * @param {any} setVal The value that is expected to be set on the property. An `undefined` value is allowed, but the value `undefined` must be passed explicitly to `expectSetVal`.
              * @return {Trigger|Boolean}           When called on a {@link Trigger}, the expectation is stored for future evaluation and the `Trigger` value is returned to make this chainable.
-             * When called on a {@link SingleRecord}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
+             * When called on a {@link Operation}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
              */
             alias(this, "expectSetVal",
                 this._expect, "expectSetVal", "property", "post", validateArgsSingle,
@@ -1155,9 +1279,9 @@
              * @instance
              * @todo fix description and param
              * @memberof Expect
-             * @param {SingleRecord~customExpectCallback} cb Callback function that will determine whether the expecation passes or fails. See {@link SingleRecord~customExpectCallback customExpectCallback} for more details.
+             * @param {Operation~customExpectCallback} cb Callback function that will determine whether the expecation passes or fails. See {@link Operation~customExpectCallback customExpectCallback} for more details.
              * @return {Trigger|Boolean}           When called on a {@link Trigger}, the expectation is stored for future evaluation and the `Trigger` value is returned to make this chainable.
-             * When called on a {@link SingleRecord}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
+             * When called on a {@link Operation}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
              */
             alias(this, "expectCustom",
                 this._expect, "expectCustom", "both", "post", validateArgsFirstFunction,
@@ -1167,8 +1291,8 @@
 
             /**
              * This is a description of the callback used by {@link expectCustom}.
-             * @callback SingleRecord~customExpectCallback
-             * @param {SingleRecord} curr The current function call or property / set get.
+             * @callback Operation~customExpectCallback
+             * @param {Operation} curr The current function call or property / set get.
              * @return {null|String} `null` if expectation was successful. Returns `String` containing the message for the failed expectation otherwise.
              */
         }
@@ -1183,7 +1307,7 @@
         }
 
         _getCurrCallOrDefer(name, ...args) {
-            if (this instanceof SingleRecord) return this;
+            if (this instanceof Operation) return this;
             if (this instanceof Trigger && this.currentCall) return this.currentCall;
             return this._addDeferredAction(name, args);
         }
@@ -1258,22 +1382,39 @@
     }
 
     /**
-     * Methods for filtering the `historyList` or `historyList` of a {@link Wrapper}.
+     * The {@link Wrapper#historyList} on a {@link Wrapper} contains all the information about the
+     * previous operations perfomed by a wrapper. Being able to easily assess this information is
+     * one of the important features of candy-wrapper, and so the `historyList` is a `Filter` that
+     * allows for easily selecting the parts of the operation history that you are interested in.
      *
-     * TODO:
-     *     * concept of a Filter; extends an Array with some syntactic sugar built in
-     *     * chainable
-     *     * expect calls
-     *     * filter
-     *     * get
-     *     * filtering down to a single record; filterFirst; filterLast; filterOnly; filterByNumber
-     *     * examples
+     * Filters have two parts: first, the ability to select the operation records you care about using
+     * the `filter` calls; and second, the ability to perform `expect` operations on one or more of
+     * the operations in the `Filter`.
      *
+     * The ability to filter the `historyList` using the `filter` functions is essentially just
+     * syntactic sugar on top of the `Array.map()` and `Array.filter()` classes. The methods such
+     * as `filterByCallArgs` and `filterByException` simply select the elements of the `Filter`
+     * that match the desired attributes. The `get` methods on the `Filter`, such as `getAllCallArgs`
+     * or `getAllExceptions` are just doing a map to create an `Array` of the features you care about.
+     *
+     * There are two different ways of performing `expect` calls on `Filters`. The first is to filter
+     * down to a single {@link Operation}, and perform expectations on that operation. This can be
+     * done using `filter` methods that return a single `Operation`, such as
+     * {@link Filter#filterFirst filterFirst}, {@link Filter#filterLast filterLast} or
+     * {@link Filter#filterByNumber filterByNumber}. The other way to perform expect calls on a `Filter`
+     * is by performing an expect on the whole list at once, such as using
+     * {@link Filter#expectCount expectCount}.
+     *
+     * Note that many of the `Filter` operations are chainable and combinable to make unique and
+     * powerful combinations out of the `Filter` methods.
      * @extends {Array}
      */
     class Filter extends Array {
         constructor(wrapper, ...args) {
             super(...args);
+            if (!(wrapper instanceof Wrapper)) {
+                throw new TypeError ("Filter constructor: expected first argument to be of type Wrapper");
+            }
             this.wrapper = wrapper;
 
             /**
@@ -1283,7 +1424,7 @@
              * @function
              * @memberof Filter
              * @instance
-             * @returns {Filter} Returns a `Filter` containing just the `SingleRecord` records where a property was set.
+             * @returns {Filter} Returns a `Filter` containing just the {@link Operation} records where a property was set.
              */
             alias(this, "filterPropSet",
                 this._filter, "filterSet", "property",
@@ -1298,7 +1439,7 @@
              * @function
              * @memberof Filter
              * @instance
-             * @returns {Filter} Returns a `Filter` containing just the `SingleRecord` records when the property was gotten.
+             * @returns {Filter} Returns a `Filter` containing just the {@link Operation} records when the property was gotten.
              */
             alias(this, "filterPropGet",
                 this._filter, "filterGet", "property",
@@ -1312,9 +1453,9 @@
              * @function
              * @memberof Filter
              * @instance
-             * @param {any} setVal If `setVal` strictly matches the value of a `SingleRecord` where the property was set, the record
+             * @param {any} setVal If `setVal` strictly matches the value of a `Operation` where the property was set, the record
              * will be included in the results.
-             * @returns {Filter} Returns a `Filter` containing just the `SingleRecord` records that are of type `set` and have a
+             * @returns {Filter} Returns a `Filter` containing just the {@link Operation} records that are of type `set` and have a
              * matching `setVal`.
              */
             alias(this, "filterPropSetByVal",
@@ -1382,7 +1523,7 @@
              * @memberof Filter
              * @instance
              * @param {Error|null} exception An `Error` (or any class that inherits from `Error`) that will be
-             * strictly matched. If `exception` is `null` the filter will include all records that did not throw
+             * strictly matched. If `exception` is `null` the filter will include all {@link Operation} records that did not throw
              * an `Error`.
              * @returns {Filter} A `Filter` containing the function calls or property set / get that threw an
              * `Error` that matches `exception`.
@@ -1419,13 +1560,13 @@
                 });
 
             /**
-             * Gets the first {@link SingleRecord} from the filter. Is the same as
+             * Gets the first {@link Operation} from the filter. Is the same as
              * `{@link Filter#filterByNumber filterByNumber}(0)`.
              * @name filterFirst
              * @function
              * @memberof Filter
              * @instance
-             * @returns {SingleRecord} The first record in the `Filter`
+             * @returns {Operation} The first operation record in the `Filter`
              * @see {@link Filter#filterByNumber filterByNumber}
              * {@link Filter#filterSecond filterSecond}
              * {@link Filter#filterThird filterThird}
@@ -1435,13 +1576,13 @@
             alias(this, "filterFirst", this.filterByNumber, 0);
 
             /**
-             * Gets the second {@link SingleRecord} from the filter. Is the same as
+             * Gets the second {@link Operation} from the filter. Is the same as
              * `{@link Filter#filterByNumber filterByNumber}(1)`.
              * @name filterSecond
              * @function
              * @memberof Filter
              * @instance
-             * @returns {SingleRecord} The second record in the `Filter`
+             * @returns {Operation} The second operation record in the `Filter`
              * @see {@link Filter#filterByNumber filterByNumber}
              * {@link Filter#filterFirst filterFirst}
              * {@link Filter#filterThird filterThird}
@@ -1451,13 +1592,13 @@
             alias(this, "filterSecond", this.filterByNumber, 1);
 
             /**
-             * Gets the third {@link SingleRecord} from the filter. Is the same as
+             * Gets the third {@link Operation} from the filter. Is the same as
              * `{@link Filter#filterByNumber filterByNumber}(2)`.
              * @name filterThird
              * @function
              * @memberof Filter
              * @instance
-             * @returns {SingleRecord} The third record in the `Filter`
+             * @returns {Operation} The third operation record in the `Filter`
              * @see {@link Filter#filterByNumber filterByNumber}
              * {@link Filter#filterFirst filterFirst}
              * {@link Filter#filterSecond filterSecond}
@@ -1467,13 +1608,13 @@
             alias(this, "filterThird", this.filterByNumber, 2);
 
             /**
-             * Gets the fourth {@link SingleRecord} from the filter. Is the same as
+             * Gets the fourth {@link Operation} from the filter. Is the same as
              * `{@link Filter#filterByNumber filterByNumber}(3)`.
              * @name filterFourth
              * @function
              * @memberof Filter
              * @instance
-             * @returns {SingleRecord} The fourth record in the `Filter`
+             * @returns {Operation} The fourth operation record in the `Filter`
              * @see {@link Filter#filterByNumber filterByNumber}
              * {@link Filter#filterFirst filterFirst}
              * {@link Filter#filterSecond filterSecond}
@@ -1483,13 +1624,13 @@
             alias(this, "filterFourth", this.filterByNumber, 3);
 
             /**
-             * Gets the fifth {@link SingleRecord} from the filter. Is the same as
+             * Gets the fifth {@link Operation} from the filter. Is the same as
              * `{@link Filter#filterByNumber filterByNumber}(4)`.
              * @name filterFifth
              * @function
              * @memberof Filter
              * @instance
-             * @returns {SingleRecord} The fifth record in the `Filter`
+             * @returns {Operation} The fifth operation record in the `Filter`
              * @see {@link Filter#filterByNumber filterByNumber}
              * {@link Filter#filterFirst filterFirst}
              * {@link Filter#filterSecond filterSecond}
@@ -1573,25 +1714,37 @@
             if (type === "property") this.wrapper._propOnly(name);
             if (type === "function") this.wrapper._funcOnly(name);
 
-            return this.filter(function(element, index, array) {
-                return fn(element, index, array, ...args);
-            });
+            // XXX: `Array.filter()` creates a `new Array()`... which doesn't call
+            // `new Filter()` with the right args. Rewriting `Array.filter()` is the only
+            // solution...
+            var newFilter = new Filter(this.wrapper);
+            for (let i = 0; i < this.length; i++) {
+                if (fn(this[i], i, this, ...args)) {
+                    newFilter.push(this[i]);
+                }
+            }
+            return newFilter;
         }
 
-        _get(name, type, idx) {
+        _get(name, type, property) {
             if (type === "property") this.wrapper._propOnly(name);
             if (type === "function") this.wrapper._funcOnly(name);
 
-            return this.map(function(element) {
-                return element[idx];
-            });
+            // XXX: `Array.map()` creates a `new Array()`... which doesn't call
+            // `new Filter()` with the right args. Rewriting `Array.map()` is the only
+            // solution...
+            var newFilter = new Filter(this.wrapper);
+            for (let i = 0; i < this.length; i++) {
+                    newFilter.push(this[i][property]);
+            }
+            return newFilter;
         }
 
         /**
          * Similar to {@link Filter#filterFirst filterFirst}, this returns the first member of
          * the `Filter`; however, it also asserts that it is the ONLY member of the filter and will
          * throw `TypeError` if there is more than one member in the `Filter`.
-         * @returns {SingleRecord} Returns the first member of the `Filter`.
+         * @returns {Operation} Returns the first member of the `Filter`.
          * @throws {TypeError} If there is more than one member in the `Filter`.
          */
         filterOnly() {
@@ -1603,10 +1756,10 @@
         }
 
         /**
-         * Returns the `SingleRecord` at the position `num` in the `Filter`
-         * @param {Number} num A number indicating the index of the record to be returned. These are "programming numbers"
-         * not "counting numbers", so if `num` is zero it returns the first record, one for the second record, etc.
-         * @returns {SingleRecord} The record at position `num` in the filter. Same as `historyList[num]` or
+         * Returns the `Operation` at the position `num` in the `Filter`
+         * @param {Number} num A number indicating the index of the {@link Operation} record to be returned. These are "programming numbers"
+         * not "counting numbers", so if `num` is zero it returns the first `Operation` record, one for the second record, etc.
+         * @returns {Operation} The operation record at position `num` in the filter. Same as `historyList[num]` or
          * `historyList[num]` but with some light error checking.
          * @throws {RangeError} If `num` is less than zero or larger than the size of the `Filter`; or if the `Filter` is empty.
          */
@@ -1625,8 +1778,8 @@
         }
 
         /**
-         * Similar to {@link Filter#filterFirst filterFirst}, but returns the last record in the `Filter`.
-         * @returns {SingleRecord} Returns the last record in the `Filter`
+         * Similar to {@link Filter#filterFirst filterFirst}, but returns the last {@link Operation} record in the `Filter`.
+         * @returns {Operation} Returns the last operation record in the `Filter`
          */
         filterLast() {
             if (this.length === 0) {
@@ -1639,7 +1792,7 @@
         /**
          * Expects that `Filter` has `count` members.
          * @param  {Number} num  How many members are expected to be in the `Filter`
-         * @return {Boolean}      Returns `true` if `Filter` has `count` records, `false` otherwise
+         * @return {Boolean}      Returns `true` if `Filter` has `count` {@link Operation} records, `false` otherwise
          */
         expectCount(num) {
             validateArgsSingleNumber("expectCount", num);
@@ -1655,7 +1808,7 @@
          * Expects that `Filter` has `count` members.
          * @param  {Number} min   How the miniumum number of members expected to be in the `Filter`
          * @param  {Number} max   The maximum number of members expected to be in the `Filter`
-         * @return {Boolean}      Returns `true` if `Filter` has `count` records, `false` otherwise
+         * @return {Boolean}      Returns `true` if `Filter` has `count` {@link Operation} records, `false` otherwise
          */
         expectCountRange(min, max) {
             if (typeof min !== "number") {
@@ -1676,7 +1829,7 @@
         /**
          * Expects that `Filter` has at least `min` members.
          * @param  {Number} min   How least number of members that are expected to be in the `Filter`
-         * @return {Boolean}      Returns `true` if `arr` has at least `count` records, `false` otherwise
+         * @return {Boolean}      Returns `true` if `arr` has at least `count` {@link Operation} records, `false` otherwise
          */
         expectCountMin(min) {
             validateArgsSingleNumber("expectCountMin", min);
@@ -1719,7 +1872,20 @@
     }
 
     /**
-     * A single historical record of when a function or property was accessed.
+     * This class represents a single function call, property get, or property set. It can represent any of those
+     * things in the current tense ("this is the operation that is currently running") or in the past tense ("the
+     * historyList is full of operations that have already run"). {@link Trigger Triggers} use `Operations` in
+     * the present tense, and have the opportunity to modify the `Operation` as it is happening. {@link Filter Filters}
+     * operate on the `historyList` of the {@link Wrapper}, which is the history of all the times a function has been
+     * called or a property has been set / get.
+     *
+     * `Operations` may either represent an action taken on function or a property, as represented by the `Operator.type`
+     * property. If a `Operator.type` is "property", the `Operator.getOrSet` property will further distinguish whether
+     * this operation was a `get` operation (that is, getting the value from the property) or `set` operation (that is,
+     * assigning a value to the property).
+     *
+     * `Operations` extend the `Expect` class, which enables expect methods to be run against the `Operator`. Again
+     * these expectations can be run in real-time during a `Trigger`, or after-the-fact from the `historyList`.
      * @borrows Expect#expectCallArgs as expectCallArgs
      * @borrows Expect#expectContext as expectContext
      * @borrows Expect#expectCustom as expectCustom
@@ -1727,24 +1893,31 @@
      * @borrows Expect#expectReturn as expectReturn
      * @borrows Expect#expectSetVal as expectSetVal
      */
-    class SingleRecord extends Expect {
+    class Operation extends Expect {
         constructor(wrapper, desc) {
+            /** @lends Operation# */
             super();
 
             if (!Wrapper.isWrapper(wrapper)) {
-                throw new TypeError("SingleRecord constructor: expected 'wrapper' argument to be of type Wrapper");
+                throw new TypeError("Operation constructor: expected 'wrapper' argument to be of type Wrapper");
             }
 
             if (typeof desc !== "object") {
-                throw new TypeError("SingleRecord constructor: expected desc to be of type Object");
+                throw new TypeError("Operation constructor: expected desc to be of type Object");
             }
 
             // common properties
+            /** @type {Wrapper} The {@link Wrapper} that created this call */
             this.wrapper = wrapper;
+            /** @type {String} The type of operation record this is, either "function" or "property" */
             this.type = wrapper.type;
+            /** @type {Boolean} Set by a {@link Trigger} to be `true` if the operation record is currently in it's "pre-call" phase -- that is before the call to the wrapped thing has actually happened. */
             this.preCall = false;
+            /** @type {Boolean} Set by a {@link Trigger} to be `true` if the operation record is in it's "post-call" phase. */
             this.postCall = false;
+            /** @type {any} The value that was or will be returned. */
             this.retVal = desc.retVal;
+            /** @type {Error|null} The `Error` that was or will be thrown. If null, there was no `Error`. */
             this.exception = desc.exception || null;
 
             if (this.type === "function") {
@@ -1759,7 +1932,10 @@
         }
 
         _functionConstructor(desc) {
+            /** @lends Operation# */
+            /** @type {any} The `this` value that was or will be used for the function call. Only applies to functions. */
             this.context = desc.context;
+            /** @type {...any} The arguments that were or will be passed to the function call. Only applies to functions. */
             this.argList = desc.argList;
 
             killAlias("function", this, "getOrSet");
@@ -1771,7 +1947,10 @@
         }
 
         _propertyConstructor(desc) {
+            /** @lends Operation# */
+            /** @type {String} Whether this was a property "set" (assignment) or a property "get" (retreiving the value). Only applies to properties. */
             this.getOrSet = desc.getOrSet;
+            /** @type {any} The value that was or will be used for a property "set". Only applies to properties. */
             this.setVal = desc.setVal;
 
             killAlias("property", this, "context");
@@ -1789,7 +1968,7 @@
      * in the order they were added to the `Trigger`.
      *
      * TODO:
-     *     * same expect calls as SingleRecord
+     *     * same expect calls as Operation
      *     * created on the wrapper
      *     * not very interesting by themselves
      *     * customTrigger
@@ -1854,62 +2033,171 @@
                     return fn.call(this, curr, ...args);
                 });
             /**
-             * The callback
+             * This is the callback for {@link actionCustom}. Note that actions get called every time a {@link Trigger}
+             * executes, which will usually be twice for everytime a `Wrapper` is called -- once before the call, to
+             * modify arguments and context, and once after the call to modify exceptions and return values. Use the
+             * `current.preCall` and `current.postCall` properties to determine which half of the `Wrapper` call is
+             * occuring.
              * @callback Trigger~customActionCallback
-             * @param {SingleRecord} current The currently executing function or property touch.
+             * @param {Operation} current The currently executing function or property set / get.
              */
 
+            /**
+             * When triggered this action will set the return value to the value of the argumennt list specified by the
+             * index `num`
+             * @name actionReturnFromArg
+             * @function
+             * @instance
+             * @memberof Trigger
+             * @param {Number} num The index of the argument list to return when the wrapper is called. As an index, this
+             * `0` represents the first value, `1` the second, etc.
+             * @return {Trigger}         Returns this `Trigger`, so that further actions or expectations can be chained.
+             * @example
+             * var anon = new Wrapper();
+             *
+             * w.triggerAlways().actionReturnFromArg(2);
+             *
+             * var ret = anon("I", "like", "sleeping");
+             * console.log (ret); // "sleeping"
+             */
             alias(this, "actionReturnFromArg",
                 this._action, "actionReturnFromArg", "function", "post", validateArgsSingleNumber,
                 function(curr, num) {
                     curr.retVal = curr.argList[num];
                 });
 
+            /**
+             * When triggered, this action sets the return value to the `this` value of the function.
+             * @name actionReturnContext
+             * @function
+             * @instance
+             * @memberof Trigger
+             * @return {Trigger}         Returns this `Trigger`, so that further actions or expectations can be chained.
+             */
             alias(this, "actionReturnContext",
                 this._action, "actionReturnContext", "function", "post", validateArgsNone,
                 function(curr) {
                     curr.retVal = curr.context;
                 });
 
+            /**
+             * When triggered, this action sets the return value to a property on the `this` value that is specified by
+             * the `prop` value.
+             * @name actionReturnFromContext
+             * @function
+             * @instance
+             * @memberof Trigger
+             * @param {String} prop The property on the `this` context that should be returned when the `Wrapper` is called.
+             * @return {Trigger}         Returns this `Trigger`, so that further actions or expectations can be chained.
+             */
             alias(this, "actionReturnFromContext",
                 this._action, "actionReturnFromContext", "function", "post", validateArgsSingleString,
                 function(curr, prop) {
                     curr.retVal = curr.context[prop];
                 });
 
+            /**
+             * When triggered, this action throws the error specified by the `err` argument.
+             * @name actionThrowException
+             * @function
+             * @instance
+             * @memberof Trigger
+             * @param {Error|null} err   An instance of `Error`, or some class inheriting from `Error`, that will be thrown
+             * when this action is triggered. If `null` is used instead of an `Error` then nothing will be thrown and it
+             * has the effect of clearing any errors that would have been thrown.
+             * @return {Trigger}         Returns this `Trigger`, so that further actions or expectations can be chained.
+             */
             alias(this, "actionThrowException",
                 this._action, "actionThrowException", "both", "post", validateArgsSingleExceptionOrNull,
                 function(curr, err) {
                     curr.exception = err;
                 });
 
+            /**
+             * When triggered, this action behaves as if assigning the value `setVal` to the property.
+             * @name actionSetVal
+             * @function
+             * @instance
+             * @memberof Trigger
+             * @param {any} setVal The value to be assigned to the property. May be `undefined`, but requires `undefined` to
+             * be explicitly passed as an argument to the function.
+             * @return {Trigger}         Returns this `Trigger`, so that further actions or expectations can be chained.
+             */
             alias(this, "actionSetVal",
                 this._action, "actionSetVal", "property", "pre", validateArgsSingle,
                 function(curr, setVal) {
                     curr.setVal = setVal;
                 });
 
-            alias(this, "actionReturnPromise",
-                this._action, "actionReturnPromise", "both", "post", validateArgsNoneOrOne,
+            /**
+             * When triggered, this action causes the `Wrapper` to return a resolved (that is, successful) `Promise`. If a
+             * `retVal` argument is provided, it will be the value that the `Promise` resolves to. If no `retVal` is provided,
+             * then whatever value the `Wrapper` would have returned is wrapped in a promise.
+             * @name actionReturnResolvedPromise
+             * @function
+             * @instance
+             * @memberof Trigger
+             * @param {any} [retVal] The optional return value to wrap. If this is not specified, the value that is returned
+             * by the `Wrapper` will be used.
+             * @return {Trigger}         Returns this `Trigger`, so that further actions or expectations can be chained.
+             */
+            alias(this, "actionReturnResolvedPromise",
+                this._action, "actionReturnResolvedPromise", "both", "post", validateArgsNoneOrOne,
                 function(curr, retVal) {
                     retVal = retVal || curr.retVal;
                     curr.retVal = Promise.resolve(retVal);
                 });
 
-            alias(this, "actionRejectPromise",
-                this._action, "actionRejectPromise", "both", "post", validateArgsNoneOrOneException,
-                function(curr, e) {
-                    e = e || curr.exception;
+            /**
+             * Similar to {@link Trigger#actionReturnPromise actionReturnPromise}, this action causes the `Wrapper` to return a
+             * `Promise`, but in this case the `Promise` is one that has been rejected (that is, failed).
+             * @name actionReturnRejectedPromise
+             * @function
+             * @instance
+             * @memberof Trigger
+             * @param {Error|null} err An instance of `Error`, or inheriting from `Error`, that will be the error the `Promise`
+             * resolves to. This will appear as the error argument that is passed to the `.catch()` call on the `Promise`.
+             * @return {Trigger}         Returns this `Trigger`, so that further actions or expectations can be chained.
+             */
+            alias(this, "actionReturnRejectedPromise",
+                this._action, "actionReturnRejectedPromise", "both", "post", validateArgsNoneOrOneException,
+                function(curr, err) {
+                    err = err || curr.exception;
                     curr.exception = null;
-                    curr.retVal = Promise.reject(e);
+                    curr.retVal = Promise.reject(err);
                 });
 
+            /**
+             * When triggered, this action will callback the function specified by `fn`. It may be combined with
+             * {@link Trigger#actionCallbackContext actionCallbackContext} and {@link Trigger#actionCallbackArgs actionCallbackArgs}
+             * to specify the `this` context and arguments to pass to the callback.
+             * @name actionCallbackFunction
+             * @function
+             * @instance
+             * @memberof Trigger
+             * @param {Function} fn The function to be called as a callback. This function is called after the completion of all `Triggers`.
+             * @return {Trigger}         Returns this `Trigger`, so that further actions or expectations can be chained.
+             */
             alias(this, "actionCallbackFunction",
                 this._action, "actionCallbackFunction", "function", "post", validateArgsSingleFunction,
                 function(curr, fn) {
                     curr.callback.fn = fn;
                 });
 
+            /**
+             * Similar to {@link Trigger#actionCallbackFunction actionCallbackFunction}, but treats one the arguments specified by the
+             * index `num` as the callback function. It will throw an `Error` if the argument at `num` is not a function. It may be combined with
+             * {@link Trigger#actionCallbackContext actionCallbackContext} and {@link Trigger#actionCallbackArgs actionCallbackArgs}
+             * to specify the `this` context and arguments to pass to the callback.
+             * @name actionCallbackToArg
+             * @function
+             * @instance
+             * @memberof Trigger
+             * @param {Number} num The index into the array of arguments, where the resulting argument will be treated as a callback function.
+             * This function is called after the completion of all `Triggers`.
+             * @throws {Error} If the argument at `num` is not a function.
+             * @return {Trigger}         Returns this `Trigger`, so that further actions or expectations can be chained.
+             */
             alias(this, "actionCallbackToArg",
                 this._action, "actionCallbackToArg", "function", "post", validateArgsSingleNumber,
                 function(curr, num) {
@@ -1921,12 +2209,32 @@
                     curr.callback.fn = cb;
                 });
 
+            /**
+             * When triggered, this action sets the `this` context of the callback function. If no callback function is
+             * specified, this action has no meaningful impact.
+             * @name actionCallbackContext
+             * @function
+             * @instance
+             * @memberof Trigger
+             * @param {any} context The `this` context to use when calling the callback function.
+             * @return {Trigger}         Returns this `Trigger`, so that further actions or expectations can be chained.
+             */
             alias(this, "actionCallbackContext",
                 this._action, "actionCallbackContext", "function", "post", validateArgsSingle,
                 function(curr, context) {
                     curr.callback.context = context;
                 });
 
+            /**
+             * When triggered, this action sets the arguments of the callback function. If no callback function is
+             * specified, this action has no meaningful impact.
+             * @name actionCallbackArgs
+             * @function
+             * @instance
+             * @memberof Trigger
+             * @param {...any} args The arguments to pass to the callback function.
+             * @return {Trigger}         Returns this `Trigger`, so that further actions or expectations can be chained.
+             */
             alias(this, "actionCallbackArgs",
                 this._action, "actionCallbackArgs", "function", "post", validateArgsAny,
                 function(curr, ...args) {
@@ -2058,6 +2366,43 @@
     function validateArgsAny() {}
 
     var sandboxSingleton;
+    /**
+     * A Sandbox is a container for all your wrappers. It gives you a convenient way to track
+     * them, and unwrap everything when you are done with your wrappers. This is convenient for
+     * test suites, which may be wrapping and unwrapping the same objects on a regular basis.
+     *
+     * Sandbox also has a singleton -- a single instance of a Sandbox that can be used across
+     * multiple contexts.
+     *
+     * ``` js
+     * // create a new sandbox
+     * sb = new Sandbox();
+     *
+     * // create a new wrapper in the sandbox
+     * var wrapper = sb.newWrapper(obj, method);
+     *
+     * // destroy the sandbox, which unwraps the object
+     * sb.destroy();
+     *
+     * // also works with tests
+     * it("does a test", Sandbox.test(function() {
+     *     var wrapper = this.sandbox.newWrapper(obj, method);
+     * }))
+     *
+     * // the singleton is a convenient way of accessing your sandbox anywhere
+     * function init() {
+     *     var sb = Sandbox.singletonStart();
+     *     sb.newWrapper(obj, method);
+     * }
+     *
+     * // get the same sandbox as the one in init
+     * var sb = Sandbox.singletonGetCurrent();
+     * sb.newWrapper(obj, method);
+     *
+     * // unwrap all the wrappers created on the singleton
+     * Sandbox.singletonEnd();
+     * ```
+     */
     class Sandbox {
         constructor() {
             this.wrapperList = new Set();
@@ -2066,6 +2411,12 @@
             };
         }
 
+        /**
+         * Creates a Sandbox singleton. Future calls to `Sandbox.singletonGetCurrent` will retrieve the
+         * singletone. Makes it easy to work with the same `Sandbox` across multiple contexts.
+         * @return {Sandbox} The Sandbox singleton, a single global singleton.
+         * @throws {Erro} If the Sandbox Singleton has already been created.
+         */
         static singletonStart() {
             if (typeof sandboxSingleton === "object") {
                 throw new Error("Sandbox.singletonStart: already started");
@@ -2091,19 +2442,41 @@
             sandboxSingleton = undefined;
         }
 
-        // it ("does a test", Sandbox.test(function() {
-        // }));
+        /**
+         * Creates a testing context, is designed to be passed to something like (Mocha's)[https://mochajs.org/]
+         * `it()` functions. The `this` context of the callback function will have a `.sandbox` value
+         * that will be a `Sandbox` for creating new wrappers. Any wrappers created with `this.sandbox.newWrapper()`
+         * will be automatically unwrapped when the test ends.
+         * @param  {Function} fn The callback function that will be executed.
+         * @example
+         * it("does a test", Sandbox.test(function() {
+         *     this.sandbox.newWrapper(...);
+         * }))
+         * // all wrappers are unwrapped when the sandbox exists
+         */
         static test(fn) {
             return function(...args) {
                 var sb = new Sandbox();
                 this.sandbox = sb;
 
-                fn.call(this, ...args);
+                var ret = fn.call(this, ...args);
 
                 sb.destroy();
+
+                return ret;
             };
         }
 
+        /**
+         * This is the same as {@link Sandbox#test test}, but expects a done callback.
+         * @param  {Function} fn The callback function that will be executed.
+         * @example
+         * it("does a test", Sandbox.test(function(done) {
+         *     this.sandbox.newWrapper(...);
+         *     done();
+         * }))
+         * // all wrappers are unwrapped when the sandbox exists
+         */
         static testAsync(fn) {
             return function(done, ...args) {
                 var sb = new Sandbox();
@@ -2115,6 +2488,11 @@
             };
         }
 
+        /**
+         * The same as `new Wrapper()` for creating a {@link Wrapper}, but the `Wrapper`
+         * will be contained in the Sandbox, guaranteeing that it will be unwrapped when
+         * the Sandbox is done. See {@link Wrapper} for details on this function.
+         */
         newWrapper(...args) {
             var w = new Wrapper(...args);
 
@@ -2134,6 +2512,9 @@
             return w;
         }
 
+        /**
+         * Destroys a Sandbox, unwrapping all the wrappers that belong to it.
+         */
         destroy() {
             for (let w of this.wrapperList) {
                 w.configUnwrap();
@@ -2146,6 +2527,9 @@
     var matcherRegistrySingleton;
     /**
      * A class for matching anything. Really, anything.
+     *
+     * Most {@link Trigger Triggers}, {@link Filter Filters} and expects use `Match` internally to match
+     * values, and passing a new `Match` to them will use the `Match` that you specify.
      *
      * Matching has two major flavors: matching by "value", where two things are strictly compared to
      * see if they are they exact same; and matching by "type", where something is compared to a class
@@ -2728,7 +3112,7 @@
     // can return a function as the exported value.
     return {
         Wrapper: Wrapper,
-        SingleRecord: SingleRecord,
+        Operation: Operation,
         Match: Match,
         Trigger: Trigger,
         ExpectError: ExpectError,
