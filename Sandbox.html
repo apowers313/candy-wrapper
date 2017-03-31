@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>ExpectError - Documentation</title>
+    <title>Sandbox - Documentation</title>
 
     <script src="scripts/prettify/prettify.js"></script>
     <script src="scripts/prettify/lang-css.js"></script>
@@ -27,7 +27,7 @@
 
 <div id="main">
     
-    <h1 class="page-title">ExpectError</h1>
+    <h1 class="page-title">Sandbox</h1>
     
 
     
@@ -40,11 +40,40 @@
 <header>
     
         <h2>
-        ExpectError
+        Sandbox
         </h2>
         
-            <div class="class-description"><p>An Error thrown by a failed <a href="Expect.html">Expect</a> call. Nothing fancy here, just a
-different error name so that it can be distinguished from other types of errors.</p></div>
+            <div class="class-description"><p>A Sandbox is a container for all your wrappers. It gives you a convenient way to track
+them, and unwrap everything when you are done with your wrappers. This is convenient for
+test suites, which may be wrapping and unwrapping the same objects on a regular basis.</p>
+<p>Sandbox also has a singleton -- a single instance of a Sandbox that can be used across
+multiple contexts.</p>
+<pre class="prettyprint source lang-js"><code>// create a new sandbox
+sb = new Sandbox();
+
+// create a new wrapper in the sandbox
+var wrapper = sb.newWrapper(obj, method);
+
+// destroy the sandbox, which unwraps the object
+sb.destroy();
+
+// also works with tests
+it(&quot;does a test&quot;, Sandbox.test(function() {
+    var wrapper = this.sandbox.newWrapper(obj, method);
+}))
+
+// the singleton is a convenient way of accessing your sandbox anywhere
+function init() {
+    var sb = Sandbox.singletonStart();
+    sb.newWrapper(obj, method);
+}
+
+// get the same sandbox as the one in init
+var sb = Sandbox.singletonGetCurrent();
+sb.newWrapper(obj, method);
+
+// unwrap all the wrappers created on the singleton
+Sandbox.singletonEnd();</code></pre></div>
         
     
 </header>
@@ -58,7 +87,7 @@ different error name so that it can be distinguished from other types of errors.
     <h2>Constructor</h2>
     
 
-    <h4 class="name" id="ExpectError"><span class="type-signature"></span>new ExpectError<span class="signature">()</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="Sandbox"><span class="type-signature"></span>new Sandbox<span class="signature">()</span><span class="type-signature"></span></h4>
 
     
 
@@ -70,7 +99,7 @@ different error name so that it can be distinguished from other types of errors.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="candy-wrapper.js.html">candy-wrapper.js</a>, <a href="candy-wrapper.js.html#line1377">line 1377</a>
+        <a href="candy-wrapper.js.html">candy-wrapper.js</a>, <a href="candy-wrapper.js.html#line2406">line 2406</a>
     </li></ul></dd>
     
 
@@ -137,17 +166,6 @@ different error name so that it can be distinguished from other types of errors.
     </div>
 
     
-        <h3 class="subsection-title">Extends</h3>
-
-        
-
-
-    <ul>
-        <li>Error</li>
-    </ul>
-
-
-    
 
     
 
@@ -159,6 +177,602 @@ different error name so that it can be distinguished from other types of errors.
 
     
 
+    
+        <h3 class="subsection-title">Methods</h3>
+
+        
+            
+
+    
+
+    <h4 class="name" id=".singletonStart"><span class="type-signature">(static) </span>singletonStart<span class="signature">()</span><span class="type-signature"> &rarr; {<a href="Sandbox.html">Sandbox</a>}</span></h4>
+
+    
+
+
+
+
+<dl class="details">
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="candy-wrapper.js.html">candy-wrapper.js</a>, <a href="candy-wrapper.js.html#line2420">line 2420</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+<div class="description">
+    <p>Creates a Sandbox singleton. Future calls to <code>Sandbox.singletonGetCurrent</code> will retrieve the
+singletone. Makes it easy to work with the same <code>Sandbox</code> across multiple contexts.</p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Throws:</h5>
+
+        
+
+<dl>
+    <dt>
+        <div class="param-desc">
+        <p>If the Sandbox Singleton has already been created.</p>
+        </div>
+    </dt>
+    <dd></dd>
+    <dt>
+        <dl>
+            <dt>
+                Type
+            </dt>
+            <dd>
+                
+<span class="param-type">Erro</span>
+
+
+            </dd>
+        </dl>
+    </dt>
+    <dd></dd>
+</dl>
+
+
+    
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    <p>The Sandbox singleton, a single global singleton.</p>
+</div>
+
+
+
+<dl class="param-type">
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type"><a href="Sandbox.html">Sandbox</a></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+        
+            
+
+    
+
+    <h4 class="name" id=".test"><span class="type-signature">(static) </span>test<span class="signature">(fn)</span><span class="type-signature"></span></h4>
+
+    
+
+
+
+
+<dl class="details">
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="candy-wrapper.js.html">candy-wrapper.js</a>, <a href="candy-wrapper.js.html#line2457">line 2457</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+<div class="description">
+    <p>Creates a testing context, is designed to be passed to something like (Mocha's)[https://mochajs.org/]
+<code>it()</code> functions. The <code>this</code> context of the callback function will have a <code>.sandbox</code> value
+that will be a <code>Sandbox</code> for creating new wrappers. Any wrappers created with <code>this.sandbox.newWrapper()</code>
+will be automatically unwrapped when the test ends.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>it("does a test", Sandbox.test(function() {
+    this.sandbox.newWrapper(...);
+}))
+// all wrappers are unwrapped when the sandbox exists</code></pre>
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>fn</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">function</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>The callback function that will be executed.</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id=".testAsync"><span class="type-signature">(static) </span>testAsync<span class="signature">(fn)</span><span class="type-signature"></span></h4>
+
+    
+
+
+
+
+<dl class="details">
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="candy-wrapper.js.html">candy-wrapper.js</a>, <a href="candy-wrapper.js.html#line2480">line 2480</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+<div class="description">
+    <p>This is the same as test, but expects a done callback.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>it("does a test", Sandbox.test(function(done) {
+    this.sandbox.newWrapper(...);
+    done();
+}))
+// all wrappers are unwrapped when the sandbox exists</code></pre>
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>fn</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">function</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>The callback function that will be executed.</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="destroy"><span class="type-signature"></span>destroy<span class="signature">()</span><span class="type-signature"></span></h4>
+
+    
+
+
+
+
+<dl class="details">
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="candy-wrapper.js.html">candy-wrapper.js</a>, <a href="candy-wrapper.js.html#line2518">line 2518</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+<div class="description">
+    <p>Destroys a Sandbox, unwrapping all the wrappers that belong to it.</p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="newWrapper"><span class="type-signature"></span>newWrapper<span class="signature">()</span><span class="type-signature"></span></h4>
+
+    
+
+
+
+
+<dl class="details">
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="candy-wrapper.js.html">candy-wrapper.js</a>, <a href="candy-wrapper.js.html#line2496">line 2496</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+<div class="description">
+    <p>The same as <code>new Wrapper()</code> for creating a <a href="Wrapper.html">Wrapper</a>, but the <code>Wrapper</code>
+will be contained in the Sandbox, guaranteeing that it will be unwrapped when
+the Sandbox is done. See <a href="Wrapper.html">Wrapper</a> for details on this function.</p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
     
 
     
