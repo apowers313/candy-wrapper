@@ -6,7 +6,7 @@
 [![Coverage Status](https://coveralls.io/repos/github/apowers313/candy-wrapper/badge.svg?branch=master)](https://coveralls.io/github/apowers313/candy-wrapper?branch=master)
 [![Stories in Ready](https://badge.waffle.io/apowers313/candy-wrapper.png?label=ready&title=Ready)](https://waffle.io/apowers313/candy-wrapper)
 
-<!-- [![Sauce Test Status](https://saucelabs.com/browser-matrix/apowers313.svg)](https://saucelabs.com/u/apowers313) -->
+[![Sauce Test Status](https://saucelabs.com/browser-matrix/apowers313.svg)](https://saucelabs.com/beta/builds/011f525b0b50411290a7040eaa686fc2)
 
 [Full API Documentation Available Here!](https://apowers313.github.io/candy-wrapper)
 
@@ -25,7 +25,7 @@ The primary interfaces are Wrapper, Expect, Trigger, and Action:
 If you are new to wrappers or candy-wrapper, a good place to start is the [Getting Started Tutorial](https://apowers313.github.io/candy-wrapper/tutorial-getting-started.html).
 
 ## ES6
-Note that this library currently makes exensive use of the features of [JavaScript ES6](http://www.ecma-international.org/ecma-262/6.0/), notably [Proxies](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy), [classes](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Classes), [template literals](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals), [rest parameters](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/rest_parameters), and the [spread operator](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Spread_operator). For information about which platforms currently support ES6, see the [ES6 compatibility table](https://kangax.github.io/compat-table/es6/). It has been tested against Node 6 and seems to run on the latest versions of Chrome, Firefox, Edge, and Safari.
+Note that this library currently makes exensive use of the features of [JavaScript ES6](http://www.ecma-international.org/ecma-262/6.0/), notably [Proxies](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy), [classes](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Classes), [template literals](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals), [rest parameters](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/rest_parameters), and the [spread operator](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Spread_operator). For information about which platforms currently support ES6, see the [ES6 compatibility table](https://kangax.github.io/compat-table/es6/). It has been tested against Node 6 and is tested against the latest versions of Chrome, Firefox, Edge, and Safari.
 
 Presumably it could be back-ported to ES5.1, perhaps drawing on the work of Sinon. The biggest challenge would be removing the use of Proxies. A [pull request](https://github.com/apowers313/candy-wrapper) would be more than welcome if anyone wants to take that challenge on.
 
