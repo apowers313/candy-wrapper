@@ -65,7 +65,7 @@ console.log(powerObject.pow.historyList[0].retVal); // 3^2 = 9
 console.log(powerObject.pow.historyList[1].retVal); // 5^2 = 25
 ```
 
-Every time `powerObject.pow()` it added a new {@link SingleRecord} to the `historyList` `Array`. `powerObject.pow()` behaves the exact same, but the `Wrapper` allows us to look at what happened every time it was called.
+Every time `powerObject.pow()` it added a new {@link Operation} to the `historyList` `Array`. `powerObject.pow()` behaves the exact same, but the `Wrapper` allows us to look at what happened every time it was called.
 
 That's one way of looking at the calls to `powerObject.pow()`, but it's not very easy to read. Here is another way of checking out the history of `powerObject.pow()`:
 
@@ -83,7 +83,7 @@ powerObject.pow
 
 There are two things going on there. First, the `historyList` is actually a {@link Filter} and `Filters` provide some convenient ways of accessing specific items in the `historyList`. The `filterFirst()` function is essentially the same as `historyList[0]`, but as we will see later there are other filters that allow more sophisticated ways of what's in the `historyList`.
 
-The second thing that's going on is the use of the `expectReturn()` method. Every {@link SingleRecord} in the `historyList` has a set of expectation methods on it, allowing you to check whether your expectations for that call have been met. The expectations return `true` or `false` depending on whether the expectation was met. You can use these expectations with your favorite assertion library, like [Chai](http://chaijs.com/). Or if you want to throw an `Error` when expectations aren't met, you can do this:
+The second thing that's going on is the use of the `expectReturn()` method. Every {@link Operation} in the `historyList` has a set of expectation methods on it, allowing you to check whether your expectations for that call have been met. The expectations return `true` or `false` depending on whether the expectation was met. You can use these expectations with your favorite assertion library, like [Chai](http://chaijs.com/). Or if you want to throw an `Error` when expectations aren't met, you can do this:
 
 ``` js
 powerObject.pow(3);
@@ -110,7 +110,7 @@ powerObject.pow
     .expectSetVal(3); // true
 ```
 
-That's just the tip of the iceberg -- there are all kinds of {@link Filter Filters} and {@link SingleRecord expectations} that you can play around with. Before you start experimenting more, it is worth pointing out that there is a pattern to how the expectations and filters are named.
+That's just the tip of the iceberg -- there are all kinds of {@link Filter Filters} and {@link Operation expectations} that you can play around with. Before you start experimenting more, it is worth pointing out that there is a pattern to how the expectations and filters are named.
 
 * Return - the return value from a function or property get.
 * Exception - the `Error` that was thrown by a function or property get / set, or `null` for no `Error`.
@@ -144,7 +144,18 @@ Using {@link Trigger Triggers} we can change the behavior of the wrapper:
 ``` js
 powerObject.pow
     .triggerAlways()
-    .expectCallArgs(Match.type(Number))
+    .expectCallArgs(Match.type("number"))
 ```
 
-## Configuring a Wrapper
+There are three things going on in the example above: first, we have created a trigger that
+always executes; second, we expect certain arguments when the function is called; and third we
+have use the `Match.type` to say that we should be matching all types of `Numbers`, not just a single number value.
+
+Now if we call our function, here is its behavior:
+
+``` js
+powerObject.pow(3); // returns 9
+powerObject.pow("something"); // throws an ExpectError
+```
+
+That's it! From here you should be able to use candy-wrapper to monitor and / or modify the behavior of your functions and properties. If you have any questions, feel free to submit an [issue on GitHub](https://github.com/apowers313/candy-wrapper/issues).
