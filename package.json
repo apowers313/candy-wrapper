@@ -1,7 +1,7 @@
 {
   "name": "candy-wrapper",
-  "version": "0.8.0",
-  "description": "A sinon.js-like wrapper for functions that creates stubs, spys, mocks, etc.",
+  "version": "0.8.1",
+  "description": "Wrap your functions, methods, and properties to monitor them and modify their behavior.",
   "main": "main.js",
   "directories": {
     "test": "test"
