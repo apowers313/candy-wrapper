@@ -640,7 +640,7 @@
             /** @type {Array<Trigger>} A list of {@link Trigger}s to be run whenever this Wrapper is called. */
             this.triggerList = [];
             /** @type {Array<String>} List of messages from failed `expect` calls. */
-            this.expectMessageList = [];
+            this.expectErrorList = [];
             /** @type {Boolean} Whether or not all expectations have passed on this wrapper. */
             this.expectPassed = true;
             /**
@@ -794,7 +794,7 @@
          * > &nbsp;&nbsp;&nbsp;&nbsp;expectReturn: expectation failed for: 10<br>
          * > &nbsp;&nbsp;&nbsp;&nbsp;expectReturn: expectation failed for: 23<br>
          *
-         * `expectReportAllFailures` draws upon a list of messages stored in the wrapper at `Wrapper.expectMessageList`. This
+         * `expectReportAllFailures` draws upon a list of messages stored in the wrapper at `Wrapper.expectErrorList`. This
          * list will continue to be added to as new expectations fail. `expectReportAllFailures` includes a convenience
          * argument, `clear`, that will clear out the previous expectation messages and status so that
          * a fresh set of expectations can be built up.
@@ -810,14 +810,53 @@
          */
         expectReportAllFailures(clear) {
             if (this.expectPassed) return true;
-            var message = `${this.expectMessageList.length} expectation(s) failed:\n`;
-            for (let idx in this.expectMessageList) {
-                let newMsg = "          " + this.expectMessageList[idx] + "\n";
+            var message = `${this.expectErrorList.length} expectation(s) failed:\n`;
+
+            function indent(num) {
+                var base = "      ";
+                var indent = "    ";
+                var ret = base;
+                for (let i = 0; i < num; i++) ret += indent;
+                return ret;
+            }
+
+            function diffToStr(diff, indentNum) {
+                if (!diff) return "";
+
+                var diffList = diff.toStringArray();
+                var retMsg = "";
+                for (let i = 0; i < diffList.length; i++) {
+                    retMsg += indent(indentNum) + diffList[i] + "\n";
+                }
+                return retMsg;
+            }
+
+            function errListToStr(errList, indentNum) {
+                var retMsg = "";
+                for (let k = 0; k < errList.length; k++) {
+                    let subErr = errList[k];
+                    retMsg += indent(indentNum) + subErr.message + "\n";
+                    retMsg += diffToStr(subErr.diff, indentNum+1);
+                }
+                return retMsg;
+            }
+
+            // add the detailed failure messages
+            for (let i = 0; i < this.expectErrorList.length; i++) {
+                let err = this.expectErrorList[i];
+                let newMsg = indent(1) + err.message + "\n";
+
+                // add iterator error messages
+                newMsg += errListToStr(err.errorList, 2);
+
+                // add diff messages
+                newMsg += diffToStr(err.diff, 2);
+
                 message = message.concat(newMsg);
             }
 
             if (clear) {
-                this.expectMessageList.length = 0;
+                this.expectErrorList.length = 0;
                 this.expectPassed = true;
             }
 
@@ -1182,7 +1221,10 @@
                     if (m.compare(single.retVal)) {
                         return null;
                     }
-                    return "expectReturn: expectation failed for: " + retVal;
+
+                    var err = new ExpectError("expectReturn: expectation failed for: " + retVal);
+                    err.diff = m.lastDiff;
+                    return err;
                 });
 
             /**
@@ -1202,7 +1244,9 @@
                     if (m.compare(single.argList)) {
                         return null;
                     }
-                    return "expectCallArgs: expectation failed for: " + args;
+                    var err = new ExpectError("expectCallArgs: expectation failed for: " + args);
+                    err.diff = m.lastDiff;
+                    return err;
                 });
 
             /**
@@ -1223,7 +1267,9 @@
                     if (m.compare(single.context)) {
                         return null;
                     }
-                    return "expectContext: expectation failed for: " + context;
+                    var err = new ExpectError("expectContext: expectation failed for: " + context);
+                    err.diff = m.lastDiff;
+                    return err;
                 });
 
             /**
@@ -1246,7 +1292,9 @@
                     if (m.compare(single.exception)) {
                         return null;
                     }
-                    return "expectException: expectation failed for: " + exception;
+                    var err = new ExpectError("expectException: expectation failed for: " + exception);
+                    err.diff = m.lastDiff;
+                    return err;
                 });
 
             /**
@@ -1268,7 +1316,9 @@
                     if (m.compare(single.setVal)) {
                         return null;
                     }
-                    return "expectSetVal: expectation failed for: " + setVal;
+                    var err = new ExpectError("expectSetVal: expectation failed for: " + setVal);
+                    err.diff = m.lastDiff;
+                    return err;
                 });
 
             // returns string or null
@@ -1293,7 +1343,7 @@
              * This is a description of the callback used by {@link expectCustom}.
              * @callback Operation~customExpectCallback
              * @param {Operation} curr The current function call or property / set get.
-             * @return {null|String} `null` if expectation was successful. Returns `String` containing the message for the failed expectation otherwise.
+             * @return {null|ExpectError} `null` if expectation was successful. Returns {@link ExpectError} containing the message for the failed expectation otherwise.
              */
         }
 
@@ -1308,22 +1358,28 @@
 
         _getCurrCallOrDefer(name, ...args) {
             if (this instanceof Operation) return this;
+            if (this instanceof ExpectIterator) return this.current;
             if (this instanceof Trigger && this.currentCall) return this.currentCall;
             return this._addDeferredAction(name, args);
         }
 
-        static _softAssert(ctx, message) {
-            var passed = (message === null) ? true : false;
+        static _softAssert(ctx, err) {
+            // let the iterator handle the errors
+            if (ctx instanceof ExpectIterator && ctx.current) return err;
 
+            // overall pass fail
+            var passed = (err === null) ? true : false;
+
+            // decide what to do with the error -- throw or store
             if (!passed) {
                 // see if the config says we should throw
                 if ((ctx instanceof Trigger && ctx.wrapper.config.expectThrowsOnTrigger) ||
                     ctx.wrapper.config.expectThrows) {
-                    throw new ExpectError(message);
+                    throw err;
                 }
 
                 // otherwise store the message for future reference
-                ctx.wrapper.expectMessageList.push(message);
+                ctx.wrapper.expectErrorList.push(err);
             }
 
             ctx.wrapper.expectPassed = ctx.wrapper.expectPassed && passed;
@@ -1363,21 +1419,144 @@
             if (!runNow) return this;
             // test the expect
             var msg = fn.call(this, curr, ...args);
-            var passed = Expect._softAssert(this, msg);
+            // form the result into an error
+            var err;
+            if (typeof msg === "string") {
+                err = new ExpectError(msg);
+            } else {
+                err = msg;
+            }
+            var passed = Expect._softAssert(this, err);
 
             return passed;
         }
     }
 
     /**
-     * An Error thrown by a failed {@link Expect} call. Nothing fancy here, just a
-     * different error name so that it can be distinguished from other types of errors.
+     * An Error thrown by a failed {@link Expect} call. A different error name so that it
+     * can be distinguished from other types of errors, plus lists of errors and diffs for
+     * more intelligent diagnostic information of what went wrong.
      * @extends {Error}
      */
     class ExpectError extends Error {
         constructor(message) {
             super(message);
             this.name = "ExpectError";
+            this.errorList = []; // for ExpectIterator
+            this.diff = null;
+        }
+    }
+
+    /**
+     * This class is used to apply an expect method to a `Filter` array. It is used for functions
+     * such as {@link Filter#expectAll}, {@link Filter#expectSome}, and {@link Filter#expectNone}.
+     * @private
+     * @extends {Expect}
+     */
+    class ExpectIterator extends Expect {
+        constructor(wrapper, iterType, filter) {
+            super();
+
+            this.wrapper = wrapper;
+            this.iterType = iterType;
+            this.filter = filter;
+            this.current = null;
+        }
+
+        _expect(...args) {
+            var results = [];
+
+            // iterate through all the ops in the filter...
+            for (let i = 0; i < this.filter.length; i++) {
+                this.current = this.filter[i];
+                // ...whatever `expect` was called, call it on each op
+                let ret = super._expect(...args);
+                results.push(ret);
+            }
+            this.current = null;
+
+            // now that we have our results, evaluate them
+            switch (this.iterType) {
+                case "all":
+                    return this._expectAll(results);
+                case "some":
+                    return this._expectSome(results);
+                case "none":
+                    return this._expectNone(results);
+            }
+        }
+
+        _expectAll(results) {
+            var passed = true;
+            var errList = [];
+
+            // check to make sure all the resutls passed
+            for (let i = 0; i < results.length; i++) {
+                // any results failed, add a failure message to the list
+                if (results[i] !== null) {
+                    errList.push (results[i]);
+                    passed = false;
+                }
+            }
+
+            // create an error, if necessary
+            var err = null;
+            if (!passed) {
+                err = new ExpectError(`expectAll: all expectations should have passed, but ${errList.length} failed`);
+                err.errorList = errList;
+            }
+
+            // run the soft assertion
+            var ret = Expect._softAssert(this, err);
+            return ret;
+        }
+
+        _expectSome(results) {
+            var passed = false;
+            var errList = [];
+
+            // check to make sure at least one the resutls passed
+            for (let i = 0; i < results.length; i++) {
+                // any results failed, add a failure message to the list
+                if (results[i] === null) {
+                    passed = true;
+                }
+            }
+
+            // create an error, if necessary
+            var err = null;
+            if (!passed) {
+                err = new ExpectError(`expectSome: at least one expectation should have passed, but none did`);
+                err.errorList = errList;
+            }
+
+            // run the soft assertion
+            var ret = Expect._softAssert(this, err);
+            return ret;
+        }
+
+        _expectNone(results) {
+            var passed = true;
+            var passList = [];
+
+            // check to make sure all the resutls passed
+            for (let i = 0; i < results.length; i++) {
+                // any results failed, add a failure message to the list
+                if (results[i] === null) {
+                    passed = false;
+                    passList.push(i);
+                }
+            }
+
+            // create an error, if necessary
+            var err = null;
+            if (!passed) {
+                err = new ExpectError(`expectNone: no expectations should have passed, but ${passList.length} passed`);
+            }
+
+            // run the soft assertion
+            var ret = Expect._softAssert(this, err);
+            return ret;
         }
     }
 
@@ -1413,7 +1592,7 @@
         constructor(wrapper, ...args) {
             super(...args);
             if (!(wrapper instanceof Wrapper)) {
-                throw new TypeError ("Filter constructor: expected first argument to be of type Wrapper");
+                throw new TypeError("Filter constructor: expected first argument to be of type Wrapper");
             }
             this.wrapper = wrapper;
 
@@ -1735,7 +1914,7 @@
             // solution...
             var newFilter = new Filter(this.wrapper);
             for (let i = 0; i < this.length; i++) {
-                    newFilter.push(this[i][property]);
+                newFilter.push(this[i][property]);
             }
             return newFilter;
         }
@@ -1797,11 +1976,11 @@
         expectCount(num) {
             validateArgsSingleNumber("expectCount", num);
 
-            var msg = null;
+            var err = null;
             var passed = (this.length === num);
-            if (!passed) msg = `expectCount: expected exactly ${num}`;
+            if (!passed) err = new ExpectError (`expectCount: expected exactly ${num}`);
 
-            return Expect._softAssert(this, msg);
+            return Expect._softAssert(this, err);
         }
 
         /**
@@ -1819,11 +1998,11 @@
                 throw new TypeError("expectCountRange: expected 'max' to be of type Number");
             }
 
-            var msg = null;
+            var err = null;
             var passed = ((this.length >= min) && (this.length <= max));
-            if (!passed) msg = `expectCountRange: expected no more than ${min} and fewer than ${max}`;
+            if (!passed) err = new ExpectError(`expectCountRange: expected no more than ${min} and fewer than ${max}`);
 
-            return Expect._softAssert(this, msg);
+            return Expect._softAssert(this, err);
         }
 
         /**
@@ -1834,11 +2013,11 @@
         expectCountMin(min) {
             validateArgsSingleNumber("expectCountMin", min);
 
-            var msg = null;
+            var err = null;
             var passed = (this.length >= min);
-            if (!passed) msg = `expectCountMin: expected no more than ${min}`;
+            if (!passed) err = new ExpectError(`expectCountMin: expected no more than ${min}`);
 
-            return Expect._softAssert(this, msg);
+            return Expect._softAssert(this, err);
         }
 
         /**
@@ -1849,26 +2028,96 @@
         expectCountMax(max) {
             validateArgsSingleNumber("expectCountMax", max);
 
-            var msg = null;
+            var err = null;
             var passed = (this.length <= max);
-            if (!passed) msg = `expectCountMax: expected no more than ${max}`;
+            if (!passed) err = new ExpectError(`expectCountMax: expected no more than ${max}`);
 
-            return Expect._softAssert(this, msg);
+            return Expect._softAssert(this, err);
         }
 
-        // All(expectName, ...args) {
-        //     var ret = true;
-        //     this.forEach(() => {
-        //         ret = ret && this.wrapper[expectName](...args);
-        //     });
-        //     return ret;
-        // }
+        /**
+         * Expects that all {@link Operation} records in the `Filter` pass the `expect` function
+         * that is chained off this method.
+         * @return {ExpectIterator} Returns an {@link ExpectIterator} that applies the next `expect`
+         * call to all the operation records in this `Filter`. If no `expect` call is performed,
+         * this method effectively does nothing.
+         * @example
+         * new Wrapper(obj, "method");
+         *
+         * // call the method twice with the argument "good"
+         * obj.method("good");
+         * obj.method("good");
+         *
+         * // expect that all method calls had the argument "good"
+         * obj.method.historyList.expectAll().expectCallArgs("good"); // true
+         * obj.method.expectReportAllFailure(); // no failures, doesn't throw
+         *
+         * // call the method one more time with the argument "bad"
+         * obj.method("bad");
+         *
+         * // expect that all method calls had the argument "good"
+         * obj.method.historyList.expectAll().expectCallArgs("good"); // false
+         * obj.method.expectReportAllFailure(); // throws an error
+         */
+        expectAll() {
+            return new ExpectIterator(this.wrapper, "all", this);
+        }
 
-        // Some(expectName, ...args) {
-        // }
+        /**
+         * Similar to {@link Filter#expectAll expectAll}, but the `expect` function is only expected
+         * to pass at least once.
+         * @return {ExpectIterator} Returns an {@link ExpectIterator} that applies the next `expect`
+         * call to all the operation records in this `Filter`. If no `expect` call is performed,
+         * this method effectively does nothing.
+         * @example
+         * new Wrapper(obj, "method");
+         *
+         * // call the method twice with the argument "bad"
+         * obj.method("bad");
+         * obj.method("bad");
+         *
+         * // expect that some method calls had the argument "good"
+         * obj.method.historyList.exepctSome().expectCallArgs("good"); // false
+         * obj.method.expectReportAllFailure(true); // throws
+         *
+         * // call the method one more time with the argument "good"
+         * obj.method("good");
+         *
+         * // expect that all method calls had the argument "good"
+         * obj.method.historyList.exepctSome().expectCallArgs("good"); // true
+         * obj.method.expectReportAllFailure(); // no failures, doesn't throw
+         */
+        expectSome() {
+            return new ExpectIterator(this.wrapper, "some", this);
+        }
 
-        // None(expectName, ...args) {
-        // }
+        /**
+         * Similar to {@link Filter#expectAll expectAll}, but the `expect` function is expected to never
+         * be successful.
+         * @return {ExpectIterator} Returns an {@link ExpectIterator} that applies the next `expect`
+         * call to all the operation records in this `Filter`. If no `expect` call is performed,
+         * this method effectively does nothing.
+         * @example
+         * new Wrapper(obj, "method");
+         *
+         * // call the method twice with the argument "good"
+         * obj.method("good");
+         * obj.method("good");
+         *
+         * // expect that none of the method calls had the argument "bad"
+         * obj.method.historyList.expectNever().expectCallArgs("bad"); // true
+         * obj.method.expectReportAllFailure(); // no failures, doesn't throw
+         *
+         * // call the method one more time with the argument "bad"
+         * obj.method("bad");
+         *
+         * // expect that none of the method calls had the argument "bad"
+         * obj.method.historyList.expectNever().expectCallArgs("bad"); // false
+         * obj.method.expectReportAllFailure(); // throws an error
+         */
+        expectNone() {
+            return new ExpectIterator(this.wrapper, "none", this);
+        }
     }
 
     /**
@@ -2588,13 +2837,13 @@
                 this.matchType = "value";
             } else if (opts.hasOwnProperty("type")) {
                 if (typeof opts.type !== "string") {
-                    throw new TypeError ("Match constructor: expected type name to be of type String");
+                    throw new TypeError("Match constructor: expected type name to be of type String");
                 }
 
                 // make sure the type exists in the registry
                 var reg = Match.getMatcherTypeRegistry();
                 if (!reg.matcherList.has(opts.type)) {
-                    throw new TypeError (`Match constructor: type '${opts.type}' hasn't be registered`);
+                    throw new TypeError(`Match constructor: type '${opts.type}' hasn't be registered`);
                 }
 
                 this.typeStr = opts.type;
@@ -2621,7 +2870,7 @@
             }
 
             // matching by type
-            if(this.matchType === "type") {
+            if (this.matchType === "type") {
                 var type = Match.getType(value);
 
                 // match any parent types of the value
@@ -2949,13 +3198,13 @@
          * Converts the diff to an array of descriptive strings that explain why two things are different.
          * @return {Array.<String>} One string in the array for each difference.
          */
-        getDiffsAsStrings() {
+        toStringArray() {
             var msgList = [];
 
             for (let val of this) {
-                    let key = val.key;
-                    if (key) msgList.push(`At ${key}: Expected: '${val.src}'; Got: '${val.dst}'`);
-                    else msgList.push(`Expected: '${val.src}'; Got: '${val.dst}'`);
+                let key = val.key;
+                if (key) msgList.push(`At ${key}: Expected: '${val.src}'; Got: '${val.dst}'`);
+                else msgList.push(`Expected: '${val.src}'; Got: '${val.dst}'`);
             }
 
             return msgList;

@@ -169,7 +169,9 @@ function depends(mod) {
     describe("create wrapper", function() {
         it("can create an empty wrapper", function() {
             var w = new Wrapper();
-            assert.isFunction(w);
+            console.log ("foo");
+            console.log ("w is function", w instanceof Function);
+            assert.instanceOf(w, Function);
             w();
         });
 
@@ -180,7 +182,7 @@ function depends(mod) {
                 called = true;
             }
             var ret = new Wrapper(testFunc);
-            assert.isFunction(ret);
+            assert.instanceOf(ret, Function);
             assert.strictEqual(ret.type, "function");
             ret();
             assert.strictEqual(called, true, "expected wrapped function to get called");
@@ -191,7 +193,7 @@ function depends(mod) {
                 goBowling: function() {}
             };
             var w = new Wrapper(testObj, "goBowling");
-            assert.isFunction(w);
+            assert.instanceOf(w, Function);
             assert.instanceOf(w, Wrapper);
             assert.strictEqual(w.type, "function");
         });
@@ -201,7 +203,7 @@ function depends(mod) {
                 beer: "yummy"
             };
             var w = new Wrapper(testObj, "beer");
-            assert.isFunction(w);
+            assert.instanceOf(w, Function);
             assert.instanceOf(w, Wrapper);
             assert.strictEqual(w.type, "property");
             assert.strictEqual(w.propValue, "yummy");
@@ -222,7 +224,7 @@ function depends(mod) {
             new Wrapper(testObj);
             assert.strictEqual(testObj.beer, "yummy");
             assert.strictEqual(testObj.check, false);
-            assert.isFunction(testObj.goBowling);
+            assert.instanceOf(testObj.goBowling, Function);
             testObj.goBowling();
             assert.strictEqual(testObj.check, true);
             assert.isOk(testObj.check);
@@ -256,8 +258,8 @@ function depends(mod) {
             assert.strictEqual(testObj.rabbitHole.deep.deeper.deepest.location, "wonderland");
             assert.strictEqual(testObj.rabbitHole.deep.deeper.deepest.check1, false);
             assert.strictEqual(testObj.rabbitHole.deep.deeper.deepest.check2, false);
-            assert.isFunction(testObj.rabbitHole.deep.deeper.deepest.eatMe);
-            assert.isFunction(testObj.rabbitHole.deep.deeper.deepest.drinkMe);
+            assert.instanceOf(testObj.rabbitHole.deep.deeper.deepest.eatMe, Function);
+            assert.instanceOf(testObj.rabbitHole.deep.deeper.deepest.drinkMe, Function);
             testObj.rabbitHole.deep.deeper.deepest.eatMe();
             testObj.rabbitHole.deep.deeper.deepest.drinkMe();
             assert.strictEqual(testObj.rabbitHole.deep.deeper.deepest.check1, true);
@@ -331,7 +333,7 @@ function depends(mod) {
                 goBowling: function() {}
             };
             var ret = new Wrapper(testObj, "goBowling", testFunc);
-            assert.isFunction(ret);
+            assert.instanceOf(ret, Function);
             assert.strictEqual(ret.type, "function");
             ret();
             assert.strictEqual(called, true, "expected wrapped function to get called");
@@ -2167,12 +2169,12 @@ function depends(mod) {
             // pass
             ret = testFunc.expectReportAllFailures();
             assert.strictEqual(ret, true);
-            assert.strictEqual(testFunc.expectMessageList.length, 0);
+            assert.strictEqual(testFunc.expectErrorList.length, 0);
 
             // pass and clear
             ret = testFunc.expectReportAllFailures(true);
             assert.strictEqual(ret, true);
-            assert.strictEqual(testFunc.expectMessageList.length, 0);
+            assert.strictEqual(testFunc.expectErrorList.length, 0);
 
             // fail return
             testFunc("drink up!");
@@ -2184,7 +2186,7 @@ function depends(mod) {
                 .filterFirst()
                 .expectReturn("wine");
             assert.strictEqual(ret, false);
-            assert.strictEqual(testFunc.expectMessageList.length, 1);
+            assert.strictEqual(testFunc.expectErrorList.length, 1);
             assert.throws(function() {
                 testFunc.expectReportAllFailures();
             }, ExpectError, /1 expectation\(s\) failed:\n.*/);
@@ -2208,7 +2210,7 @@ function depends(mod) {
                 .filterFirst()
                 .expectReturn("beer");
             assert.strictEqual(ret, true);
-            assert.strictEqual(testFunc.expectMessageList.length, 1);
+            assert.strictEqual(testFunc.expectErrorList.length, 1);
             assert.throws(function() {
                 testFunc.expectReportAllFailures(true);
             }, ExpectError, /1 expectation\(s\) failed:\n.*/);
@@ -2223,10 +2225,97 @@ function depends(mod) {
                 .filterFirst()
                 .expectReturn("wine");
             assert.strictEqual(ret, false);
-            assert.strictEqual(testFunc.expectMessageList.length, 2);
+            assert.strictEqual(testFunc.expectErrorList.length, 2);
             assert.throws(function() {
                 testFunc.expectReportAllFailures();
             }, ExpectError, /2 expectation\(s\) failed:\n.*/);
+        });
+
+        it("expect all", function() {
+            var w = new Wrapper();
+
+            w("beer");
+            w("beer");
+            w("beer");
+
+            // pass
+            var ret;
+            ret = w.historyList.expectAll().expectCallArgs("beer");
+            assert.isTrue(ret);
+            assert.doesNotThrow(function() {
+                w.expectReportAllFailures();
+            });
+
+            // fail
+            w("wine");
+            w("wine");
+            ret = w.historyList.expectAll().expectCallArgs("beer");
+            assert.isFalse(ret);
+            assert.throws(function() {
+                w.expectReportAllFailures();
+            }, ExpectError, new RegExp(
+                "1 expectation\\(s\\) failed:\n" +
+                " +expectAll: all expectations should have passed, but 2 failed\n" +
+                " +expectCallArgs: expectation failed for: beer\n" +
+                " +At \\[0\\]: Expected: 'beer'; Got: 'wine'\n" +
+                " +expectCallArgs: expectation failed for: beer\n" +
+                " +At \\[0\\]: Expected: 'beer'; Got: 'wine'\n",
+                "g"));
+        });
+
+        it("expect some", function() {
+            var w = new Wrapper();
+
+            w("wine");
+            w("wine");
+            w("wine");
+
+            // fail
+            var ret;
+            ret = w.historyList.expectSome().expectCallArgs("beer");
+            assert.isFalse(ret);
+            assert.throws(function() {
+                w.expectReportAllFailures(true);
+            }, ExpectError, new RegExp(
+                "1 expectation\\(s\\) failed:\n" +
+                " +expectSome: at least one expectation should have passed, but none did\n",
+                "g"));
+
+            // pass
+            w("beer");
+            w("wine");
+            ret = w.historyList.expectSome().expectCallArgs("beer");
+            assert.isTrue(ret);
+            assert.doesNotThrow(function() {
+                w.expectReportAllFailures();
+            });
+        });
+
+        it("expect none", function() {
+            var w = new Wrapper();
+
+            w("wine");
+            w("wine");
+            w("wine");
+
+            // pass
+            var ret;
+            ret = w.historyList.expectNone().expectCallArgs("beer");
+            assert.isTrue(ret);
+            assert.doesNotThrow(function() {
+                w.expectReportAllFailures();
+            });
+
+            // fail
+            w("beer");
+            ret = w.historyList.expectNone().expectCallArgs("beer");
+            assert.isFalse(ret);
+            assert.throws(function() {
+                w.expectReportAllFailures();
+            }, ExpectError, new RegExp(
+                "1 expectation\\(s\\) failed:\n" +
+                " +expectNone: no expectations should have passed, but 1 passed\n",
+                "g"));
         });
 
         it("clears expectation messages");
@@ -3755,26 +3844,26 @@ function depends(mod) {
 
             // same diff
             diff = Match.diff("foo", "foo");
-            msgList = diff.getDiffsAsStrings();
+            msgList = diff.toStringArray();
             assert.deepEqual(msgList, []);
 
             // simple string diff
             diff = Match.diff("foo", "bar");
-            msgList = diff.getDiffsAsStrings();
+            msgList = diff.toStringArray();
             assert.deepEqual(msgList, ["Expected: 'foo'; Got: 'bar'"]);
 
             // simple number diff
             diff = Match.diff(3, 5);
-            msgList = diff.getDiffsAsStrings();
+            msgList = diff.toStringArray();
             assert.deepEqual(msgList, ["Expected: '3'; Got: '5'"]);
 
             // array diff
             diff = Match.diff([1, 2, 3], [1, 2, 4]);
-            msgList = diff.getDiffsAsStrings();
+            msgList = diff.toStringArray();
             assert.deepEqual(msgList, ["At [2]: Expected: '3'; Got: '4'"]);
 
             diff = Match.diff([1, 2, 3, 4], [1, 2, 4]);
-            msgList = diff.getDiffsAsStrings();
+            msgList = diff.toStringArray();
             assert.deepEqual(msgList, [
                 "At [2]: Expected: '3'; Got: '4'",
                 "At [3]: Expected: '4'; Got: 'undefined'"
@@ -3788,7 +3877,7 @@ function depends(mod) {
                 foo: null,
                 idx: 1
             });
-            msgList = diff.getDiffsAsStrings();
+            msgList = diff.toStringArray();
             assert.deepEqual(msgList, ["At .foo: Expected: 'bar'; Got: 'null'"]);
 
             // deep object diff
@@ -3811,7 +3900,7 @@ function depends(mod) {
                 }
             };
             diff = Match.diff(obj1, obj2);
-            msgList = diff.getDiffsAsStrings();
+            msgList = diff.toStringArray();
             assert.deepEqual(msgList, ["At .rabbitHole.deep.deeper.location: Expected: 'wonderland'; Got: 'home'"]);
 
             // array of objects
@@ -3830,14 +3919,14 @@ function depends(mod) {
                 }
             }, 42];
             diff = Match.diff(arr1, arr2);
-            msgList = diff.getDiffsAsStrings();
+            msgList = diff.toStringArray();
             assert.deepEqual(msgList, ["At [2].going.down: Expected: 'elevator'; Got: 'escalator'"]);
 
             // multiple differences
             obj1.list = arr1;
             obj2.list = arr2;
             diff = Match.diff(obj1, obj2);
-            msgList = diff.getDiffsAsStrings();
+            msgList = diff.toStringArray();
             assert.deepEqual(msgList, [
                 "At .rabbitHole.deep.deeper.location: Expected: 'wonderland'; Got: 'home'",
                 "At .list[2].going.down: Expected: 'elevator'; Got: 'escalator'"
