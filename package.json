@@ -7,9 +7,9 @@
     "test": "test"
   },
   "scripts": {
-    "test": "npm run testnode",
-    "testbrowsers": "grunt default",
-    "testnode": "istanbul cover _mocha",
+    "test": "npm run test:node && npm run test:browsers",
+    "test:browsers": "grunt default",
+    "test:node": "istanbul cover _mocha",
     "docs:create": "rm -rf \"\" ./docs && jsdoc -c ./.jsdoc-conf.json",
     "docs:publish": "gh-pages --silent --repo https://$GH_TOKEN@github.com/apowers313/candy-wrapper.git --dist docs"
   },

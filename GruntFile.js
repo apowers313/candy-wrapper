@@ -8,12 +8,12 @@ module.exports = function(grunt) {
     }, {
         browserName: 'MicrosoftEdge',
         platform: 'Windows 10'
-    }, {
-        browserName: 'internet explorer',
-        platform: 'Windows 10'
-    }, {
-        browserName: 'chrome',
-        platform: 'Linux'
+    // }, {
+    //     browserName: 'internet explorer',
+    //     platform: 'Windows 10'
+    // }, {
+    //     browserName: 'chrome',
+    //     platform: 'Linux'
     }, {
         browserName: 'firefox',
         platform: 'Linux'
