@@ -48,8 +48,6 @@ new Wrapper();
 
 ### Browser
 
-**Note**: I wouldn't recommend using candy-wrapper browser for now, but if you want to play around with it...
-
 Install:
 
 ``` html
