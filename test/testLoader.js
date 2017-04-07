@@ -1,6 +1,7 @@
 // XXX: loader has to run inside a test, or mocha doesn't wait for Promises to resolve
 describe("test loader", function() {
     it("runs all tests", function() {
+        this.timeout(10000);
 
         var testList = [
             "unit/exampleTest.js",
