@@ -288,6 +288,20 @@
                 apply: (target, context, argList) => this._doCall(target, context, argList)
             });
 
+            // mirror function name and length
+            Object.defineProperty(this, "name", {
+                writable: false,
+                enumerable: false,
+                configurable: true,
+                value: wrappedFn.name
+            });
+            Object.defineProperty(this, "length", {
+                writable: false,
+                enumerable: false,
+                configurable: true,
+                value: wrappedFn.length
+            });
+
             this.configDefault();
             this.configReset();
             return this.chainable;
@@ -345,10 +359,18 @@
 
             /** @type {Object} The results of `getOwnPropertyDescriptor` on the original property, saved so that it can be restored later. */
             this.origPropDesc = Object.getOwnPropertyDescriptor(obj, prop);
+            if (this.origPropDesc === undefined) {
+                throw new TypeError(`Wrapper constructor: expected '${prop}' to exist on object`);
+            }
+            if (this.origPropDesc.configurable === false) {
+                throw new Error(`new Wrapper: can't wrap non-configurable property: '${prop}'`);
+            }
             /** @type {any} The current value of the property. */
             this.propValue = this.origPropDesc.value;
             /** @type {Function} An optional custom function that will be called when getting or setting the property. */
-            this.setterGetterFn = fn;
+            this.getterFn = fn || this.origPropDesc.get;
+            /** @type {Function} An optional custom function that will be called when getting or setting the property. */
+            this.setterFn = fn || this.origPropDesc.set;
 
             // create a proxy for the setter / getters
             /** @type {Proxy.<Wrapper>} The thing that is returned representing the Wrapped and is intended to be used for chainable Wrapper calls */
@@ -392,10 +414,10 @@
             this._runTriggerList("pre", st);
 
             // do the set or get
-            if (type === "get" && this.setterGetterFn) {
-                st.retVal = this.setterGetterFn(type);
-            } else if (type === "set" && this.setterGetterFn) {
-                st.retVal = this.setterGetterFn(type, st.setVal);
+            if (type === "get" && this.getterFn) {
+                st.retVal = this.getterFn(type);
+            } else if (type === "set" && this.setterFn) {
+                st.retVal = this.setterFn(type, st.setVal);
             } else if (type === "set") {
                 // if no setter / getter function, just used the cached propValue
                 st.retVal = st.setVal;
@@ -424,8 +446,8 @@
 
             debug(`_runTriggerList ${preOrPost}`, this.triggerList);
 
-            for (let idx in this.triggerList) {
-                let trigger = this.triggerList[idx];
+            for (let i = 0; i < this.triggerList.length; i++) {
+                let trigger = this.triggerList[i];
                 trigger._run(op);
             }
         }
@@ -836,7 +858,7 @@
                 for (let k = 0; k < errList.length; k++) {
                     let subErr = errList[k];
                     retMsg += indent(indentNum) + subErr.message + "\n";
-                    retMsg += diffToStr(subErr.diff, indentNum+1);
+                    retMsg += diffToStr(subErr.diff, indentNum + 1);
                 }
                 return retMsg;
             }
@@ -1251,23 +1273,22 @@
 
             /**
              * Evaluates whether the context (`this`) of a function call matches the `context` parameter.
-             * @name expectContext
+             * @name expectCallContext
              * @function
              * @instance
-             * @todo fix description and param
              * @memberof Expect
              * @param {Object} context The expected `this` for the function. Is compared by a strict deep-equals.
              * @return {Trigger|Boolean}           When called on a {@link Trigger}, the expectation is stored for future evaluation and the `Trigger` value is returned to make this chainable.
              * When called on a {@link Operation}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
              */
-            alias(this, "expectContext",
-                this._expect, "expectContext", "function", "pre", validateArgsSingle,
+            alias(this, "expectCallContext",
+                this._expect, "expectCallContext", "function", "pre", validateArgsSingle,
                 function(single, context) {
                     var m = Match.value(context);
                     if (m.compare(single.context)) {
                         return null;
                     }
-                    var err = new ExpectError("expectContext: expectation failed for: " + context);
+                    var err = new ExpectError("expectCallContext: expectation failed for: " + context);
                     err.diff = m.lastDiff;
                     return err;
                 });
@@ -1277,7 +1298,6 @@
              * @name expectException
              * @function
              * @instance
-             * @todo fix description and param
              * @memberof Expect
              * @param {Error|null} exception The `Error` (or class that inherits from `Error`) that is expected to strictly match. A strict
              * comparison between errors evaluates that the `Error.name` and `Error.message` are the exact same. If `exception` is `null`, it
@@ -1303,7 +1323,6 @@
              * @name expectSetVal
              * @function
              * @instance
-             * @todo fix description and param
              * @memberof Expect
              * @param {any} setVal The value that is expected to be set on the property. An `undefined` value is allowed, but the value `undefined` must be passed explicitly to `expectSetVal`.
              * @return {Trigger|Boolean}           When called on a {@link Trigger}, the expectation is stored for future evaluation and the `Trigger` value is returned to make this chainable.
@@ -1327,7 +1346,6 @@
              * @name expectCustom
              * @function
              * @instance
-             * @todo fix description and param
              * @memberof Expect
              * @param {Operation~customExpectCallback} cb Callback function that will determine whether the expecation passes or fails. See {@link Operation~customExpectCallback customExpectCallback} for more details.
              * @return {Trigger|Boolean}           When called on a {@link Trigger}, the expectation is stored for future evaluation and the `Trigger` value is returned to make this chainable.
@@ -1494,7 +1512,7 @@
             for (let i = 0; i < results.length; i++) {
                 // any results failed, add a failure message to the list
                 if (results[i] !== null) {
-                    errList.push (results[i]);
+                    errList.push(results[i]);
                     passed = false;
                 }
             }
@@ -1893,7 +1911,7 @@
             if (type === "property") this.wrapper._propOnly(name);
             if (type === "function") this.wrapper._funcOnly(name);
 
-            // XXX: `Array.filter()` creates a `new Array()`... which doesn't call
+            // NOTE: `Array.filter()` creates a `new Array()`... which doesn't call
             // `new Filter()` with the right args. Rewriting `Array.filter()` is the only
             // solution...
             var newFilter = new Filter(this.wrapper);
@@ -1909,7 +1927,7 @@
             if (type === "property") this.wrapper._propOnly(name);
             if (type === "function") this.wrapper._funcOnly(name);
 
-            // XXX: `Array.map()` creates a `new Array()`... which doesn't call
+            // NOTE: `Array.map()` creates a `new Array()`... which doesn't call
             // `new Filter()` with the right args. Rewriting `Array.map()` is the only
             // solution...
             var newFilter = new Filter(this.wrapper);
@@ -1978,7 +1996,7 @@
 
             var err = null;
             var passed = (this.length === num);
-            if (!passed) err = new ExpectError (`expectCount: expected exactly ${num}`);
+            if (!passed) err = new ExpectError(`expectCount: expected exactly ${num}`);
 
             return Expect._softAssert(this, err);
         }
@@ -2136,7 +2154,7 @@
      * `Operations` extend the `Expect` class, which enables expect methods to be run against the `Operator`. Again
      * these expectations can be run in real-time during a `Trigger`, or after-the-fact from the `historyList`.
      * @borrows Expect#expectCallArgs as expectCallArgs
-     * @borrows Expect#expectContext as expectContext
+     * @borrows Expect#expectCallContext as expectCallContext
      * @borrows Expect#expectCustom as expectCustom
      * @borrows Expect#expectException as expectException
      * @borrows Expect#expectReturn as expectReturn
@@ -2177,7 +2195,7 @@
                 return this._propertyConstructor(desc);
             }
 
-            // XXX: not reached
+            // NOTE: not reached
         }
 
         _functionConstructor(desc) {
@@ -2224,7 +2242,7 @@
      *     * customAction
      *
      * @borrows Expect#expectCallArgs as expectCallArgs
-     * @borrows Expect#expectContext as expectContext
+     * @borrows Expect#expectCallContext as expectCallContext
      * @borrows Expect#expectCustom as expectCustom
      * @borrows Expect#expectException as expectException
      * @borrows Expect#expectReturn as expectReturn
@@ -2493,12 +2511,12 @@
 
         _run(si) {
             // check trigger to see if it should run
-            if (!this.triggerFn.call(this, si)) return;
+            if (!this.triggerFn(si)) return;
 
             // perform actions
             this.currentCall = si;
-            for (let idx in this.actionList) {
-                let action = this.actionList[idx];
+            for (let i = 0; i < this.actionList.length; i++) {
+                let action = this.actionList[i];
                 this[action.name](...action.argList);
             }
             this.currentCall = null;
@@ -3356,6 +3374,212 @@
         return diff;
     }
 
+    class Module {
+        constructor(moduleName) {
+            this.moduleName = moduleName;
+            this.propertyMap = new Map();
+            this.behaviorMap = new Map();
+        }
+
+        defineMethod(name) {
+            validateArgsSingleString("defineMethod", name);
+            return this.defineInterface(name, "function");
+        }
+
+        defineProperty(name) {
+            validateArgsSingleString("defineProperty", name);
+            return this.defineInterface(name, "property");
+        }
+
+        defineInterface(name, type) {
+            if (this.getInterface(name)) {
+                throw new TypeError(`defineInterface: '${name}' is already defined`);
+            }
+
+            var newProp = new Interface(this, name, type);
+            this.propertyMap.set(name, newProp);
+            return newProp;
+        }
+
+        defineBehavior(behaviorName, interfaceName) {
+            if (typeof behaviorName !== "string") {
+                throw new TypeError("defineBehavior: expected first argument 'behaviorName' to be of type String");
+            }
+
+            if (this.getBehavior(behaviorName)) {
+                throw new TypeError(`defineBehavior: behavior name '${behaviorName}' is already defined`);
+            }
+
+            if (this.getInterface(behaviorName)) {
+                throw new TypeError(`defineBehavior: behavior name '${behaviorName}' is already used as an interface name`);
+            }
+
+            var newBehavior = new Behavior(this, behaviorName);
+            this.behaviorMap.set(behaviorName, newBehavior);
+            if (interfaceName === undefined) return newBehavior;
+
+            if (typeof interfaceName !== "string") {
+                throw new TypeError("defineBehavior: expected second argument 'interfaceName' to be of type String");
+            }
+
+            var foundInterface = this.getInterface(interfaceName);
+            if (!foundInterface) {
+                throw new TypeError(`defineBehavior: interface '${interfaceName}' not found`);
+            }
+
+            return newBehavior[foundInterface.interfaceName]();
+        }
+
+        getInterface(interfaceName) {
+            validateArgsSingleString("getInterface", interfaceName);
+            return this.propertyMap.get(interfaceName);
+        }
+
+        getBehavior(behaviorName) {
+            validateArgsSingleString("getBehavior", behaviorName);
+            return this.behaviorMap.get(behaviorName);
+        }
+
+        getStub(behaviorName) {
+            validateArgsSingleString("getStub", behaviorName);
+            var behavior = this.getBehavior(behaviorName);
+            if (!behavior) {
+                throw new TypeError(`getStub: behavior '${behaviorName}' not defined`);
+            }
+
+            return behavior.getStub();
+        }
+    }
+
+    class Interface {
+        constructor(module, name, type) {
+            this.module = module;
+            this.interfaceName = name;
+            this.interfaceType = type;
+        }
+    }
+
+    // returns a function, and that function returns the specified value
+    function fnRetVal(val) {
+        var fn = function(retVal) {
+            return retVal;
+        };
+        return fn.bind(null, val);
+    }
+
+    class Behavior {
+        constructor(module, name) {
+            this.module = module;
+            this.behaviorName = name;
+            this.behaviorSequence = [];
+
+            this.chainable = new Proxy(this, {
+                get: (obj, property) => {
+                    var found = this._lookupProperty(property);
+                    if (!found) return obj[property];
+                    return found;
+                }
+            });
+
+            return this.chainable;
+        }
+
+        _lookupProperty(property) {
+            // lookup interface
+            var foundInterface = this.module.getInterface(property);
+            if (foundInterface instanceof Interface) {
+                return this._addInterfaceBehavior(foundInterface);
+            }
+
+            // lookup behavior
+            var behavior = this.module.getBehavior(property);
+            if (behavior instanceof Behavior) {
+                return this._addBehavior(behavior);
+            }
+
+            return undefined;
+        }
+
+        _addInterfaceBehavior(interfaceObj) {
+            var interfaceBehavior = new InterfaceBehavior(this.module, this, interfaceObj);
+            this.behaviorSequence.push(interfaceBehavior);
+            return fnRetVal(interfaceBehavior);
+        }
+
+        _addBehavior(behavior) {
+            this.behaviorSequence.push(behavior);
+            return fnRetVal(this.chainable);
+        }
+
+        getStub() {
+            var stub = new Wrapper();
+            var interfaceCountMap = new Map();
+
+            function incrementInterfaceCountMap(interfaceBehavior) {
+                var name = interfaceBehavior.interface.interfaceName;
+
+                if (interfaceCountMap.has(name)) {
+                    let count = interfaceCountMap.get(name);
+                    count++;
+                    interfaceCountMap.set(name, count);
+                    return count;
+                } else {
+                    interfaceCountMap.set(name, 0);
+                    return 0;
+                }
+            }
+
+            // collect all the interface behaviors
+            let interfaceBehaviorList = this._gatherInterfaceBehaviors(this);
+
+            // add all the interface behaviors to the stub
+            for (let i = 0; i < interfaceBehaviorList.length; i++) {
+                let behavior = interfaceBehaviorList[i];
+                let count = incrementInterfaceCountMap(behavior);
+                this._addInterfaceBehaviorToStub(stub, count, behavior);
+            }
+
+            return stub;
+        }
+
+        // recursively iterates all behaviors and adds any interface behaviors to the returned array
+        _gatherInterfaceBehaviors(behavior) {
+            var ret = [];
+
+            for (let i = 0; i < behavior.behaviorSequence.length; i++) {
+                let currBehavior = behavior.behaviorSequence[i];
+                if (currBehavior instanceof InterfaceBehavior) {
+                    ret.push(currBehavior);
+                } else {
+                    ret = ret.concat(this._gatherInterfaceBehaviors(currBehavior));
+                }
+            }
+
+            return ret;
+        }
+
+        // adds the correct behavior to the stub
+        _addInterfaceBehaviorToStub(stub, cnt, interfaceBehavior) {
+            if (interfaceBehavior.hasOwnProperty("retVal")) {
+                stub.triggerOnCallNumber(cnt)
+                    .actionReturn(interfaceBehavior.retVal);
+            }
+        }
+
+        // getTest() {}
+    }
+
+    class InterfaceBehavior {
+        constructor(module, behavior, interfaceObj) {
+            this.module = module;
+            this.interface = interfaceObj;
+        }
+
+        returns(retVal) {
+            this.retVal = retVal;
+        }
+    }
+
     // Just return a value to define the module export.
     // This example returns an object, but the module
     // can return a function as the exported value.
@@ -3366,7 +3590,11 @@
         Trigger: Trigger,
         ExpectError: ExpectError,
         Sandbox: Sandbox,
-        Filter: Filter
+        Filter: Filter,
+        Module: Module,
+        Interface: Interface,
+        Behavior: Behavior,
+        InterfaceBehavior: InterfaceBehavior
     };
 }));
 
