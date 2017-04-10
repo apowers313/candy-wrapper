@@ -42,7 +42,7 @@ $ npm install candy-wrapper
 Use:
 
 ``` js
-var Wrapper = require("candy-wrapper").Wrapper.
+var Wrapper = require("candy-wrapper").Wrapper;
 new Wrapper();
 ```
 
