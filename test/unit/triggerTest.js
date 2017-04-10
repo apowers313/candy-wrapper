@@ -1,11 +1,7 @@
 var assert = assert || chai.assert;
 var Wrapper = CandyWrapper.Wrapper;
-var Match = CandyWrapper.Match;
 var Trigger = CandyWrapper.Trigger;
-var Filter = CandyWrapper.Filter;
-var Operation = CandyWrapper.Operation;
 var ExpectError = CandyWrapper.ExpectError;
-var Sandbox = CandyWrapper.Sandbox;
 
 /* JSHINT */
 /* globals chai, CandyWrapper */
@@ -526,7 +522,7 @@ describe("trigger", function() {
             // pass
             var w = new Wrapper();
             w.triggerAlways()
-                .expectContext({
+                .expectCallContext({
                     location: "home"
                 });
             assert.doesNotThrow(function() {
@@ -538,7 +534,7 @@ describe("trigger", function() {
             // pass
             new Wrapper();
             w.triggerAlways()
-                .expectContext({
+                .expectCallContext({
                     location: "home"
                 });
             assert.throws(function() {

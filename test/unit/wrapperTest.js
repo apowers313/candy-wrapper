@@ -1,11 +1,6 @@
 var assert = assert || chai.assert;
 var Wrapper = CandyWrapper.Wrapper;
-var Match = CandyWrapper.Match;
-var Trigger = CandyWrapper.Trigger;
-var Filter = CandyWrapper.Filter;
-var Operation = CandyWrapper.Operation;
 var ExpectError = CandyWrapper.ExpectError;
-var Sandbox = CandyWrapper.Sandbox;
 
 /* JSHINT */
 /* globals chai, CandyWrapper */
@@ -216,8 +211,184 @@ describe("create wrapper", function() {
             new Wrapper(null);
         }, TypeError, /Wrapper: bad arguments/);
     });
-    it("mirrors defineProperty values");
-    it("mirrors function name, argument length, and argument list");
+
+    it("mirrors defineProperty values", function() {
+        var testObj = {};
+        Object.defineProperty(testObj, "notWritable", {
+            writable: false,
+            value: 42,
+            configurable: true,
+            enumerable: true
+        });
+        Object.defineProperty(testObj, "notConfigurable", {
+            writable: true,
+            value: 43,
+            configurable: false,
+            enumerable: true
+        });
+        Object.defineProperty(testObj, "notEnumerable", {
+            writable: true,
+            value: 44,
+            configurable: true,
+            enumerable: false
+        });
+        Object.defineProperty(testObj, "allGood", {
+            writable: true,
+            value: 45,
+            configurable: true,
+            enumerable: true
+        });
+
+        var desc;
+        // not writable
+        new Wrapper(testObj, "notWritable");
+        assert.isTrue(Wrapper.isWrapper(testObj, "notWritable"));
+        desc = Object.getOwnPropertyDescriptor(testObj, "notWritable");
+        assert.strictEqual(testObj.notWritable, 42);
+        assert.isUndefined(desc.writable);
+        assert.isTrue(desc.configurable);
+        assert.isTrue(desc.enumerable);
+
+        // not configurable
+        assert.throws(function() {
+            new Wrapper(testObj, "notConfigurable");
+        }, Error, "new Wrapper: can't wrap non-configurable property: 'notConfigurable'");
+
+        // not enumerable
+        new Wrapper(testObj, "notEnumerable");
+        assert.isTrue(Wrapper.isWrapper(testObj, "notEnumerable"));
+        desc = Object.getOwnPropertyDescriptor(testObj, "notEnumerable");
+        assert.strictEqual(testObj.notEnumerable, 44);
+        assert.isUndefined(desc.writable);
+        assert.isTrue(desc.configurable);
+        assert.isFalse(desc.enumerable);
+
+        // all good
+        new Wrapper(testObj, "allGood");
+        assert.isTrue(Wrapper.isWrapper(testObj, "allGood"));
+        desc = Object.getOwnPropertyDescriptor(testObj, "allGood");
+        assert.strictEqual(testObj.allGood, 45);
+        assert.isUndefined(desc.writable);
+        assert.isTrue(desc.configurable);
+        assert.isTrue(desc.enumerable);
+    });
+
+    it("works with setters and getters", function() {
+        function iThrow() { // the new Apple blanket!
+            throw new Error("testing: rubber baby buggy bumpers");
+        }
+
+        function returnFuzzyBeachBall() {
+            return "fuzzy beach ball";
+        }
+        var testObj = {};
+        Object.defineProperty(testObj, "setThrows", {
+            configurable: true,
+            enumerable: true,
+            set: iThrow
+        });
+        Object.defineProperty(testObj, "getBeachBall", {
+            configurable: true,
+            enumerable: true,
+            get: returnFuzzyBeachBall
+        });
+        Object.defineProperty(testObj, "setterAndGetter", {
+            configurable: true,
+            enumerable: true,
+            set: iThrow,
+            get: returnFuzzyBeachBall
+        });
+        Object.defineProperty(testObj, "noSetterGetter", {
+            configurable: true,
+            enumerable: true
+        });
+
+        // wrap everything
+        new Wrapper(testObj);
+        assert.isTrue(Wrapper.isWrapper(testObj, "setThrows"));
+        assert.isTrue(Wrapper.isWrapper(testObj, "getBeachBall"));
+        assert.isTrue(Wrapper.isWrapper(testObj, "setterAndGetter"));
+        assert.isTrue(Wrapper.isWrapper(testObj, "noSetterGetter"));
+
+        var ret;
+        // set
+        assert.throws(function() {
+            testObj.setThrows = 42;
+        }, Error, "testing: rubber baby buggy bumpers");
+        ret = testObj.noSetterGetter;
+        assert.isUndefined(ret);
+
+        // get
+        ret = testObj.getBeachBall;
+        assert.strictEqual(ret, "fuzzy beach ball");
+        assert.doesNotThrow(function() {
+            testObj.getBeachBall = 42;
+        });
+        ret = testObj.getBeachBall;
+        assert.strictEqual(ret, "fuzzy beach ball");
+
+        // set and get
+        assert.throws(function() {
+            testObj.setterAndGetter = 42;
+        }, Error, "testing: rubber baby buggy bumpers");
+        ret = testObj.setterAndGetter;
+        assert.strictEqual(ret, "fuzzy beach ball");
+
+        // neither
+        ret = testObj.noSetterGetter;
+        assert.isUndefined(ret);
+        assert.doesNotThrow(function() {
+            testObj.noSetterGetter = 42;
+        });
+        ret = testObj.noSetterGetter;
+        assert.strictEqual(ret, 42);
+    });
+
+    it("mirrors function name nad argument length", function() {
+        function pudding(a, b, c) {
+            a = b = c; // keep linter happy
+        }
+
+        function schmoo() {}
+        var testFunc1 = function() {};
+        var testFunc2 = function(a, b, c, d, e, f) {
+            a = b = c = d = e = f; // keep linter happy
+        };
+
+        var w = new Wrapper(pudding);
+        assert.strictEqual(w.name, "pudding");
+        assert.strictEqual(w.length, 3);
+
+        w = new Wrapper(schmoo);
+        assert.strictEqual(w.name, "schmoo");
+        assert.strictEqual(w.length, 0);
+
+        w = new Wrapper(testFunc1);
+        // NOTE: FF and IE don't infer function names like Chrome does
+        // assert.strictEqual(w.name, "testFunc1");
+        assert.strictEqual(w.length, 0);
+
+        w = new Wrapper(testFunc2);
+        // NOTE: FF and IE don't infer function names like Chrome does
+        // assert.strictEqual(w.name, "testFunc2");
+        assert.strictEqual(w.length, 6);
+
+        w = new Wrapper(function() {});
+        assert.strictEqual(w.name, "");
+        assert.strictEqual(w.length, 0);
+
+        w = new Wrapper(new Function()); // jshint ignore:line
+        assert.strictEqual(w.name, "anonymous");
+        assert.strictEqual(w.length, 0);
+    });
+
+    it("throws on undefined property or method", function() {
+        var testObj = {};
+
+        assert.throws(function() {
+            new Wrapper(testObj, "beer");
+        }, TypeError, "Wrapper constructor: expected 'beer' to exist on object");
+    });
 
     describe("static", function() {
         it("can identify a wrapper", function() {

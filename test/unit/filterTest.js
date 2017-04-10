@@ -1,11 +1,8 @@
 var assert = assert || chai.assert;
 var Wrapper = CandyWrapper.Wrapper;
-var Match = CandyWrapper.Match;
-var Trigger = CandyWrapper.Trigger;
 var Filter = CandyWrapper.Filter;
 var Operation = CandyWrapper.Operation;
 var ExpectError = CandyWrapper.ExpectError;
-var Sandbox = CandyWrapper.Sandbox;
 
 /* JSHINT */
 /* globals chai, CandyWrapper */
@@ -913,15 +910,15 @@ describe("filter", function() {
             w.call({
                 beer: "yummy"
             });
-            assert.isOk(w.historyList.filterByNumber(0).expectContext({
+            assert.isOk(w.historyList.filterByNumber(0).expectCallContext({
                 beer: "yummy"
             }));
-            assert.isNotOk(w.historyList.filterByNumber(0).expectContext({
+            assert.isNotOk(w.historyList.filterByNumber(0).expectCallContext({
                 wine: "empty"
             }));
             w.call(null);
-            assert.isOk(w.historyList.filterByNumber(1).expectContext(null));
-            assert.isNotOk(w.historyList.filterByNumber(1).expectContext({
+            assert.isOk(w.historyList.filterByNumber(1).expectCallContext(null));
+            assert.isNotOk(w.historyList.filterByNumber(1).expectCallContext({
                 wine: "empty"
             }));
         });
