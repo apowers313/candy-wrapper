@@ -14,6 +14,7 @@ describe("test loader", function() {
             "unit/triggerTest.js",
             "unit/sandboxTest.js",
             "unit/matchTest.js",
+            "unit/interfaceTest.js",
         ];
 
         // uses node's require to load a script
