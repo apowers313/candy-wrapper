@@ -1,6 +1,6 @@
 {
   "name": "candy-wrapper",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "description": "Wrap your functions, methods, and properties to monitor them and modify their behavior.",
   "main": "main.js",
   "directories": {
