@@ -3379,6 +3379,7 @@
             this.moduleName = moduleName;
             this.propertyMap = new Map();
             this.behaviorMap = new Map();
+            this.testList = [];
         }
 
         defineMethod(name) {
@@ -3449,6 +3450,48 @@
 
             return behavior.getStub();
         }
+
+        // tests will be run in the order defined
+        defineTest(behaviorName, desc) {
+            if (typeof behaviorName !== "string") {
+                throw new TypeError("defineTest: expected argument 'behaviorName' to be of type String");
+            }
+            var behavior = this.getBehavior(behaviorName);
+            if (!behavior) {
+                throw new TypeError(`defineTest: behavior '${behaviorName}' not defined`);
+            }
+
+            if (desc !== undefined && typeof desc !== "string") {
+                throw new TypeError ("defineTest: expection optional argument 'desc' to be of type String");
+            }
+
+            desc = desc || behavior.behaviorName;
+
+            this.testList.push({
+                behaviorName: behaviorName,
+                desc: desc
+            });
+        }
+
+        _testFunctionFactory(behavior) {
+            return function(mod) {
+                return behavior.runTest(mod);
+            };
+        }
+
+        getTestList() {
+            // cheap deep-clone testList
+            var retTestList = JSON.parse(JSON.stringify(this.testList));
+
+            // add test function to corresponding testList entries
+            for (let i = 0; i < retTestList.length; i++) {
+                let name = retTestList[i].behaviorName;
+                let behav = this.getBehavior(name);
+                retTestList[i].fn = this._testFunctionFactory(behav);
+            }
+
+            return retTestList;
+        }
     }
 
     class Interface {
@@ -3512,8 +3555,96 @@
         }
 
         getStub() {
-            var stub = new Wrapper();
+            var stubObj = {};
+
+            function newStub(prop) {
+                var stub = new Wrapper();
+                stubObj[prop] = stub;
+                return stub;
+            }
+
+            // adds the correct behavior to the stub
+            function addInterfaceBehaviorToStub(stub, cnt, interfaceBehavior) {
+                if (interfaceBehavior.hasOwnProperty("retVal")) {
+                    stub.triggerOnCallNumber(cnt)
+                        .actionReturn(interfaceBehavior.retVal);
+                }
+
+                if (interfaceBehavior.hasOwnProperty("exception")) {
+                    stub.triggerOnCallNumber(cnt)
+                        .actionThrowException(interfaceBehavior.exception);
+                }
+            }
+
+            this._iterateInterfaceBehaviors(newStub, addInterfaceBehaviorToStub);
+
+            return stubObj;
+        }
+
+        runTest(mod) {
+            // create sandbox
+            var sandbox = new Sandbox();
+            var callList = [];
+
+            function newTest(prop) {
+                if(!mod.hasOwnProperty(prop)) {
+                    throw new Error (`runTest: expected property '${prop}' to exist on module`);
+                }
+
+                var test = sandbox.newWrapper(mod, prop);
+                return test;
+            }
+
+            function createTest(wrapper, cnt, interfaceBehavior) {
+                // add call to list
+                callList.push(wrapper);
+
+                // configure wrapper's expectations
+                var trigger = wrapper.triggerOnCallNumber(cnt);
+
+                if (interfaceBehavior.hasOwnProperty("retVal")) {
+                    trigger.expectReturn(interfaceBehavior.retVal);
+                }
+            }
+
+            // iterate all behaviors creating wrappers on all tested interfaces
+            // and adding expected behaviors to each of those wrappers
+            this._iterateInterfaceBehaviors(newTest, createTest);
+
+            // Sandbox.test?
+            var testBehavior = function() {
+                // call module N times
+                for (let i = 0; i < callList.length; i++) {
+                    callList[i]();
+                }
+
+                // unwrap all wrapped methods
+                sandbox.destroy();
+            };
+
+            return testBehavior;
+        }
+
+        // this iterates all the defined behaviors
+        // it calls `newFn` to create a new thing (probably a test or stub)
+        // and it calls `updateFn` to add functionality to that thing
+        _iterateInterfaceBehaviors(newFn, updateFn) {
             var interfaceCountMap = new Map();
+            var interfaceMap = new Map();
+
+            function getOrCreateWrapper(interfaceBehavior) {
+                var name = interfaceBehavior.interface.interfaceName;
+
+                var interfaceFn = interfaceMap.get(name);
+
+                // if it hasn't been created, create it now
+                if (!interfaceFn) {
+                    interfaceFn = newFn(name);
+                    interfaceMap.set(name, interfaceFn);
+                }
+
+                return interfaceFn;
+            }
 
             function incrementInterfaceCountMap(interfaceBehavior) {
                 var name = interfaceBehavior.interface.interfaceName;
@@ -3529,44 +3660,33 @@
                 }
             }
 
-            // collect all the interface behaviors
-            let interfaceBehaviorList = this._gatherInterfaceBehaviors(this);
+            // recursively iterates all behaviors and adds any interface behaviors to the returned array
+            function gatherInterfaceBehaviors(behavior) {
+                var ret = [];
+
+                for (let i = 0; i < behavior.behaviorSequence.length; i++) {
+                    let currBehavior = behavior.behaviorSequence[i];
+                    if (currBehavior instanceof InterfaceBehavior) {
+                        ret.push(currBehavior);
+                    } else {
+                        ret = ret.concat(gatherInterfaceBehaviors(currBehavior));
+                    }
+                }
+
+                return ret;
+            }
+
+            // collect all the interface behaviors from the abstract behaviors
+            let interfaceBehaviorList = gatherInterfaceBehaviors(this);
 
             // add all the interface behaviors to the stub
             for (let i = 0; i < interfaceBehaviorList.length; i++) {
                 let behavior = interfaceBehaviorList[i];
                 let count = incrementInterfaceCountMap(behavior);
-                this._addInterfaceBehaviorToStub(stub, count, behavior);
-            }
-
-            return stub;
-        }
-
-        // recursively iterates all behaviors and adds any interface behaviors to the returned array
-        _gatherInterfaceBehaviors(behavior) {
-            var ret = [];
-
-            for (let i = 0; i < behavior.behaviorSequence.length; i++) {
-                let currBehavior = behavior.behaviorSequence[i];
-                if (currBehavior instanceof InterfaceBehavior) {
-                    ret.push(currBehavior);
-                } else {
-                    ret = ret.concat(this._gatherInterfaceBehaviors(currBehavior));
-                }
-            }
-
-            return ret;
-        }
-
-        // adds the correct behavior to the stub
-        _addInterfaceBehaviorToStub(stub, cnt, interfaceBehavior) {
-            if (interfaceBehavior.hasOwnProperty("retVal")) {
-                stub.triggerOnCallNumber(cnt)
-                    .actionReturn(interfaceBehavior.retVal);
+                let wrapper = getOrCreateWrapper(behavior);
+                updateFn(wrapper, count, behavior);
             }
         }
-
-        // getTest() {}
     }
 
     class InterfaceBehavior {
@@ -3577,6 +3697,10 @@
 
         returns(retVal) {
             this.retVal = retVal;
+        }
+
+        throws(err) {
+            this.exception = err;
         }
     }
 

@@ -83,7 +83,20 @@ describe("module", function() {
             assert.isUndefined(prop3);
         });
 
-        it("throws when getInterface gets bad args");
+        it("throws when getInterface gets bad args", function() {
+            var mod = new Module();
+
+            // bad arg
+            assert.throws(function() {
+                mod.getInterface(42);
+            }, TypeError, "getInterface: expected a single argument of type String");
+
+            // no arg
+            assert.throws(function() {
+                mod.getInterface();
+            }, TypeError, "getInterface: expected a single argument of type String");
+
+        });
 
         it("can chain on interface", function() {
             var mod = new Module();
@@ -115,7 +128,19 @@ describe("module", function() {
             assert.isUndefined(behav3);
         });
 
-        it("throws when getBehavior gets bad args");
+        it("throws when getBehavior gets bad args", function() {
+            var mod = new Module();
+
+            // not a string
+            assert.throws(function() {
+                mod.getBehavior(42);
+            }, TypeError, "getBehavior: expected a single argument of type String");
+
+            // missing arg
+            assert.throws(function() {
+                mod.getBehavior();
+            }, TypeError, "getBehavior: expected a single argument of type String");
+        });
 
         it("can't define existing behavior", function() {
             var mod = new Module();
@@ -210,8 +235,8 @@ describe("module", function() {
                     user: "Adam"
                 });
             var stub = mod.getStub("getUserSuccess");
-            assert.isTrue(Wrapper.isWrapper(stub));
-            var ret = stub();
+            assert.isTrue(Wrapper.isWrapper(stub.getUser));
+            var ret = stub.getUser();
             assert.deepEqual(ret, {
                 user: "Adam"
             });
@@ -229,23 +254,202 @@ describe("module", function() {
                 .getUserSuccess()
                 .getUserSuccess();
             var stub = mod.getStub("getUsers");
-            assert.isTrue(Wrapper.isWrapper(stub));
+            assert.isTrue(Wrapper.isWrapper(stub.getUser));
 
             // first call
-            var ret = stub();
+            var ret = stub.getUser();
             assert.deepEqual(ret, {
                 user: "Adam"
             });
 
             // second call
-            ret = stub();
+            ret = stub.getUser();
             assert.deepEqual(ret, {
                 user: "Adam"
             });
 
             // third call
-            ret = stub();
+            ret = stub.getUser();
             assert.isUndefined(ret);
+        });
+
+        it("can create a multi-stub", function() {
+            var mod = new Module();
+
+            // methods
+            mod.defineMethod("getUser");
+            mod.defineMethod("createUser");
+
+            // behaviors
+            mod.defineBehavior("getUserFail", "getUser")
+                .throws(new Error("User not found"));
+            mod.defineBehavior("createUserSuccess", "createUser")
+                .returns(true);
+            mod.defineBehavior("getUserSuccess", "getUser")
+                .returns("Adam");
+            mod.defineBehavior("createAccount")
+                .getUserFail()
+                .createUserSuccess()
+                .getUserSuccess();
+
+            // create stub
+            var stub = mod.getStub("createAccount");
+            assert.isTrue(Wrapper.isWrapper(stub.getUser));
+            assert.isTrue(Wrapper.isWrapper(stub.createUser));
+            var ret;
+
+            // first call
+            assert.throws(function() {
+                stub.getUser();
+            }, Error, "User not found");
+
+            // second call
+            ret = stub.createUser();
+            assert.strictEqual(ret, true);
+
+            // third call
+            ret = stub.getUser();
+            assert.strictEqual(ret, "Adam");
+
+            // all done
+            ret = stub.getUser();
+            assert.isUndefined(ret);
+            ret = stub.createUser();
+            assert.isUndefined(ret);
+        });
+
+        it("can stub arguments");
+        it("can stub context");
+        it("can create property stub");
+    });
+
+    describe("defineTest", function() {
+        it("throws on bad args", function() {
+            var mod = new Module();
+
+            // doesn't exist
+            assert.throws(function() {
+                mod.defineTest("asdfqwer");
+            }, TypeError, "defineTest: behavior 'asdfqwer' not defined");
+
+            // bad args
+            assert.throws(function() {
+                mod.defineTest();
+            }, TypeError, "defineTest: expected argument 'behaviorName' to be of type String");
+            assert.throws(function() {
+                mod.defineTest(42);
+            }, TypeError, "defineTest: expected argument 'behaviorName' to be of type String");
+
+            mod.defineBehavior("getUserSuccess");
+            assert.throws(function() {
+                mod.defineTest("getUserSuccess", 42);
+            }, TypeError, "defineTest: expection optional argument 'desc' to be of type String");
+        });
+
+        it("defines a test", function() {
+            var mod = new Module();
+
+            mod.defineBehavior("getUserSuccess");
+            mod.defineTest("getUserSuccess");
+            assert.strictEqual(mod.testList.length, 1);
+            assert.strictEqual(mod.testList[0].behaviorName, "getUserSuccess");
+        });
+
+        it("uses behavior name as default description", function() {
+            var mod = new Module();
+
+            mod.defineBehavior("getUserSuccess");
+            mod.defineTest("getUserSuccess");
+            assert.strictEqual(mod.testList[0].behaviorName, "getUserSuccess");
+            assert.strictEqual(mod.testList[0].desc, "getUserSuccess");
+        });
+
+        it("set desc explicitly", function() {
+            var mod = new Module();
+
+            mod.defineBehavior("getUserSuccess");
+            mod.defineTest("getUserSuccess", "ensures user success");
+            assert.strictEqual(mod.testList[0].behaviorName, "getUserSuccess");
+            assert.strictEqual(mod.testList[0].desc, "ensures user success");
+        });
+    });
+
+    describe("_testFunctionFactory", function() {
+        it("creates a function", function() {
+            var mod = new Module();
+
+            var behav = mod.defineBehavior("testBehavior");
+
+            var fn = mod._testFunctionFactory(behav);
+            assert.isFunction(fn);
+            fn();
+        });
+    });
+
+    function mochaIt(desc, fn) {
+        // console.log("    " + desc);
+        fn();
+    }
+
+    describe("getTestList", function() {
+        it("returns a test list", function() {
+            var mod = new Module();
+
+            mod.defineBehavior("getUserSuccess");
+            mod.defineTest("getUserSuccess", "successful get user");
+            var testList = mod.getTestList();
+            assert.isArray(testList);
+            assert.strictEqual(testList.length, 1);
+            assert.strictEqual(testList[0].behaviorName, "getUserSuccess");
+        });
+
+        it("throws if interace isn't defined", function() {
+            var mod = new Module();
+
+            mod.defineMethod("getUser");
+            mod.defineBehavior("getUserSuccess").getUser().returns("Adam");
+            mod.defineTest("getUserSuccess", "successful get user");
+            var testList = mod.getTestList();
+
+            assert.throws(function() {
+                mochaIt(testList[0].desc, testList[0].fn({module: "test"}));
+            }, Error, "runTest: expected property 'getUser' to exist on module");
+        });
+
+        it("throws on bad return value", function() {
+            var mod = new Module();
+
+            mod.defineMethod("getUser");
+            mod.defineBehavior("getUserSuccess").getUser().returns("Adam");
+            mod.defineTest("getUserSuccess", "successful get user");
+            var testList = mod.getTestList();
+
+            var myMod = {
+                name: "myMod",
+                getUser: function() {
+                    return "Bob";
+                }
+            };
+            assert.throws(function() {
+                mochaIt(testList[0].desc, testList[0].fn(myMod));
+            }, ExpectError, "expectReturn: expectation failed for: Adam");
+        });
+
+        it("passes good expect", function() {
+            var mod = new Module();
+
+            mod.defineMethod("getUser");
+            mod.defineBehavior("getUserSuccess").getUser().returns("Adam");
+            mod.defineTest("getUserSuccess", "successful get user");
+            var testList = mod.getTestList();
+
+            var myMod = {
+                getUser: function() {
+                    return "Adam";
+                }
+            };
+
+            mochaIt(testList[0].desc, testList[0].fn(myMod));
         });
     });
 });
