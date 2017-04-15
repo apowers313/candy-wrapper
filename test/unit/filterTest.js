@@ -1039,6 +1039,8 @@ describe("filter", function() {
             assert.isNotOk(w.historyList.filterByNumber(3).expectException(new TypeError("beer")));
         });
 
+        it("property exception works with configSwallowExpectException");
+
         it("function exception", function() {
             var w = new Wrapper();
             w.triggerOnCallNumber(0)
@@ -1141,6 +1143,8 @@ describe("filter", function() {
             w.expectReportAllFailures(true);
             assert.isTrue(ret);
         });
+
+        it("exception works with configSwallowExpectException");
 
         it("call custom", function() {
             var testFunc = function() {

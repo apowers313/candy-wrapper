@@ -318,8 +318,64 @@ describe("module", function() {
             assert.isUndefined(ret);
         });
 
-        it("can stub arguments");
-        it("can stub context");
+        it("can stub arguments", function() {
+            var mod = new Module();
+
+            // methods
+            mod.defineMethod("getUser");
+
+            // behaviors
+            mod.defineBehavior("getUserMissing", "getUser")
+                .args("Adam")
+                .returns(false);
+
+            // create stub
+            var stub = mod.getStub("getUserMissing");
+
+            // first call
+            var ret = stub.getUser("Adam");
+            assert.isFalse(ret);
+            assert.isTrue(Wrapper.isWrapper(stub.getUser));
+            var callArgs = stub.getUser.historyList.getAllCallArgs();
+            assert.isArray(callArgs);
+            assert.strictEqual(callArgs.length, 1);
+            assert.deepEqual(callArgs[0], ["Adam"]);
+        });
+
+        it("can stub context", function() {
+            var mod = new Module();
+
+            // methods
+            mod.defineMethod("getUser");
+
+            // behaviors
+            mod.defineBehavior("getUserMissing", "getUser")
+                .context({
+                    ctx: true,
+                    name: "beer"
+                })
+                .returns(false);
+
+            // create stub
+            var stub = mod.getStub("getUserMissing");
+
+            // first call
+            var ret = stub.getUser.call({
+                ctx: true,
+                name: "beer"
+            });
+            assert.isFalse(ret);
+            assert.isTrue(Wrapper.isWrapper(stub.getUser));
+            var callContexts = stub.getUser.historyList.getAllCallContexts();
+            assert.isArray(callContexts);
+            assert.strictEqual(callContexts.length, 1);
+            assert.deepEqual(callContexts[0], {
+                ctx: true,
+                name: "beer"
+            });
+        });
+
+        it("can stub exception");
         it("can create property stub");
     });
 
@@ -372,6 +428,91 @@ describe("module", function() {
             assert.strictEqual(mod.testList[0].behaviorName, "getUserSuccess");
             assert.strictEqual(mod.testList[0].desc, "ensures user success");
         });
+
+        it("can test exception", function() {
+            var mod = new Module();
+
+            mod.defineMethod("getUser");
+            mod.defineBehavior("getUserError")
+                .getUser()
+                .throws(new Error("user not found"));
+            mod.defineTest("getUserError", "throws error on failure");
+
+            // pass
+            var myMod = {
+                getUser: function() {
+                    throw new Error("user not found");
+                }
+            };
+            mod.runAllTests(myMod, mochaIt);
+
+            // fail - no error
+            myMod.getUser = function() {};
+            assert.throws(function() {
+                mod.runAllTests(myMod, mochaIt);
+            }, ExpectError, "expectException: expectation failed for: Error: user not found");
+
+            // fail - wrong error
+            myMod.getUser = function() {
+                throw new Error("out of memory");
+            };
+            assert.throws(function() {
+                mod.runAllTests(myMod, mochaIt);
+            }, ExpectError, "expectException: expectation failed for: Error: user not found");
+        });
+
+        it("can set test args", function() {
+            var mod = new Module();
+
+            // method
+            mod.defineMethod("getUser");
+            var myMod = {
+                getUser: function(...args) {
+                    assert.deepEqual(args, [1, undefined, false, "God"]);
+                }
+            };
+
+            // behavior
+            mod.defineBehavior("getUserArgs")
+                .getUser()
+                .args(1, undefined, false, "God");
+            mod.defineTest("getUserArgs", "tests the getUserArgs");
+
+            // pass
+            mod.runAllTests(myMod, mochaIt);
+        });
+
+        it("can set test context", function() {
+            var mod = new Module();
+
+            // method
+            mod.defineMethod("getUser");
+            var myMod = {
+                getUser: function() {
+                    assert.deepEqual(this, {
+                        happy: true,
+                        name: "bob",
+                        sumthin: "yup"
+                    });
+                }
+            };
+
+            // behavior
+            mod.defineBehavior("getUserArgs")
+                .getUser()
+                .context({
+                    happy: true,
+                    name: "bob",
+                    sumthin: "yup"
+                });
+            mod.defineTest("getUserArgs", "tests the getUserArgs");
+
+            // pass
+            mod.runAllTests(myMod, mochaIt);
+        });
+
+        it("does set value");
+        it("can test get value");
     });
 
     describe("_testFunctionFactory", function() {
@@ -402,7 +543,9 @@ describe("module", function() {
             assert.strictEqual(testList.length, 1);
             assert.strictEqual(testList[0].behaviorName, "getUserSuccess");
         });
+    });
 
+    describe("test", function() {
         it("throws if interace isn't defined", function() {
             var mod = new Module();
 
@@ -412,7 +555,9 @@ describe("module", function() {
             var testList = mod.getTestList();
 
             assert.throws(function() {
-                mochaIt(testList[0].desc, testList[0].fn({module: "test"}));
+                mochaIt(testList[0].desc, testList[0].fn({
+                    module: "test"
+                }));
             }, Error, "runTest: expected property 'getUser' to exist on module");
         });
 

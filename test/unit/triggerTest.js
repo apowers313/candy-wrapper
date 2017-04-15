@@ -566,6 +566,57 @@ describe("trigger", function() {
             }, ExpectError);
         });
 
+        it("can swallow exception", function() {
+            var testFunc = function() {
+                throw new Error("test exception");
+            };
+            testFunc = new Wrapper(testFunc);
+
+            testFunc.triggerAlways().expectException(new Error("test exception"));
+
+            // throws the error
+            assert.throws(function() {
+                testFunc();
+            }, Error, "test exception");
+
+            // swallows the error
+            testFunc.configSwallowExpectException(true);
+            assert.doesNotThrow(function() {
+                testFunc();
+            });
+
+            // make sure the exception is still recorded
+            assert.strictEqual(testFunc.historyList.length, 2);
+            var errList = testFunc.historyList.getAllExceptions();
+            assert.strictEqual(errList[0].name, "Error");
+            assert.strictEqual(errList[0].message, "test exception");
+            assert.strictEqual(errList[0].name, "Error");
+            assert.strictEqual(errList[0].message, "test exception");
+        });
+
+        it("doesn't swallow different exception", function() {
+            var testFunc = function() {
+                throw new Error("this is not a test");
+            };
+            testFunc = new Wrapper(testFunc);
+            assert.isTrue(Wrapper.isWrapper(testFunc));
+
+            testFunc.triggerAlways().expectException(new Error("test exception"));
+
+            assert.throws(function() {
+                testFunc();
+            }, Error, "this is not a test");
+
+            testFunc.configSwallowExpectException(true);
+
+            assert.throws(function() {
+                testFunc();
+            }, Error, "this is not a test");
+
+            // make sure the exception is still recorded
+            assert.strictEqual(testFunc.historyList.length, 0);
+        });
+
         it("does setval", function() {
             var testObj = {
                 beer: "yummy"
@@ -617,8 +668,24 @@ describe("trigger", function() {
             assert.isOk(check);
         });
 
+        it("prints diff", function() {
+            var w = new Wrapper();
+
+            w.triggerAlways()
+                .expectCallArgs("beer");
+
+            // fail
+            assert.throws(function() {
+                w("wine");
+            }, ExpectError, new RegExp(
+                "expectCallArgs: expectation failed for: beer\n" +
+                " +At \\[0\\]: Expected: 'beer'; Got: 'wine'\n",
+                "g"));
+        })
+
         it("is chainable");
     });
+
     describe("trigger action", function() {
         it("can spoof a call return value", function() {
             var w = new Wrapper();
@@ -978,10 +1045,62 @@ describe("trigger", function() {
             }, TypeError, "expected a single argument of any type");
         });
 
+        it("can set call arguments", function() {
+            var testFunc = function(...args) {
+                assert.deepEqual(args, [1, undefined, false, "God"]);
+            };
+            testFunc = new Wrapper(testFunc);
+
+            testFunc.triggerAlways()
+                .actionCallArgs(1, undefined, false, "God");
+
+            // all pass, args replaced by trigger
+            testFunc();
+            testFunc("foo");
+            testFunc(undefined);
+            testFunc(null);
+            testFunc([]);
+        });
+
+        it("can set call call context", function() {
+            var testFunc = function() {
+                assert.deepEqual(this, {
+                    happy: true,
+                    name: "bob",
+                    sumthin: "yup"
+                });
+            };
+            testFunc = new Wrapper(testFunc);
+
+            testFunc.triggerAlways()
+                .actionCallContext({
+                    happy: true,
+                    name: "bob",
+                    sumthin: "yup"
+                });
+
+            // all pass, args replaced by trigger
+            testFunc.call();
+            testFunc.call({});
+            testFunc.call({
+                sumthin: "nope"
+            });
+            testFunc.call(null);
+
+            // trhows on too many args
+            assert.throws(function() {
+                testFunc.triggerAlways()
+                    .actionCallContext({
+                        happy: true,
+                        name: "bob",
+                        sumthin: "yup"
+                    }, 2);
+            }, TypeError, "actionCallContext: expected a single argument of any type");
+        });
+
         it("can chain actions");
         it("actionCallbackAsync");
         it("actionCallbackPropibute");
         it("actionAsync");
     });
-
 });

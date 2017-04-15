@@ -56,6 +56,14 @@
         }
     }
 
+    function indent(num) {
+        var base = "      ";
+        var indent = "    ";
+        var ret = base;
+        for (let i = 0; i < num; i++) ret += indent;
+        return ret;
+    }
+
     var wrapperCookie = "193fe616-09d1-4d5c-a5b9-ff6f3e79714c";
     var wrapperCookieKey = "uniquePlaceToKeepAGuidForCandyWrapper";
 
@@ -323,7 +331,7 @@
             var ret, exception = null;
             if (this.config.callUnderlying) { // option to turn on / off whether the function gets called
                 try {
-                    ret = this.wrapped.apply(context, argList);
+                    ret = this.wrapped.apply(si.context, si.argList);
                 } catch (ex) {
                     exception = ex;
                 }
@@ -341,7 +349,11 @@
             this.historyList.push(si);
 
             // throw the exception...
-            if (si.exception) throw si.exception;
+            if (si.exception && // if we have an exception
+                (!this.config.swallowException || ( // and the exception shouldn't be swallowed
+                    this.config.swallowException && !si.exception.candyWrapperExpected // or the exception should be swallowed, but this error wasn't expected
+                )))
+                throw si.exception;
             // ...or call the callback...
             if (typeof si.callback.fn === "function") {
                 let cbFn = si.callback.fn;
@@ -647,7 +659,8 @@
                 expectThrowsOnTrigger: true,
                 expectThrows: false,
                 callUnderlying: true,
-                allowRewrap: true
+                allowRewrap: true,
+                swallowException: false
             };
         }
 
@@ -801,6 +814,21 @@
         }
 
         /**
+         * When a {@link Trigger} expects an exception, it won't stop the exception from being thrown. When the `swallowException`
+         * argument to `configSwallowExpectException` is `true`, it will prevent the specific exception that was expected from
+         * being thrown. This is useful for testing, where tests may expect an error to be thrown -- which is actually indicates
+         * a successful test case. Allowing the error to be thrown would cause the test to fail. Note that this only swallows the
+         * specific `Error` that is expected, and all other errors will still be thrown.
+         *
+         * Note that even if an exception is swallowed, it will still be recorded to the `Wrapper`'s `historyList`.
+         * @param  {Boolean} swallowException If set to `true` any expected exceptions won't be thrown; if `false`, the `Error` will
+         * be thrown anyway.
+         */
+        configSwallowExpectException(swallowException) {
+            this.config.swallowException = swallowException;
+        }
+
+        /**
          * The typical behavior for expectations called against a {@link Filter}, {@link Operation}
          * is that they will return `true` or `false` immediately. This allows them to be used with assertion libraries,
          * such as [Chai](http://chaijs.com/). Alternatively, `expectReportAllFailures` allows you to run all your expectations
@@ -834,31 +862,13 @@
             if (this.expectPassed) return true;
             var message = `${this.expectErrorList.length} expectation(s) failed:\n`;
 
-            function indent(num) {
-                var base = "      ";
-                var indent = "    ";
-                var ret = base;
-                for (let i = 0; i < num; i++) ret += indent;
-                return ret;
-            }
-
-            function diffToStr(diff, indentNum) {
-                if (!diff) return "";
-
-                var diffList = diff.toStringArray();
-                var retMsg = "";
-                for (let i = 0; i < diffList.length; i++) {
-                    retMsg += indent(indentNum) + diffList[i] + "\n";
-                }
-                return retMsg;
-            }
-
+            // iterates sub errors from ExpectIterator
             function errListToStr(errList, indentNum) {
                 var retMsg = "";
                 for (let k = 0; k < errList.length; k++) {
                     let subErr = errList[k];
                     retMsg += indent(indentNum) + subErr.message + "\n";
-                    retMsg += diffToStr(subErr.diff, indentNum + 1);
+                    retMsg += subErr.diffToStr(indentNum + 1);
                 }
                 return retMsg;
             }
@@ -872,7 +882,7 @@
                 newMsg += errListToStr(err.errorList, 2);
 
                 // add diff messages
-                newMsg += diffToStr(err.diff, 2);
+                newMsg += err.diffToStr(2);
 
                 message = message.concat(newMsg);
             }
@@ -1309,9 +1319,22 @@
                 this._expect, "expectException", "both", "post", validateArgsSingleExceptionOrNull,
                 function(single, exception) {
                     var m = Match.value(exception);
+
+                    // expectation passed
                     if (m.compare(single.exception)) {
+                        // hide a value on the error so that _doCall knows that we expected this error
+                        if (single.exception) {
+                            Object.defineProperty(single.exception, "candyWrapperExpected", {
+                                value: true,
+                                writable: true,
+                                configurable: true,
+                                enumerable: false
+                            });
+                        }
                         return null;
                     }
+
+                    // expectation failed
                     var err = new ExpectError("expectException: expectation failed for: " + exception);
                     err.diff = m.lastDiff;
                     return err;
@@ -1393,10 +1416,11 @@
                 // see if the config says we should throw
                 if ((ctx instanceof Trigger && ctx.wrapper.config.expectThrowsOnTrigger) ||
                     ctx.wrapper.config.expectThrows) {
+                    err.message += "\n" + err.diffToStr();
                     throw err;
                 }
 
-                // otherwise store the message for future reference
+                // store the exception for future reference
                 ctx.wrapper.expectErrorList.push(err);
             }
 
@@ -1462,6 +1486,17 @@
             this.name = "ExpectError";
             this.errorList = []; // for ExpectIterator
             this.diff = null;
+        }
+
+        diffToStr(indentNum = 1) {
+            if (!this.diff) return "";
+
+            var diffList = this.diff.toStringArray();
+            var retMsg = "";
+            for (let i = 0; i < diffList.length; i++) {
+                retMsg += indent(indentNum) + diffList[i] + "\n";
+            }
+            return retMsg;
         }
     }
 
@@ -2432,6 +2467,36 @@
                     err = err || curr.exception;
                     curr.exception = null;
                     curr.retVal = Promise.reject(err);
+                });
+
+            /**
+             * When triggered, sets the call args to the function to the arguments specified by args
+             * @name actionCallArgs
+             * @function
+             * @instance
+             * @memberof Trigger
+             * @param {...[any]} args The arguments to be passed to the wrapped function
+             * @return {Trigger}         Returns this `Trigger`, so that further actions or expectations can be chained.
+             */
+            alias(this, "actionCallArgs",
+                this._action, "actionCallArgs", "function", "pre", validateArgsAny,
+                function(curr, ...args) {
+                    curr.argList = args;
+                });
+
+            /**
+             * When triggered, sets the context (`this` value) of the function to the object specified by `ctx`
+             * @name actionCallContext
+             * @function
+             * @instance
+             * @memberof Trigger
+             * @param {ctx} args The context to be passed to the wrapped function
+             * @return {Trigger}         Returns this `Trigger`, so that further actions or expectations can be chained.
+             */
+            alias(this, "actionCallContext",
+                this._action, "actionCallContext", "function", "pre", validateArgsSingle,
+                function(curr, ctx) {
+                    curr.context = ctx;
                 });
 
             /**
@@ -3462,7 +3527,7 @@
             }
 
             if (desc !== undefined && typeof desc !== "string") {
-                throw new TypeError ("defineTest: expection optional argument 'desc' to be of type String");
+                throw new TypeError("defineTest: expection optional argument 'desc' to be of type String");
             }
 
             desc = desc || behavior.behaviorName;
@@ -3491,6 +3556,15 @@
             }
 
             return retTestList;
+        }
+
+        runAllTests(mod, cb) {
+            var runList = this.getTestList();
+            for (let i = 0; i < runList.length; i++) {
+                let test = runList[i];
+                let fn = test.fn(mod);
+                cb(test.desc, fn);
+            }
         }
     }
 
@@ -3565,14 +3639,21 @@
 
             // adds the correct behavior to the stub
             function addInterfaceBehaviorToStub(stub, cnt, interfaceBehavior) {
+                var trigger = stub.triggerOnCallNumber(cnt);
                 if (interfaceBehavior.hasOwnProperty("retVal")) {
-                    stub.triggerOnCallNumber(cnt)
-                        .actionReturn(interfaceBehavior.retVal);
+                    trigger.actionReturn(interfaceBehavior.retVal);
                 }
 
                 if (interfaceBehavior.hasOwnProperty("exception")) {
-                    stub.triggerOnCallNumber(cnt)
-                        .actionThrowException(interfaceBehavior.exception);
+                    trigger.actionThrowException(interfaceBehavior.exception);
+                }
+
+                if (interfaceBehavior.hasOwnProperty("args")) {
+                    trigger.expectCallArgs(...interfaceBehavior.args);
+                }
+
+                if (interfaceBehavior.hasOwnProperty("context")) {
+                    trigger.expectCallContext(interfaceBehavior.context);
                 }
             }
 
@@ -3587,11 +3668,12 @@
             var callList = [];
 
             function newTest(prop) {
-                if(!mod.hasOwnProperty(prop)) {
-                    throw new Error (`runTest: expected property '${prop}' to exist on module`);
+                if (!mod.hasOwnProperty(prop)) {
+                    throw new Error(`runTest: expected property '${prop}' to exist on module`);
                 }
 
                 var test = sandbox.newWrapper(mod, prop);
+                test.configSwallowExpectException(true);
                 return test;
             }
 
@@ -3604,6 +3686,18 @@
 
                 if (interfaceBehavior.hasOwnProperty("retVal")) {
                     trigger.expectReturn(interfaceBehavior.retVal);
+                }
+
+                if (interfaceBehavior.hasOwnProperty("exception")) {
+                    trigger.expectException(interfaceBehavior.exception);
+                }
+
+                if (interfaceBehavior.hasOwnProperty("args")) {
+                    trigger.actionCallArgs(...interfaceBehavior.args);
+                }
+
+                if (interfaceBehavior.hasOwnProperty("context")) {
+                    trigger.actionCallContext(interfaceBehavior.context);
                 }
             }
 
@@ -3696,11 +3790,27 @@
         }
 
         returns(retVal) {
+            validateArgsSingle("returns", retVal);
             this.retVal = retVal;
+            return this;
         }
 
         throws(err) {
+            validateArgsSingleExceptionOrNull("throws", err);
             this.exception = err;
+            return this;
+        }
+
+        args(...args) {
+            validateArgsAny("args", ...args);
+            this.args = args;
+            return this;
+        }
+
+        context(ctx) {
+            validateArgsSingle("context", ctx);
+            this.context = ctx;
+            return this;
         }
     }
 
