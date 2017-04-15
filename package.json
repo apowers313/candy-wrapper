@@ -1,6 +1,6 @@
 {
   "name": "candy-wrapper",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "description": "Wrap your functions, methods, and properties to monitor them and modify their behavior.",
   "main": "main.js",
   "directories": {
@@ -9,7 +9,7 @@
   "scripts": {
     "test": "npm run test:node && npm run test:browsers",
     "test:browsers": "grunt default",
-    "test:node": "istanbul cover _mocha",
+    "test:node": "istanbul cover _mocha test/nodeTest.js",
     "docs:create": "rm -rf \"\" ./docs && jsdoc -c ./.jsdoc-conf.json",
     "docs:publish": "gh-pages --silent --repo https://$GH_TOKEN@github.com/apowers313/candy-wrapper.git --dist docs"
   },
