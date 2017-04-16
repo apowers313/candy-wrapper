@@ -376,7 +376,45 @@ describe("module", function() {
         });
 
         it("can stub exception");
-        it("can create property stub");
+
+        it("can create property stub with get", function() {
+            var mod = new Module();
+
+            // property
+            mod.defineProperty("beer");
+
+            // behavior
+            mod.defineBehavior("getBeerSuccess")
+                .beer()
+                .returns("yummy");
+
+            // get stub
+            var stub = mod.getStub("getBeerSuccess");
+
+            // pass
+            var ret = stub.beer;
+            assert.strictEqual(ret, "yummy");
+        });
+
+        it("can create property stub with set", function() {
+            var mod = new Module();
+
+            // property
+            mod.defineProperty("beer");
+
+            // behavior
+            mod.defineBehavior("getBeerSuccess")
+                .beer()
+                .set("yummy");
+
+            // get stub
+            var stub = mod.getStub("getBeerSuccess");
+
+            // pass
+            stub.beer = "gross";
+            var ret = stub.beer;
+            assert.strictEqual(ret, "yummy");
+        });
     });
 
     describe("defineTest", function() {
