@@ -320,50 +320,50 @@
             var funcName = this.wrapped.name || "<<anonymous>>";
             debug(`calling wrapper on "${funcName}"`);
 
-            var si = new Operation(this, {
+            var op = new Operation(this, {
                 context: context,
                 argList: argList
             });
 
             // run pre-call triggers
-            this._runTriggerList("pre", si);
+            this._runTriggerList("pre", op);
 
             // run the wrapped function
             var ret, exception = null;
             if (this.config.callUnderlying) { // option to turn on / off whether the function gets called
                 try {
-                    ret = this.wrapped.apply(si.context, si.argList);
+                    ret = this.wrapped.apply(op.context, op.argList);
                 } catch (ex) {
                     exception = ex;
                 }
             }
 
-            si.retVal = ret;
-            si.exception = exception;
+            op.retVal = ret;
+            op.exception = exception;
 
             // run post-call triggers
-            this._runTriggerList("post", si);
-            debug("final si", si);
+            this._runTriggerList("post", op);
+            debug("final op", op);
 
             // save call
-            si.postCall = si.preCall = true; // in the future evaulate both pre and post calls
-            this.historyList.push(si);
+            op.postCall = op.preCall = true; // in the future evaulate both pre and post calls
+            this.historyList.push(op);
 
             // throw the exception...
-            if (si.exception && // if we have an exception
+            if (op.exception && // if we have an exception
                 (!this.config.swallowException || ( // and the exception shouldn't be swallowed
-                    this.config.swallowException && !si.exception.candyWrapperExpected // or the exception should be swallowed, but this error wasn't expected
+                    this.config.swallowException && !op.exception.candyWrapperExpected // or the exception should be swallowed, but this error wasn't expected
                 )))
-                throw si.exception;
+                throw op.exception;
             // ...or call the callback...
-            if (typeof si.callback.fn === "function") {
-                let cbFn = si.callback.fn;
-                let cbArgs = si.callback.argList || [];
-                let cbCtx = si.callback.context || {};
-                si.callback.retVal = cbFn.call(cbCtx, ...cbArgs);
+            if (typeof op.callback.fn === "function") {
+                let cbFn = op.callback.fn;
+                let cbArgs = op.callback.argList || [];
+                let cbCtx = op.callback.context || {};
+                op.callback.retVal = cbFn.call(cbCtx, ...cbArgs);
             }
             // ...then return the return value.
-            return si.retVal;
+            return op.retVal;
         }
 
         _propConstructor(obj, prop, fn) {
@@ -394,7 +394,7 @@
                             return this._doSetterGetter("get");
                         case 1:
                             return this._doSetterGetter("set", argList[0]);
-                        /* istanbul ignore next */
+                            /* istanbul ignore next */
                         default:
                             throw new Error("Wrong number of args to setter / getter. (How is that even possible?)");
                     }
@@ -416,7 +416,7 @@
 
         _doSetterGetter(type, val) {
             // create a new Operation for this property
-            var st = new Operation(this, {
+            var op = new Operation(this, {
                 getOrSet: type,
                 retVal: this.propValue,
                 setVal: val
@@ -425,30 +425,34 @@
             debug(`_doSetterGetter ${type} "${val}"`);
 
             // run pre-call trigger
-            this._runTriggerList("pre", st);
+            this._runTriggerList("pre", op);
 
             // do the set or get
             if (type === "get" && this.getterFn) {
-                st.retVal = this.getterFn(type);
+                op.retVal = this.getterFn(type);
             } else if (type === "set" && this.setterFn) {
-                st.retVal = this.setterFn(type, st.setVal);
+                op.retVal = this.setterFn(type, op.setVal);
             } else if (type === "set") {
                 // if no setter / getter function, just used the cached propValue
-                st.retVal = st.setVal;
-                this.propValue = st.setVal;
+                op.retVal = op.setVal;
+                this.propValue = op.setVal;
             }
 
             // run post-call trigger
-            this._runTriggerList("post", st);
-            debug("final st", st);
+            this._runTriggerList("post", op);
+            debug("final op", op);
 
             // save this property Operation for future reference
-            this.historyList.push(st);
+            this.historyList.push(op);
 
             // always return the value
-            debug("settergetter returning", st.retVal);
-            if (st.exception) throw st.exception;
-            return st.retVal;
+            debug("settergetter returning", op.retVal);
+            if (op.exception && // if we have an exception
+                (!this.config.swallowException || ( // and the exception shouldn't be swallowed
+                    this.config.swallowException && !op.exception.candyWrapperExpected // or the exception should be swallowed, but this error wasn't expected
+                )))
+                throw op.exception;
+            return op.retVal;
         }
 
         _runTriggerList(preOrPost, op) {
@@ -925,7 +929,7 @@
          * obj.method("drink", "beer") // returns "yum!"
          */
         triggerOnCallArgs(...args) {
-            this._funcOnly();
+            this._funcOnly("triggerOnCallArgs");
             var m = Match.value(args);
             var t = new Trigger(this, function(op) {
                 return m.compare(op.argList);
@@ -951,7 +955,7 @@
          * obj.method.call({location: "home"}, "hi mom") // throws "You should be at work right now."
          */
         triggerOnCallContext(context) {
-            this._funcOnly();
+            this._funcOnly("triggerOnCallContext");
             validateArgsSingle("triggerOnCallContext", context);
             var m = Match.value(context);
             var t = new Trigger(this, function(op) {
@@ -980,7 +984,7 @@
          * obj.method(); // throws "BOOM!"
          */
         triggerOnCallNumber(num) {
-            this._funcOnly();
+            this._funcOnly("triggerOnCallNumber");
             validateArgsSingleNumber("triggerOnCallNumber", num);
             var count = 0;
             var t = new Trigger(this, function(op) {
@@ -1088,7 +1092,7 @@
          * myObj.name = "Mary"; // throws "BOOM!"
          */
         triggerOnSet() {
-            this._propOnly();
+            this._propOnly("triggerOnSet");
             var t = new Trigger(this, function(single) {
                 if (single.getOrSet === "set") return true;
                 return false;
@@ -1104,7 +1108,7 @@
          * @return {Trigger} The `Trigger` that was created.
          */
         triggerOnSetVal(setVal) {
-            this._propOnly();
+            this._propOnly("triggerOnSetVal");
             validateArgsSingle("triggerOnSetVal", setVal);
             var m = Match.value(setVal);
             var t = new Trigger(this, function(single) {
@@ -1122,7 +1126,7 @@
          * @return {Trigger} The `Trigger` that was created.
          */
         triggerOnSetNumber(num) {
-            this._propOnly();
+            this._propOnly("triggerOnSetNumber");
             validateArgsSingleNumber("triggerOnSetNumber", num);
 
             var count = 0;
@@ -1152,7 +1156,7 @@
          * var ret = myObj.name; // throws "BOOM!"
          */
         triggerOnGet() {
-            this._propOnly();
+            this._propOnly("triggerOnGet");
             var t = new Trigger(this, function(single) {
                 if (single.getOrSet === "get") return true;
                 return false;
@@ -1182,7 +1186,7 @@
          * ret = myObj.name; // throws "BOOM!"
          */
         triggerOnGetNumber(num) {
-            this._propOnly();
+            this._propOnly("triggerOnGetNumber");
             validateArgsSingleNumber("triggerOnGetNumber", num);
 
             var count = 0;
@@ -1217,7 +1221,7 @@
          * ret = myObj.name; // throws "BOOM!"
          */
         triggerOnTouchNumber(num) {
-            this._propOnly();
+            this._propOnly("triggerOnTouchNumber");
             validateArgsSingleNumber("triggerOnTouchNumber", num);
 
             var count = 0;
@@ -2577,12 +2581,12 @@
                 });
         }
 
-        _run(si) {
+        _run(op) {
             // check trigger to see if it should run
-            if (!this.triggerFn(si)) return;
+            if (!this.triggerFn(op)) return;
 
             // perform actions
-            this.currentCall = si;
+            this.currentCall = op;
             for (let i = 0; i < this.actionList.length; i++) {
                 let action = this.actionList[i];
                 this[action.name](...action.argList);
@@ -3634,29 +3638,56 @@
         getStub() {
             var stubObj = {};
 
-            function newStub(prop) {
-                var stub = new Wrapper();
-                stubObj[prop] = stub;
-                return stub;
+            function newStub(prop, type) {
+                if (type === "function") {
+                    let stub = new Wrapper();
+                    stubObj[prop] = stub;
+                    return stub;
+                } else { // property
+                    stubObj[prop] = undefined;
+                    let stub = new Wrapper(stubObj, prop);
+                    return stub;
+                }
+
             }
 
             // adds the correct behavior to the stub
             function addInterfaceBehaviorToStub(stub, cnt, interfaceBehavior) {
-                var trigger = stub.triggerOnCallNumber(cnt);
-                if (interfaceBehavior.hasOwnProperty("retVal")) {
-                    trigger.actionReturn(interfaceBehavior.retVal);
-                }
+                var trigger;
+                var type = interfaceBehavior.interface.interfaceType;
 
-                if (interfaceBehavior.hasOwnProperty("exception")) {
-                    trigger.actionThrowException(interfaceBehavior.exception);
-                }
+                if (type === "function") {
+                    trigger = stub.triggerOnCallNumber(cnt);
+                    if (interfaceBehavior.hasOwnProperty("args")) {
+                        trigger.expectCallArgs(...interfaceBehavior.args);
+                    }
 
-                if (interfaceBehavior.hasOwnProperty("args")) {
-                    trigger.expectCallArgs(...interfaceBehavior.args);
-                }
+                    if (interfaceBehavior.hasOwnProperty("context")) {
+                        trigger.expectCallContext(interfaceBehavior.context);
+                    }
 
-                if (interfaceBehavior.hasOwnProperty("context")) {
-                    trigger.expectCallContext(interfaceBehavior.context);
+                    if (interfaceBehavior.hasOwnProperty("retVal")) {
+                        trigger.actionReturn(interfaceBehavior.retVal);
+                    }
+
+                    if (interfaceBehavior.hasOwnProperty("exception")) {
+                        trigger.actionThrowException(interfaceBehavior.exception);
+                    }
+                } else { // property
+                    if (interfaceBehavior.hasOwnProperty("retVal")) {
+                        let trigger = stub.triggerOnGetNumber(cnt);
+                        trigger.actionReturn(interfaceBehavior.retVal);
+                    }
+
+                    if (interfaceBehavior.hasOwnProperty("exception")) {
+                        let trigger = stub.triggerOnTouchNumber(cnt);
+                        trigger.actionThrowException(interfaceBehavior.exception);
+                    }
+
+                    if (interfaceBehavior.hasOwnProperty("setVal")) {
+                        let trigger = stub.triggerOnSetNumber(cnt);
+                        trigger.actionSetVal(interfaceBehavior.setVal);
+                    }
                 }
             }
 
@@ -3731,12 +3762,13 @@
 
             function getOrCreateWrapper(interfaceBehavior) {
                 var name = interfaceBehavior.interface.interfaceName;
+                var type = interfaceBehavior.interface.interfaceType;
 
                 var interfaceFn = interfaceMap.get(name);
 
                 // if it hasn't been created, create it now
                 if (!interfaceFn) {
-                    interfaceFn = newFn(name);
+                    interfaceFn = newFn(name, type);
                     interfaceMap.set(name, interfaceFn);
                 }
 
@@ -3815,6 +3847,12 @@
             this.context = ctx;
             return this;
         }
+
+        set(val) {
+            validateArgsSingle("set", val);
+            this.setVal = val;
+            return this;
+        }
     }
 
     // Just return a value to define the module export.
@@ -3836,3 +3874,4 @@
 }));
 
 /* JSHINT */
+/* globals define */
