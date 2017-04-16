@@ -617,6 +617,36 @@ describe("trigger", function() {
             assert.strictEqual(testFunc.historyList.length, 0);
         });
 
+        it("can swallow property exception", function() {
+            var testObj = {
+                beer: "yummy"
+            };
+            var w = new Wrapper(testObj, "beer", function() {
+                throw new Error("test exception");
+            });
+
+            w.triggerAlways().expectException(new Error("test exception"));
+
+            // throws the error
+            assert.throws(function() {
+                w();
+            }, Error, "test exception");
+
+            // swallows the error
+            w.configSwallowExpectException(true);
+            assert.doesNotThrow(function() {
+                w();
+            });
+
+            // make sure the exception is still recorded
+            assert.strictEqual(w.historyList.length, 2);
+            var errList = w.historyList.getAllExceptions();
+            assert.strictEqual(errList[0].name, "Error");
+            assert.strictEqual(errList[0].message, "test exception");
+            assert.strictEqual(errList[0].name, "Error");
+            assert.strictEqual(errList[0].message, "test exception");
+        });
+
         it("does setval", function() {
             var testObj = {
                 beer: "yummy"
