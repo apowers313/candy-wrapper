@@ -377,7 +377,7 @@ describe("module", function() {
 
         it("can stub exception");
 
-        it("can create property stub with get", function() {
+        it("can create property stub and get", function() {
             var mod = new Module();
 
             // property
@@ -394,6 +394,28 @@ describe("module", function() {
             // pass
             var ret = stub.beer;
             assert.strictEqual(ret, "yummy");
+        });
+
+        it("can create property stub and throw", function() {
+            var mod = new Module();
+
+            // property
+            mod.defineProperty("beer");
+
+            // behavior
+            mod.defineBehavior("getBeerError")
+                .beer()
+                .throws(new Error("beer not found"));
+
+            // get stub
+            var stub = mod.getStub("getBeerError");
+
+            // pass
+            assert.throws(function() {
+                stub.beer = "gross";
+            }, Error, "beer not found");
+            var ret = stub.beer;
+            assert.strictEqual(ret, "gross");
         });
 
         it("can create property stub with set", function() {
@@ -549,7 +571,7 @@ describe("module", function() {
             mod.runAllTests(myMod, mochaIt);
         });
 
-        it("does set value");
+        it("can test set value");
         it("can test get value");
     });
 
