@@ -428,15 +428,26 @@
             this._runTriggerList("pre", op);
 
             // do the set or get
+            var exception = null;
             if (type === "get" && this.getterFn) {
-                op.retVal = this.getterFn(type);
+                try {
+                    op.retVal = this.getterFn(type);
+                } catch (ex) {
+                    exception = ex;
+                }
             } else if (type === "set" && this.setterFn) {
-                op.retVal = this.setterFn(type, op.setVal);
+                try {
+                    op.retVal = this.setterFn(type, op.setVal);
+                } catch (ex) {
+                    exception = ex;
+                }
             } else if (type === "set") {
                 // if no setter / getter function, just used the cached propValue
                 op.retVal = op.setVal;
                 this.propValue = op.setVal;
             }
+
+            op.exception = exception;
 
             // run post-call trigger
             this._runTriggerList("post", op);
