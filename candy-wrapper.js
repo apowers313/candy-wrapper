@@ -215,7 +215,12 @@
                 let key = args[1];
                 this.origObj = obj;
                 this.origProp = key;
-                if (typeof obj[key] === "function") {
+
+                // testing `typeof obj[key]` could trigger a getter
+                // get the value from the property descriptor instead
+                let desc = Object.getOwnPropertyDescriptor(obj, key);
+
+                if (desc && desc.value && typeof desc.value === "function") {
                     obj[key] = this._callConstructor(obj[key]);
                     return obj[key];
                 } else {
@@ -422,26 +427,26 @@
                 setVal: val
             });
 
-            debug(`_doSetterGetter ${type} "${val}"`);
+            debug(`_doSetterGetter ${op.getOrSet} "${op.setVal}"`);
 
             // run pre-call trigger
             this._runTriggerList("pre", op);
 
             // do the set or get
             var exception = null;
-            if (type === "get" && this.getterFn) {
+            if (op.getOrSet === "get" && this.getterFn) {
                 try {
-                    op.retVal = this.getterFn(type);
+                    op.retVal = this.getterFn(op.getOrSet);
                 } catch (ex) {
                     exception = ex;
                 }
-            } else if (type === "set" && this.setterFn) {
+            } else if (op.getOrSet === "set" && this.setterFn) {
                 try {
-                    op.retVal = this.setterFn(type, op.setVal);
+                    op.retVal = this.setterFn(op.getOrSet, op.setVal);
                 } catch (ex) {
                     exception = ex;
                 }
-            } else if (type === "set") {
+            } else if (op.getOrSet === "set") {
                 // if no setter / getter function, just used the cached propValue
                 op.retVal = op.setVal;
                 this.propValue = op.setVal;
@@ -553,15 +558,15 @@
                 let obj = args[0];
                 let key = args[1];
 
-                // property is a function
-                if (typeof obj[key] === "function")
-                    return Wrapper.isWrapper(obj[key]);
-
-                if (typeof obj[key] === "object")
-                    return false;
-
                 let desc = Object.getOwnPropertyDescriptor(obj, key);
                 if (desc === undefined)
+                    return false;
+
+                // property is a function
+                if (desc.value && typeof desc.value === "function")
+                    return Wrapper.isWrapper(obj[key]);
+
+                if (desc.value && typeof desc.value === "object")
                     return false;
 
                 if (typeof desc.set !== "function" ||
@@ -2446,6 +2451,7 @@
             alias(this, "actionSetVal",
                 this._action, "actionSetVal", "property", "pre", validateArgsSingle,
                 function(curr, setVal) {
+                    // curr.getOrSet = "set";
                     curr.setVal = setVal;
                 });
 
@@ -2493,7 +2499,7 @@
              * @function
              * @instance
              * @memberof Trigger
-             * @param {...[any]} args The arguments to be passed to the wrapped function
+             * @param {...any} args The arguments to be passed to the wrapped function
              * @return {Trigger}         Returns this `Trigger`, so that further actions or expectations can be chained.
              */
             alias(this, "actionCallArgs",
@@ -3457,6 +3463,13 @@
         return diff;
     }
 
+    /**
+     * Used for creating a group of behavior-based stubs and tests. Modules are like most JavaScript modules: a
+     * group of logically related behaviors -- for example, those that would be imported through a `require` call.
+     *
+     * Modules have interfaces that can created through `defineMethod` (for functions) and `defineProperty`. Every
+     * interface can have multiple {@link Behavior Behaviors}, that describe how the interface works.
+     */
     class Module {
         constructor(moduleName) {
             this.moduleName = moduleName;
@@ -3465,16 +3478,33 @@
             this.testList = [];
         }
 
+        /**
+         * Defines a new method / funciton interface on the module.
+         * @param  {String} name The name of the interface (i.e. - the key used to access / call the method)
+         * @return {Interface}      The interface that was created
+         */
         defineMethod(name) {
             validateArgsSingleString("defineMethod", name);
             return this.defineInterface(name, "function");
         }
 
+        /**
+         * Defines a new property interface on the module.
+         * @param  {String} name The name of the interface / property
+         * @return {Interface}      The interface that was created
+         */
         defineProperty(name) {
             validateArgsSingleString("defineProperty", name);
             return this.defineInterface(name, "property");
         }
 
+        /**
+         * Defines an interface (method or property) on the module
+         * @param  {String} name The name of the interface to be created
+         * @param  {String} type The type of interface, either "function" or "property"
+         * @return {Interface}      The interface that was created
+         * @private
+         */
         defineInterface(name, type) {
             if (this.getInterface(name)) {
                 throw new TypeError(`defineInterface: '${name}' is already defined`);
@@ -3485,6 +3515,12 @@
             return newProp;
         }
 
+        /**
+         * Defines a new behavior for the module.
+         * @param  {String} behaviorName  The name of the behavior
+         * @param  {String} [interfaceName] An optional interface that the behavior is being defined for
+         * @return {Behavior}               The Behavior that was created
+         */
         defineBehavior(behaviorName, interfaceName) {
             if (typeof behaviorName !== "string") {
                 throw new TypeError("defineBehavior: expected first argument 'behaviorName' to be of type String");
@@ -3514,16 +3550,31 @@
             return newBehavior[foundInterface.interfaceName]();
         }
 
+        /**
+         * Returns the interface specified by `interfaceName`
+         * @param  {String} interfaceName The name of the interface to get
+         * @return {Interface|undefined}  The requrested interface or undefined if the interface wasn't found
+         */
         getInterface(interfaceName) {
             validateArgsSingleString("getInterface", interfaceName);
             return this.propertyMap.get(interfaceName);
         }
 
+        /**
+         * Returns the behavior specified by `behaviorName`
+         * @param  {String} behaviorName The name of the behavior to get
+         * @return {Behavior|undefined}  The requrested behavior or undefined if the behavior wasn't found
+         */
         getBehavior(behaviorName) {
             validateArgsSingleString("getBehavior", behaviorName);
             return this.behaviorMap.get(behaviorName);
         }
 
+        /**
+         * Returns a stub {@link Wrapper} for the specified behavior.
+         * @param  {String} behaviorName The behavior to create a stub for
+         * @return {Wrapper}             A stub that performs the specified behavior
+         */
         getStub(behaviorName) {
             validateArgsSingleString("getStub", behaviorName);
             var behavior = this.getBehavior(behaviorName);
@@ -3534,7 +3585,14 @@
             return behavior.getStub();
         }
 
-        // tests will be run in the order defined
+        /**
+         * Specifies that one of the previously defined `Behaviors` should be tested by the module. Only
+         * the behaviors that have been specified through `defineTest` will be tested. Tests will be run
+         * in the order that they are defined.
+         * @param  {String} behaviorName The name of the behavior to be tested
+         * @param  {String} [desc]       An optional description of the test, similar to what might be passed to
+         * the `test()` or `it()` function of a test runner. If not specified, the behavior name will be used.
+         */
         defineTest(behaviorName, desc) {
             if (typeof behaviorName !== "string") {
                 throw new TypeError("defineTest: expected argument 'behaviorName' to be of type String");
@@ -3562,6 +3620,17 @@
             };
         }
 
+        /**
+         * @typedef {Object} Test
+         * @property {String} behaviorName The name of the behavior to be tested
+         * @property {String} desc A short description of the test...[any]
+         * @property {Function} fn The function that runs the test. No arguments required and no return value. Throws on failure.
+         */
+        /**
+         * Returns an array of tests.
+         * @returns {Array.<Test>} An array of test objects. Each object has a `desc` and `fn` that is ready to be passed to a
+         * test runner, such as Mocha, Jasmine, or QUnit.
+         */
         getTestList() {
             // cheap deep-clone testList
             var retTestList = JSON.parse(JSON.stringify(this.testList));
@@ -3576,6 +3645,12 @@
             return retTestList;
         }
 
+        /**
+         * Runs all the tests in the testList.
+         * @param  {Object}   mod The module to be tested. Should support all the interfaces and behaviors that will be tested.
+         * @param  {Function} cb  A callback that receives the arguments `description` and `function` for each test to be run. Most
+         * testing framworks can simply pass a `test` or `it` function.
+         */
         runAllTests(mod, cb) {
             var runList = this.getTestList();
             for (let i = 0; i < runList.length; i++) {
@@ -3586,6 +3661,9 @@
         }
     }
 
+    /**
+     * Describes an interface
+     */
     class Interface {
         constructor(module, name, type) {
             this.module = module;
@@ -3602,6 +3680,9 @@
         return fn.bind(null, val);
     }
 
+    /**
+     * Describes a behavior
+     */
     class Behavior {
         constructor(module, name) {
             this.module = module;
@@ -3646,6 +3727,10 @@
             return fnRetVal(this.chainable);
         }
 
+        /**
+         * Returns a stub for this behavior
+         * @return {Wrapper} The stub for this behavior
+         */
         getStub() {
             var stubObj = {};
 
@@ -3707,6 +3792,10 @@
             return stubObj;
         }
 
+        /**
+         * Tests that the module specified by `mod` correctly implements this behavior
+         * @param  {Object} mod The module to be tested
+         */
         runTest(mod) {
             // create sandbox
             var sandbox = new Sandbox();
@@ -3723,26 +3812,51 @@
             }
 
             function createTest(wrapper, cnt, interfaceBehavior) {
-                // add call to list
-                callList.push(wrapper);
+                var trigger;
+                var type = interfaceBehavior.interface.interfaceType;
 
-                // configure wrapper's expectations
-                var trigger = wrapper.triggerOnCallNumber(cnt);
+                if (type === "function") {
+                    // add call to list
+                    callList.push(wrapper);
 
-                if (interfaceBehavior.hasOwnProperty("retVal")) {
-                    trigger.expectReturn(interfaceBehavior.retVal);
-                }
+                    // configure wrapper's expectations
+                    trigger = wrapper.triggerOnCallNumber(cnt);
 
-                if (interfaceBehavior.hasOwnProperty("exception")) {
-                    trigger.expectException(interfaceBehavior.exception);
-                }
+                    if (interfaceBehavior.hasOwnProperty("retVal")) {
+                        trigger.expectReturn(interfaceBehavior.retVal);
+                    }
 
-                if (interfaceBehavior.hasOwnProperty("args")) {
-                    trigger.actionCallArgs(...interfaceBehavior.args);
-                }
+                    if (interfaceBehavior.hasOwnProperty("exception")) {
+                        trigger.expectException(interfaceBehavior.exception);
+                    }
 
-                if (interfaceBehavior.hasOwnProperty("context")) {
-                    trigger.actionCallContext(interfaceBehavior.context);
+                    if (interfaceBehavior.hasOwnProperty("args")) {
+                        trigger.actionCallArgs(...interfaceBehavior.args);
+                    }
+
+                    if (interfaceBehavior.hasOwnProperty("context")) {
+                        trigger.actionCallContext(interfaceBehavior.context);
+                    }
+                } else {
+                    if (interfaceBehavior.hasOwnProperty("retVal")) {
+                        trigger = wrapper.triggerOnGetNumber(cnt);
+                        trigger.expectReturn(interfaceBehavior.retVal);
+                        callList.push(wrapper);
+                    }
+
+                    if (interfaceBehavior.hasOwnProperty("exception")) {
+                        trigger = wrapper.triggerOnTouchNumber(cnt);
+                        trigger.expectException(interfaceBehavior.exception);
+                        callList.push(wrapper);
+                    }
+
+                    if (interfaceBehavior.hasOwnProperty("setVal")) {
+                        trigger = wrapper.triggerOnSetNumber(cnt);
+                        trigger.actionSetVal(interfaceBehavior.setVal);
+                        callList.push(function() {
+                            wrapper(true);
+                        });
+                    }
                 }
             }
 
@@ -3829,36 +3943,65 @@
         }
     }
 
+    /**
+     * Describes the behavior of an interface
+     */
     class InterfaceBehavior {
         constructor(module, behavior, interfaceObj) {
             this.module = module;
             this.interface = interfaceObj;
         }
 
+        /**
+         * The interface returns the value specified by `retVal`
+         * @param  {any} retVal The value to be returned by the interface
+         * @return {InterfaceBehavior}        This interface, for chaining
+         */
         returns(retVal) {
             validateArgsSingle("returns", retVal);
             this.retVal = retVal;
             return this;
         }
 
+        /**
+         * The interface throws the `Error` specified by `err`
+         * @param  {Error} err The error to be thrown
+         * @return {InterfaceBehavior}        This interface, for chaining
+         */
         throws(err) {
             validateArgsSingleExceptionOrNull("throws", err);
             this.exception = err;
             return this;
         }
 
+        /**
+         * The arguments to be sent to the interface, as specified by `args`
+         * @param  {...any} args The arguments to be passed to the interface
+         * @return {InterfaceBehavior}        This interface, for chaining
+         */
         args(...args) {
             validateArgsAny("args", ...args);
             this.args = args;
             return this;
         }
 
+        /**
+         * The context (`this` value) to be passed to the interface. Only applicable
+         * to method / function interfaces.
+         * @param  {any} ctx The value to set the context of the function to
+         * @return {InterfaceBehavior}        This interface, for chaining
+         */
         context(ctx) {
             validateArgsSingle("context", ctx);
             this.context = ctx;
             return this;
         }
 
+        /**
+         * The value to be set on the property, as specified by `val`
+         * @param {any} val The value to set for the property
+         * @return {InterfaceBehavior}        This interface, for chaining
+         */
         set(val) {
             validateArgsSingle("set", val);
             this.setVal = val;

@@ -19,15 +19,14 @@ This library provides the ability to wrap functions or properties so that you ca
 The primary interfaces are Wrapper, Expect, Trigger, and Action:
 * [Wrappers](https://apowers313.github.io/candy-wrapper/Wrapper.html) wrap a function or property, so that when the Wrapper is called, so is the underlying function or property.
 * You can use [Expect](https://apowers313.github.io/candy-wrapper/Expect.html) to examine what happened with a Wrapper, such as seeing what args were passed to it or what the return value was.
-* [Triggers](https://apowers313.github.io/candy-wrapper/Trigger.html) get called just before or just after a function call, providing the opportunity validate Expects or perform Actions.
-* Actions, which are part of Triggers, can do things like change arguments recieved by the wrapped function or change the value returned to the caller.
+* [Triggers](https://apowers313.github.io/candy-wrapper/Trigger.html) get called just before or just after a function call, providing the opportunity validate Expects or perform Actions. Actions can do things like change arguments recieved by the wrapped function or change the value returned to the caller.
 
 If you are new to wrappers or candy-wrapper, a good place to start is the [Getting Started Tutorial](https://apowers313.github.io/candy-wrapper/tutorial-getting-started.html).
 
-## ES6
-Note that this library currently makes exensive use of the features of [JavaScript ES6](http://www.ecma-international.org/ecma-262/6.0/), notably [Proxies](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy), [classes](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Classes), [template literals](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals), [rest parameters](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/rest_parameters), and the [spread operator](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Spread_operator). For information about which platforms currently support ES6, see the [ES6 compatibility table](https://kangax.github.io/compat-table/es6/). It has been tested against Node 6 and is tested against the latest versions of Chrome, Firefox, Edge, and Safari.
+There is also a higher-level interface for defining stubs and tests based on their behavior.
+This interface is especially useful for creating stubs and tests that mirror each other, where the stubs can be used to replace a module during testing and a test can make sure that the module has the same behavior as a stub. The primary interface for this functionality is:
+* [Module](https://apowers313.github.io/candy-wrapper/Module.html), which defines a group of method and property interfaces, similar to a module that is imported through `require`. After behaviors are defined for the module, stubs and tests can automatically be generated to stub out the module where it is required or test instances of the module.
 
-Presumably it could be back-ported to ES5.1, perhaps drawing on the work of Sinon. The biggest challenge would be removing the use of Proxies. A [pull request](https://github.com/apowers313/candy-wrapper) would be more than welcome if anyone wants to take that challenge on.
 
 ## Installing and Using
 
@@ -174,3 +173,8 @@ Wrapper.isWrapper(Math, "random"); // true
 // this is probably a bad idea, let's go back to the original random number generator...
 Wrapper.unwrap(Math, "random");
 ```
+
+## Required: JavaScript ES6
+Note that this library currently makes exensive use of the features of [JavaScript ES6](http://www.ecma-international.org/ecma-262/6.0/), notably [Proxies](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy), [classes](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Classes), [template literals](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals), [rest parameters](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/rest_parameters), and the [spread operator](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Spread_operator). For information about which platforms currently support ES6, see the [ES6 compatibility table](https://kangax.github.io/compat-table/es6/). It has been tested against Node 6 and is tested against the latest versions of Chrome, Firefox, Edge, and Safari.
+
+Presumably it could be back-ported to ES5.1, perhaps drawing on the work of Sinon. The biggest challenge would be removing the use of Proxies. A [pull request](https://github.com/apowers313/candy-wrapper) would be more than welcome if anyone wants to take that challenge on.

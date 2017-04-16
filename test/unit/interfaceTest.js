@@ -20,6 +20,8 @@ describe("module", function() {
         assert.instanceOf(mod, Module);
     });
 
+    it("throws if no module name");
+
     describe("interface", function() {
         it("can define method", function() {
             var mod = new Module();
@@ -58,9 +60,6 @@ describe("module", function() {
                 mod.defineProperty();
             }, TypeError, "defineProperty: expected a single argument of type String");
         });
-
-        it("can define interface");
-        it("throws when defineInterface gets bad args");
 
         it("can't define existing property", function() {
             var mod = new Module();
@@ -104,6 +103,10 @@ describe("module", function() {
             var prop = mod.defineBehavior("getUserSuccess", "getUser");
             assert.instanceOf(prop, InterfaceBehavior);
         });
+
+        it("can define interface");
+        it("throws when defineInterface gets bad args");
+        it("is chainable");
     });
 
     describe("defineBehavior", function() {
@@ -207,6 +210,8 @@ describe("module", function() {
             assert.strictEqual(behavior.behaviorSequence[0].behaviorName, "getUserSuccess");
             assert.strictEqual(behavior.behaviorSequence[1].behaviorName, "getUserSuccess");
         });
+
+        it("is chainable");
     });
 
     describe("getStub", function() {
@@ -571,8 +576,63 @@ describe("module", function() {
             mod.runAllTests(myMod, mochaIt);
         });
 
-        it("can test set value");
-        it("can test get value");
+        it("can test a get value", function() {
+            var mod = new Module();
+
+            mod.defineProperty("beer");
+            mod.defineBehavior("getBeerSuccess")
+                .beer()
+                .returns("Altamont");
+            mod.defineTest("getBeerSuccess");
+
+            var myMod = {
+                beer: "Altamont"
+            };
+
+            mod.runAllTests(myMod, mochaIt);
+        });
+
+        it("can test a set value", function() {
+            var mod = new Module();
+
+            mod.defineProperty("beer");
+            mod.defineBehavior("getBeerSuccess")
+                .beer()
+                .set("Altamont");
+
+            mod.defineTest("getBeerSuccess");
+
+            var myMod = {
+                beer: "Budweiser"
+            };
+
+            mod.runAllTests(myMod, mochaIt);
+            assert.strictEqual (myMod.beer, "Altamont");
+        });
+
+        it("can test an exception", function() {
+            var mod = new Module();
+
+            mod.defineProperty("beer");
+            mod.defineBehavior("getBeerSuccess")
+                .beer()
+                .throws(new Error ("test error"));
+
+            mod.defineTest("getBeerSuccess");
+
+            var myMod = {};
+            Object.defineProperty(myMod, "beer", {
+                get: function() {
+                    throw new Error ("test error");
+                },
+                configurable: true,
+                enumerable: true
+            });
+
+            mod.runAllTests(myMod, mochaIt);
+        });
+
+        it("cleans up wrappers after test");
     });
 
     describe("_testFunctionFactory", function() {
