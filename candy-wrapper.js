@@ -2,6 +2,7 @@
 
 // UMD returnExports design pattern
 (function(root, factory) {
+    /* istanbul ignore next */
     if (typeof define === "function" && define.amd) {
         // AMD. Register as an anonymous module.
         define([], factory);
@@ -393,6 +394,7 @@
                             return this._doSetterGetter("get");
                         case 1:
                             return this._doSetterGetter("set", argList[0]);
+                        /* istanbul ignore next */
                         default:
                             throw new Error("Wrong number of args to setter / getter. (How is that even possible?)");
                     }
@@ -2226,6 +2228,7 @@
                 return this._functionConstructor(desc);
             }
 
+            /* istanbul ignore else */
             if (this.type === "property") {
                 return this._propertyConstructor(desc);
             }
