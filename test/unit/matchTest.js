@@ -328,6 +328,18 @@ describe("match", function() {
         }]);
     });
 
+    it("can test undefined", function() {
+        var undefType = Match.getType(undefined);
+
+        // right type
+        assert.isTrue(undefType.test(undefined));
+
+        // wrong type
+        assert.isFalse(undefType.test(null));
+        assert.isFalse(undefType.test(false));
+        assert.isFalse(undefType.test(""));
+    });
+
     it("can diff null", function() {
         var m = Match.value(null);
 
