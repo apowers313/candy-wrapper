@@ -166,12 +166,20 @@
      * myDrone.fly.triggerOnSet()... // throws an error -- functions don't have 'set'
      * myDrone.fly.triggerOnCallContext()... // throws an error -- properties don't have 'this' values
      * ```
+     * @throws {TypeError} If arguments aren't one of the valid signatures for the constructor.
      * @extends {Function}
      */
     class Wrapper extends Function {
 
         /**
-         * Creates a new `Wrapper` instance.
+         * Creates a new `Wrapper` instance. Currently, wrapping properties have some notable corner cases:
+         *
+         * 1. Wrapping a [non-configurable property](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/defineProperty)
+         * will result in an `Error` being thrown.
+         * 1. Wrapping a non-writable property will not prevent that property from being written, and if
+         * [getOwnPropertyDescriptor](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/getOwnPropertyDescriptor)
+         * is called on the property, the `writable` attribute will shown up as `undefined` (since setters and getters) are
+         * being used by the `Wrapper`).
          */
         constructor(...args) {
             super();
@@ -795,6 +803,7 @@
          * property will result in an `Error` being thrown.
          * @param  {Boolean} allow If `true` rewrapping will be allowed. If `false` an error will be thrown when attempting to
          * rewrap.
+         * @throws {TyperError} If wrong number of args, or non-Boolean arguments
          */
         configAllowRewrap(allow) {
             validateArgsSingleBoolean("configAllowRewrap", allow);
@@ -807,6 +816,7 @@
          * @param  {Boolean} callUnderlying If `true`, future calls to the `Wrapper` will invoke the underlying function or
          * proprty setter / getter. If `false`, future calls to the `Wrapper` will **NOT** invoke the underlying function or
          * proprty setter / getter.
+         * @throws {TyperError} If wrong number of args, or non-Boolean arguments
          */
         configCallUnderlying(callUnderlying) {
             validateArgsSingleBoolean("configCallUnderlying", callUnderlying);
@@ -818,6 +828,7 @@
          * fails.
          * @param  {Boolean} doesThrow If `true` the expectation will throw an `ExpectError` immediately if the expecation fails.
          * If `false`, it will save the failure message to be retrieved later with {@link expectReportAllFailures}.
+         * @throws {TyperError} If wrong number of args, or non-Boolean arguments
          */
         configExpectThrowsOnTrigger(doesThrow) {
             validateArgsSingleBoolean("configExpectThrowsOnTrigger", doesThrow);
@@ -829,6 +840,7 @@
          * `configExpectThrows` can be used to configure a `Wrapper` so that all of its expectations will throw an {@link ExpectError}.
          * @param  {Boolean} doesThrow If `true` all expect functions will throw an {@link ExpectError} immediately upon failure. If
          * `false`, expect functions will maintain their default behavior.
+         * @throws {TyperError} If wrong number of args, or non-Boolean arguments
          */
         configExpectThrows(doesThrow) {
             validateArgsSingleBoolean("configExpectThrows", doesThrow);
@@ -845,8 +857,10 @@
          * Note that even if an exception is swallowed, it will still be recorded to the `Wrapper`'s `historyList`.
          * @param  {Boolean} swallowException If set to `true` any expected exceptions won't be thrown; if `false`, the `Error` will
          * be thrown anyway.
+         * @throws {TyperError} If wrong number of args, or non-Boolean arguments
          */
         configSwallowExpectException(swallowException) {
+            validateArgsSingleBoolean("configSwallowExpectException", swallowException);
             this.config.swallowException = swallowException;
         }
 
@@ -933,6 +947,7 @@
          * Creates a new {@link Trigger} on the `Wrapper` that executes when the arguments to the wrapper match the arguments to this call.
          * @param  {...any} args  A list of any arguments that, when matched, will cause this `Trigger` to execute.
          * @return {Trigger}      The `Trigger` that was created.
+         * @throws {TypeError} If called on a wrapped property
          * @example
          * // create a Wrapper around something
          * var w = new Wrapper(obj, "method");
@@ -959,6 +974,7 @@
          * matches the `context` argument.
          * @param  {Object} context An `Object` that, when matched to the `this` value of the function, will cause the `Trigger` to execute.
          * @return {Trigger}        The `Trigger` that was created.
+         * @throws {TypeError} If called on a wrapped property
          * @example
          * // create a Wrapper around something
          * var w = new Wrapper(obj, "method");
@@ -986,6 +1002,7 @@
          * Creates a new {@link Trigger} on the `Wrapper` that executes the `Nth` time the wrapper is called.
          * @param  {Number} num What call number this `Trigger` should execute on. Counting starts from zero, so the first call is 0, the second is 1, etc.
          * @return {Trigger}     The `Trigger` that was created.
+         * @throws {TypeError} If called on a wrapped property or if first argument isn't a number
          * @example
          * // create a Wrapper around something
          * var w = new Wrapper(obj, "method");
@@ -1020,6 +1037,7 @@
          * an `Error` requires that the `Error.name` and `Error.message` are strictly equal. If `err` is `null`, this `Trigger` will
          * execute when there was no error.
          * @return {Trigger}   The `Trigger` that was created.
+         * @throws {TypeError} If argument isn't an `Error` or `null`
          */
         triggerOnException(err) {
             validateArgsSingleExceptionOrNull("triggerOnException", err);
@@ -1056,6 +1074,7 @@
          * {@link Trigger~triggerCustomCallback triggerCustomCallback} for the description of the expected syntax and behavior
          * of the callback.
          * @return {Trigger}  The `Trigger` that was created
+         * @throws {TypeError} If the `cb` argument isn't a `Function`
          */
         triggerOnCustom(cb) {
             validateArgsSingleFunction("triggerOnCustom", cb);
@@ -1095,6 +1114,7 @@
          * Creates a {@link Trigger} on the `Wrapper` that executes whenever a property is set. Only valid for
          * `Wrappers` around a property.
          * @return {Trigger} The `Trigger` that was created.
+         * @throws {TypeError} If called on a wrapped function
          * @example
          * var myObj = {
          *     name: "Bob"
@@ -1122,6 +1142,7 @@
          * corresponding to `setVal`
          * @param  {any} setVal When a property is set to this value, the `Trigger` will execute.
          * @return {Trigger} The `Trigger` that was created.
+         * @throws {TypeError} If called on a wrapped function
          */
         triggerOnSetVal(setVal) {
             this._propOnly("triggerOnSetVal");
@@ -1140,6 +1161,7 @@
          * @param  {Number} num The `Nth` assignment that will cause this `Trigger` to execute. Note that
          * `0` would be the first assignment, `1` the second, etc.
          * @return {Trigger} The `Trigger` that was created.
+         * @throws {TypeError} If called on a wrapped function, or argument isn't a number
          */
         triggerOnSetNumber(num) {
             this._propOnly("triggerOnSetNumber");
@@ -1159,6 +1181,7 @@
         /**
          * Creates a {@link Trigger} on the `Wrapper` that executes when the value of the property is retrieved.
          * @return {Trigger} The `Trigger` that was created.
+         * @throws {TypeError} If called on a wrapped function
          * @example
          * var myObj = {
          *     name: "Bob"
@@ -1187,6 +1210,7 @@
          * @param  {number} num The `Nth` get that will cause this `Trigger` to execute. Note that
          * `0` would be the first assignment, `1` the second, etc.
          * @return {Trigger} The `Trigger` that was created.
+         * @throws {TypeError} If called on a wrapped function, or first argument isn't a number
          * @example
          * var myObj = {
          *     name: "Bob"
@@ -1222,6 +1246,7 @@
          * @param  {Number} num The `Nth` get that will cause this `Trigger` to execute. Note that
          * `0` would be the first assignment, `1` the second, etc.
          * @return {Trigger} The `Trigger` that was created.
+         * @throws {TypeError} If called on a wrapped function, or first argument isn't a number
          * @example
          * var myObj = {
          *     name: "Bob"
@@ -1267,6 +1292,8 @@
              * @param  {any} retVal       The value that is expected to be returned from the function call or property getter.
              * @return {Trigger|Boolean}  When called on a {@link Trigger}, the expectation is stored for future evaluation and the `Trigger` value is returned to make this chainable.
              * When called on a {@link Operation}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
+             * @throws {TypeError} If called with more or less than one argument
+             * @throws {ExpectError} If called by a `Trigger` that doesn't match the expected return value
              */
             alias(this, "expectReturn",
                 this._expect, "expectReturn", "both", "post", validateArgsSingle,
@@ -1290,6 +1317,8 @@
              * @param  {...any} args The list of arguments to validate for the function call.
              * @return {Trigger|Boolean}           When called on a {@link Trigger}, the expectation is stored for future evaluation and the `Trigger` value is returned to make this chainable.
              * When called on a {@link Operation}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
+             * @throws {TypeError} If called with more or less than one argument
+             * @throws {ExpectError} If called by a `Trigger` that doesn't match the expected return value
              */
             alias(this, "expectCallArgs",
                 this._expect, "expectCallArgs", "function", "pre", validateArgsAny,
@@ -1312,6 +1341,8 @@
              * @param {Object} context The expected `this` for the function. Is compared by a strict deep-equals.
              * @return {Trigger|Boolean}           When called on a {@link Trigger}, the expectation is stored for future evaluation and the `Trigger` value is returned to make this chainable.
              * When called on a {@link Operation}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
+             * @throws {TypeError} If called on a wrapped function, or with more or less than one argument
+             * @throws {ExpectError} If called by a `Trigger` that doesn't match the expected call context (`this` value)
              */
             alias(this, "expectCallContext",
                 this._expect, "expectCallContext", "function", "pre", validateArgsSingle,
@@ -1336,6 +1367,8 @@
              * will expecct that there was no `Error` thrown.
              * @return {Trigger|Boolean}           When called on a {@link Trigger}, the expectation is stored for future evaluation and the `Trigger` value is returned to make this chainable.
              * When called on a {@link Operation}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
+             * @throws {TypeError} If called with more or less than one argument, or with an argument that isn't an `Error` or `null`
+             * @throws {ExpectError} If called by a `Trigger` that doesn't throw the expected exception (`Error`) or throwns an unexpected exception (if the expected exception was `null`)
              */
             alias(this, "expectException",
                 this._expect, "expectException", "both", "post", validateArgsSingleExceptionOrNull,
@@ -1372,6 +1405,8 @@
              * @param {any} setVal The value that is expected to be set on the property. An `undefined` value is allowed, but the value `undefined` must be passed explicitly to `expectSetVal`.
              * @return {Trigger|Boolean}           When called on a {@link Trigger}, the expectation is stored for future evaluation and the `Trigger` value is returned to make this chainable.
              * When called on a {@link Operation}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
+             * @throws {TypeError} If called with more or less than one argument
+             * @throws {ExpectError} If called by a `Trigger` that doesn't receive the expected set argument
              */
             alias(this, "expectSetVal",
                 this._expect, "expectSetVal", "property", "post", validateArgsSingle,
@@ -1385,7 +1420,6 @@
                     return err;
                 });
 
-            // returns string or null
             /**
              * Evaluates the callback function
              * @name expectCustom
@@ -1395,6 +1429,8 @@
              * @param {Operation~customExpectCallback} cb Callback function that will determine whether the expecation passes or fails. See {@link Operation~customExpectCallback customExpectCallback} for more details.
              * @return {Trigger|Boolean}           When called on a {@link Trigger}, the expectation is stored for future evaluation and the `Trigger` value is returned to make this chainable.
              * When called on a {@link Operation}, the expectation is evaluated immediately and `true` is returned if the expectation passed; `false` if it failed.
+             * @throws {TypeError} If called with more or less than one argument, or the first argument isn't a `Function`
+             * @throws {ExpectError} If called by a `Trigger` and the custom function returns an `Error` or a `String`
              */
             alias(this, "expectCustom",
                 this._expect, "expectCustom", "both", "post", validateArgsFirstFunction,
@@ -1662,6 +1698,7 @@
      * Note that many of the `Filter` operations are chainable and combinable to make unique and
      * powerful combinations out of the `Filter` methods.
      * @extends {Array}
+     * @throws {TypeError} If first argument isn't a valid `Wrapper`
      */
     class Filter extends Array {
         constructor(wrapper, ...args) {
@@ -1679,6 +1716,7 @@
              * @memberof Filter
              * @instance
              * @returns {Filter} Returns a `Filter` containing just the {@link Operation} records where a property was set.
+             * @throws {TypeError} If called on a wrapped property
              */
             alias(this, "filterPropSet",
                 this._filter, "filterSet", "property",
@@ -1694,6 +1732,7 @@
              * @memberof Filter
              * @instance
              * @returns {Filter} Returns a `Filter` containing just the {@link Operation} records when the property was gotten.
+             * @throws {TypeError} If called on a wrapped property
              */
             alias(this, "filterPropGet",
                 this._filter, "filterGet", "property",
@@ -1711,6 +1750,7 @@
              * will be included in the results.
              * @returns {Filter} Returns a `Filter` containing just the {@link Operation} records that are of type `set` and have a
              * matching `setVal`.
+             * @throws {TypeError} If called on a wrapped property, or if called with more than one argument
              */
             alias(this, "filterPropSetByVal",
                 this._filter, "filterPropSetByVal", "property",
@@ -1731,6 +1771,7 @@
              * @param {...any} args The function arguments that will be matched
              * @returns {Filter} A `Filter` continaing the function calls where the function was called with
              * arguments that match `...args`.
+             * @throws {TypeError} If called on a wrapped property
              * @example
              * new Wrapper(obj, someMethod); // create a new wrapper
              *
@@ -1759,6 +1800,7 @@
              * @instance
              * @param {Object} context The context that the `this` value of the function will be evaluated against.
              * @returns {Filter} A `Filter` containing the function calls where the `this` strictly and deeply matched `context`.
+             * @throws {TypeError} If called on a wrapped property, or with more than one argument
              */
             alias(this, "filterByCallContext",
                 this._filter, "filterByCallContext", "function",
@@ -1781,6 +1823,7 @@
              * an `Error`.
              * @returns {Filter} A `Filter` containing the function calls or property set / get that threw an
              * `Error` that matches `exception`.
+             * @throws {TypeError} If called with more or less than one argument, or if the argument passed is not an `Error` or `null`
              */
             alias(this, "filterByException",
                 this._filter, "filterByException", "both",
@@ -1803,10 +1846,12 @@
              * must be explicitly passed to `filterByReturn`.
              * @returns {Filter} A `Filter` containing the function calls or property set / get that returned a
              * value stictly matching `retVal`.
+             * @throws {TypeError} If called with more or less than one argument
              */
             alias(this, "filterByReturn",
                 this._filter, "filterByReturn", "both",
                 function(element, index, array, ...args) {
+                    validateArgsSingle("filterByReturn", ...args);
                     var retVal = args[0];
 
                     var m = Match.value(retVal);
@@ -1899,6 +1944,7 @@
              * @memberof Filter
              * @instance
              * @returns {Array} An `Array` of argument lists, where each argument list is
+             * @throws {TypeError} If called on a wrapped property
              * an `Array` of the arguments that were passed to that call. If a function was called
              * without arguments the array will empty (length of 0).
              * @example
@@ -1923,6 +1969,7 @@
              * @memberof Filter
              * @instance
              * @returns {Array} An `Array` of call contexts / `this` values
+             * @throws {TypeError} If called on a wrapped property
              */
             alias(this, "getAllCallContexts",
                 this._get, "getAllCallContexts", "function", "context");
@@ -1957,6 +2004,7 @@
              * @memberof Filter
              * @instance
              * @returns {Array} An `Array` of the values the property was set to.
+             * @throws {TypeError} If called on a wrapped function
              */
             alias(this, "getAllSetVals",
                 this._get, "getAllSetVals", "property", "setVal");
@@ -2034,6 +2082,7 @@
         /**
          * Similar to {@link Filter#filterFirst filterFirst}, but returns the last {@link Operation} record in the `Filter`.
          * @returns {Operation} Returns the last operation record in the `Filter`
+         * @throws {RangeError} If the `Filter` is empty
          */
         filterLast() {
             if (this.length === 0) {
@@ -2047,6 +2096,7 @@
          * Expects that `Filter` has `count` members.
          * @param  {Number} num  How many members are expected to be in the `Filter`
          * @return {Boolean}      Returns `true` if `Filter` has `count` {@link Operation} records, `false` otherwise
+         * @throws {TypeError} If more or less than a single argument, or if the argument received isn't a number
          */
         expectCount(num) {
             validateArgsSingleNumber("expectCount", num);
@@ -2063,6 +2113,7 @@
          * @param  {Number} min   How the miniumum number of members expected to be in the `Filter`
          * @param  {Number} max   The maximum number of members expected to be in the `Filter`
          * @return {Boolean}      Returns `true` if `Filter` has `count` {@link Operation} records, `false` otherwise
+         * @throws {TypeError} If `min` or `max` arguments aren't of type `Number`.
          */
         expectCountRange(min, max) {
             if (typeof min !== "number") {
@@ -2084,6 +2135,7 @@
          * Expects that `Filter` has at least `min` members.
          * @param  {Number} min   How least number of members that are expected to be in the `Filter`
          * @return {Boolean}      Returns `true` if `arr` has at least `count` {@link Operation} records, `false` otherwise
+         * @throws {TypeError} If first argument isn't of type `Number`
          */
         expectCountMin(min) {
             validateArgsSingleNumber("expectCountMin", min);
@@ -2099,6 +2151,7 @@
          * Expects that `Filter` has at most `max` members.
          * @param  {Number} max   The maximum number of members that are expected to be in the `Filter`
          * @return {Boolean}      Returns `true` if `Filter` has less than `count` members, `false` otherwise
+         * @throws {TypeError} If first argument isn't of type `Number`
          */
         expectCountMax(max) {
             validateArgsSingleNumber("expectCountMax", max);
@@ -2218,6 +2271,13 @@
      * @borrows Expect#expectSetVal as expectSetVal
      */
     class Operation extends Expect {
+        /**
+         * Creates a new `Operation`
+         * @param  {Wrapper} wrapper The `Wrapper` that created this `Operation`
+         * @param  {Object} desc     The default values of the Operation
+         * @return {Operation}       The newly created `Operation`
+         * @throws {TypeError} If first argument isn't a `Wrapper` or second argument isn't an `Object`
+         */
         constructor(wrapper, desc) {
             /** @lends Operation# */
             super();
@@ -2286,18 +2346,25 @@
     }
 
     /**
-     * A `Trigger` determines what `expect` or `action` calls get run on a wrapped
-     * function or property. Triggers usally get created by calling a trigger function
-     * on the {@link Wrapper}. Note that triggers are always run in the order that they
-     * are added to a `Wrapper`, and any expectations or actions on a trigger are run
-     * in the order they were added to the `Trigger`.
+     * A `Trigger` determines what `expect` or `action` calls get run in real-time on a wrapped function or property, so that a wrapped
+     * function or property can be evaluated as it is being run (through `expect` calls) or modify the behavior of a wrapped function or
+     * property (through the use of `action` calls).
      *
-     * TODO:
-     *     * same expect calls as Operation
-     *     * created on the wrapper
-     *     * not very interesting by themselves
-     *     * customTrigger
-     *     * customAction
+     * Triggers usally get created by calling a trigger function on the {@link Wrapper}, such as `triggerAlways` or `triggerOnCallArgs`.
+     * Note that triggers are always run in the order that they  are added to a `Wrapper`, and any expectations or actions on a
+     * trigger are run in the order they were added to the `Trigger`. It is important to realize that `Triggers` are not very
+     * interesting by themselves -- without any associated `action` or `expectation` they do nothing.
+     *
+     * Every time a wrapped function is called or a property is touched, triggers will be evaluated twice: once just
+     * before the wrapped function is executed or property is modified, and once after. This provides the opportunity to
+     * modify arguments or context that will be used before the wrapper is executed, and provides the opportunity to change
+     * return values or errors after the wrapper is executed. Any `actions` or `expectations` associated with the trigger will
+     * run each time it is evaluated and successfully determines that it should execute. This means that expectations are evaluated
+     * in real-time as the code is running. By default expectations will throw an error if they are not met when triggered (unless
+     * `configExpectThrowsOnTrigger` is called with `false` for the `Wrapper`).
+     *
+     * While most useful 'Triggers' and the associated `actions` and `exceptions` have been defined, it may be useful to define
+     * your own. For that purpose, `triggerCustom` and `actionCustom` have been defined.
      *
      * @borrows Expect#expectCallArgs as expectCallArgs
      * @borrows Expect#expectCallContext as expectCallContext
@@ -2312,6 +2379,14 @@
      *     .actionReturn(true);         // ...and always change the return value of the function to `true`
      */
     class Trigger extends Expect {
+        /**
+         * Creates a new Trigger
+         * @param  {Wrapper} wrapper    The `Wrapper` that created this `Trigger` and that will evaluate the trigger conditions when
+         * the wrapper is executed.
+         * @param  {Function} triggerFn The function that will be called to determine whether or not the `actions` and `expectations`
+         * associated with this trigger should be executed.
+         * @return {Trigger}            The newly created `Trigger`
+         */
         constructor(wrapper, triggerFn) {
             super();
 
@@ -2760,6 +2835,10 @@
      * ```
      */
     class Sandbox {
+        /**
+         * Creates a new Sandbox
+         * @return {Sandbox} The newly created `Sandbox`
+         */
         constructor() {
             this.wrapperList = new Set();
             this.config = {
@@ -2771,7 +2850,7 @@
          * Creates a Sandbox singleton. Future calls to `Sandbox.singletonGetCurrent` will retrieve the
          * singletone. Makes it easy to work with the same `Sandbox` across multiple contexts.
          * @return {Sandbox} The Sandbox singleton, a single global singleton.
-         * @throws {Erro} If the Sandbox Singleton has already been created.
+         * @throws {Error} If the Sandbox Singleton has already been created.
          */
         static singletonStart() {
             if (typeof sandboxSingleton === "object") {
@@ -2781,6 +2860,11 @@
             return sandboxSingleton;
         }
 
+        /**
+         * Retreives the current sandbox singleton
+         * @return {Sandbox} The current sandbox singleton
+         * @throws {Error} If the Snadbox Singleton hasn't been created yet (i.e. - through `singletonStart`)
+         */
         static singletonGetCurrent() {
             if (typeof sandboxSingleton !== "object") {
                 throw new Error("Sandbox.singletonGetCurrent: not started yet");
@@ -2789,6 +2873,11 @@
             return sandboxSingleton;
         }
 
+        /**
+         * Destroys the current sandbox singleton
+         * @return {Sandbox} The current sandbox singleton
+         * @throws {Error} If the Sandbox Singleton hasn't been created yet (i.e. - through `singletonStart`)
+         */
         static singletonEnd() {
             if (typeof sandboxSingleton !== "object") {
                 throw new Error("Sandbox.singletonEnd: not started yet");
@@ -3471,6 +3560,11 @@
      * interface can have multiple {@link Behavior Behaviors}, that describe how the interface works.
      */
     class Module {
+        /**
+         * Creates a new Module
+         * @param  {String} [moduleName] The name for the new module
+         * @return {Module}            The newly created `Module`
+         */
         constructor(moduleName) {
             this.moduleName = moduleName;
             this.propertyMap = new Map();
@@ -3482,6 +3576,7 @@
          * Defines a new method / funciton interface on the module.
          * @param  {String} name The name of the interface (i.e. - the key used to access / call the method)
          * @return {Interface}      The interface that was created
+         * @throws {TypeError} If first argument isn't of type `String`
          */
         defineMethod(name) {
             validateArgsSingleString("defineMethod", name);
@@ -3492,6 +3587,7 @@
          * Defines a new property interface on the module.
          * @param  {String} name The name of the interface / property
          * @return {Interface}      The interface that was created
+         * @throws {TypeError} If first argument isn't of type `String`
          */
         defineProperty(name) {
             validateArgsSingleString("defineProperty", name);
@@ -3520,6 +3616,8 @@
          * @param  {String} behaviorName  The name of the behavior
          * @param  {String} [interfaceName] An optional interface that the behavior is being defined for
          * @return {Behavior}               The Behavior that was created
+         * @throws {TypeError} If first argument isn't a string or isn't the name of a previously defined behavior.
+         * If second argument is specified but isn't a string, or isn't the name of a previously defined interface.
          */
         defineBehavior(behaviorName, interfaceName) {
             if (typeof behaviorName !== "string") {
@@ -3554,6 +3652,7 @@
          * Returns the interface specified by `interfaceName`
          * @param  {String} interfaceName The name of the interface to get
          * @return {Interface|undefined}  The requrested interface or undefined if the interface wasn't found
+         * @throws {TypeError} If first argument isn't of type `String`
          */
         getInterface(interfaceName) {
             validateArgsSingleString("getInterface", interfaceName);
@@ -3564,6 +3663,7 @@
          * Returns the behavior specified by `behaviorName`
          * @param  {String} behaviorName The name of the behavior to get
          * @return {Behavior|undefined}  The requrested behavior or undefined if the behavior wasn't found
+         * @throws {TypeError} If first argument isn't of type `String`
          */
         getBehavior(behaviorName) {
             validateArgsSingleString("getBehavior", behaviorName);
@@ -3574,6 +3674,7 @@
          * Returns a stub {@link Wrapper} for the specified behavior.
          * @param  {String} behaviorName The behavior to create a stub for
          * @return {Wrapper}             A stub that performs the specified behavior
+         * @throws {TypeError} If first argument isn't of type `String`
          */
         getStub(behaviorName) {
             validateArgsSingleString("getStub", behaviorName);
@@ -3592,6 +3693,8 @@
          * @param  {String} behaviorName The name of the behavior to be tested
          * @param  {String} [desc]       An optional description of the test, similar to what might be passed to
          * the `test()` or `it()` function of a test runner. If not specified, the behavior name will be used.
+         * @throws {TypeError} If first argument isn't a string or isn't the name of a previously defined behavior.
+         * If second argument is provided, but isn't of type `String`.
          */
         defineTest(behaviorName, desc) {
             if (typeof behaviorName !== "string") {
@@ -3608,6 +3711,12 @@
 
             desc = desc || behavior.behaviorName;
 
+            /**
+             * @typedef {Object} Module#Test
+             * @property {String} behaviorName The name of the behavior to be tested
+             * @property {String} desc A short description of the test...[any]
+             * @property {Function} fn The function that runs the test. No arguments required and no return value. Throws on failure.
+             */
             this.testList.push({
                 behaviorName: behaviorName,
                 desc: desc
@@ -3621,14 +3730,8 @@
         }
 
         /**
-         * @typedef {Object} Test
-         * @property {String} behaviorName The name of the behavior to be tested
-         * @property {String} desc A short description of the test...[any]
-         * @property {Function} fn The function that runs the test. No arguments required and no return value. Throws on failure.
-         */
-        /**
          * Returns an array of tests.
-         * @returns {Array.<Test>} An array of test objects. Each object has a `desc` and `fn` that is ready to be passed to a
+         * @returns {Module#Test[]} An array of test objects. Each object has a `desc` and `fn` that is ready to be passed to a
          * test runner, such as Mocha, Jasmine, or QUnit.
          */
         getTestList() {
@@ -3652,6 +3755,14 @@
          * testing framworks can simply pass a `test` or `it` function.
          */
         runAllTests(mod, cb) {
+            if (typeof mod !== "object") {
+                throw new TypeError("runAllTests: expected first argument to be the module to be tested and be of type Object");
+            }
+
+            if (typeof cb !== "function") {
+                throw new TypeError("runAllTests: expected second argument to be callback function for running tests");
+            }
+
             var runList = this.getTestList();
             for (let i = 0; i < runList.length; i++) {
                 let test = runList[i];
