@@ -635,6 +635,32 @@ describe("module", function() {
         it("cleans up wrappers after test");
     });
 
+    describe("runAllTests", function() {
+        it("throws on bad args", function() {
+            var mod = new Module();
+
+            // missing first arg
+            assert.throws(function() {
+                mod.runAllTests();
+            }, TypeError, "runAllTests: expected first argument to be the module to be tested and be of type Object");
+
+            // wrong first arg
+            assert.throws(function() {
+                mod.runAllTests(42);
+            }, TypeError, "runAllTests: expected first argument to be the module to be tested and be of type Object");
+
+            // missing second arg
+            assert.throws(function() {
+                mod.runAllTests({});
+            }, TypeError, "runAllTests: expected second argument to be callback function for running tests");
+
+            // wrong second arg
+            assert.throws(function() {
+                mod.runAllTests({}, 42);
+            }, TypeError, "runAllTests: expected second argument to be callback function for running tests");
+        });
+    });
+
     describe("_testFunctionFactory", function() {
         it("creates a function", function() {
             var mod = new Module();
@@ -715,6 +741,47 @@ describe("module", function() {
             };
 
             mochaIt(testList[0].desc, testList[0].fn(myMod));
+        });
+    });
+
+    describe("integrity checks", function() {
+        it("simple stub passes test", function() {
+            var mod = new Module();
+
+            mod.defineMethod("getUser");
+            mod.defineBehavior("getUserSuccess")
+                .getUser()
+                .returns("Adam");
+            mod.defineTest("getUserSuccess", "successful get user");
+            var stub = mod.getStub("getUserSuccess");
+            mod.runAllTests(stub, mochaIt);
+        });
+
+        it("multi-stub", function() {
+            var mod = new Module();
+
+            // methods
+            mod.defineMethod("getUser");
+            mod.defineMethod("createUser");
+
+            // behaviors
+            mod.defineBehavior("getUserFail", "getUser")
+                .throws(new Error("User not found"));
+            mod.defineBehavior("createUserSuccess", "createUser")
+                .returns(true);
+            mod.defineBehavior("getUserSuccess", "getUser")
+                .returns("Adam");
+            mod.defineBehavior("createAccount")
+                .getUserFail()
+                .createUserSuccess()
+                .getUserSuccess();
+
+            // create stub
+            var stub = mod.getStub("createAccount");
+
+            // define tests
+            mod.defineTest("createAccount", "can create an account");
+            mod.runAllTests(stub, mochaIt);
         });
     });
 });
