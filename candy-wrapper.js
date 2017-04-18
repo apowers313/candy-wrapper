@@ -3558,11 +3558,16 @@
      *
      * Modules have interfaces that can created through `defineMethod` (for functions) and `defineProperty`. Every
      * interface can have multiple {@link Behavior Behaviors}, that describe how the interface works.
+     *
+     * See the {@tutorial modules-and-behaviors} Tutorial for more information.
+     *
+     * @tutorial modules-and-behaviors
      */
     class Module {
         /**
          * Creates a new Module
-         * @param  {String} [moduleName] The name for the new module
+         * @param  {String} [moduleName] The optional name for the new module. Currently not used for anything, but may
+         * be used in the future for `submodule` functionality. Using a module name is encouraged for future compatibility.
          * @return {Module}            The newly created `Module`
          */
         constructor(moduleName) {
@@ -3730,6 +3735,23 @@
         }
 
         /**
+         * Looks up a test for the behavior specified by `behaviorName`
+         * @param  {String} behaviorName The behavior that a test has been defined for
+         * @param {Object} module The module to be tested
+         * @return {Function|undefined}  The function for running the test or `undefined`
+         */
+        getTest(behaviorName, module) {
+            for (let i = 0; i < this.testList.length; i++) {
+                let test = this.testList[i];
+                if (test.behaviorName === behaviorName) {
+                    let behavior = this.getBehavior(behaviorName);
+                    var fn = this._testFunctionFactory(behavior);
+                    if (typeof fn === "function") return fn(module);
+                }
+            }
+        }
+
+        /**
          * Returns an array of tests.
          * @returns {Module#Test[]} An array of test objects. Each object has a `desc` and `fn` that is ready to be passed to a
          * test runner, such as Mocha, Jasmine, or QUnit.
@@ -3773,12 +3795,16 @@
     }
 
     /**
-     * Describes an interface
+     * An interface is a method or property of an {@link Module} that is intended to serve as part of that Module's API.
+     * This simple class contains a minimal amount of information about the interface.
      */
     class Interface {
         constructor(module, name, type) {
+            /** @type {Module} The parent module of this interface */
             this.module = module;
+            /** @type {String} The name of the interface, which behaves as the key to the object */
             this.interfaceName = name;
+            /** @type {String} The type of interface, either `"function"` or `"property"` */
             this.interfaceType = type;
         }
     }
@@ -3792,7 +3818,8 @@
     }
 
     /**
-     * Describes a behavior
+     * A behavior describes how an interface should act in a specific instance. Every interface can (and should) have one or more
+     * behavior defined for it. The primary interface for behaviors is through {@link Module Module's} methods.
      */
     class Behavior {
         constructor(module, name) {
@@ -4055,7 +4082,10 @@
     }
 
     /**
-     * Describes the behavior of an interface
+     * Whereas {@link Behavior Behaviors} describe an abstract sequence of things that are expected to happen
+     * an `InterfaceBehavior` describes the concrete actions that an {@link Interface} is expected to take.
+     * The primary inteface to this class is through the {@link Module Module's} {@link Module#defineBehavior defineBehavior}
+     * method.
      */
     class InterfaceBehavior {
         constructor(module, behavior, interfaceObj) {
