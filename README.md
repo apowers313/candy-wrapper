@@ -1,4 +1,4 @@
-**This project is currently in BETA. APIs may be subject to frequent change prior to the 1.0 release. Please use very strict versioning in your `package.json` if you choose to use candy-wrapper at this time.**
+**This project is currently a RELEASE CANDIDATE. Please provide feedback on bugs or improvements before the 1.0 release.**
 
 ![##candy-wrapper](https://cdn.rawgit.com/apowers313/candy-wrapper/2e325ece/img/candy-wrapper-full-logo-1116x200.png?raw=true)
 
@@ -27,6 +27,7 @@ There is also a higher-level interface for defining stubs and tests based on the
 This interface is especially useful for creating stubs and tests that mirror each other, where the stubs can be used to replace a module during testing and a test can make sure that the module has the same behavior as a stub. The primary interface for this functionality is:
 * [Module](https://apowers313.github.io/candy-wrapper/Module.html), which defines a group of method and property interfaces, similar to a module that is imported through `require`. After behaviors are defined for the module, stubs and tests can automatically be generated to stub out the module where it is required or test instances of the module.
 
+For a quick introduction to Modules, Intefaces and Behaviors, see the [Modules and Behaviors Tutorial](https://apowers313.github.io/candy-wrapper/modules-and-behaviors.html)
 
 ## Installing and Using
 
@@ -172,6 +173,87 @@ Wrapper.isWrapper(Math, "random"); // true
 
 // this is probably a bad idea, let's go back to the original random number generator...
 Wrapper.unwrap(Math, "random");
+```
+
+### Module Stubs and Tests
+Changing gears (so to speak), our next example shows how to define a new module that describes the functionality of a car. The {@link Module} can then create a stub to be used where the module is needed during testing, and tests to ensure that any instance of the module will behave properly when imported into the real system.
+
+``` js
+// create a new module that will define a car
+var carModule = new Module();
+
+// define a function for the module
+carModule.defineMethod("startEngine");
+// successfully start the engine
+carModule.defineBehavior("startEngineSuccess")
+    .startEngine()
+    .args("key")
+    .returns(true);
+// fail to start the engine because no key was provided
+carModule.defineBehavior("startEngineNoKey")
+    .startEngine()
+    .args()
+    .throws(new Error("no key provided"));
+
+// define a property for the module
+carModule.defineProperty("currentSpeed");
+// property returns 10 when going slow
+carModule.defineBehavior("currentSpeedSlow")
+    .currentSpeed()
+    .returns(10);
+// property returns 70 when at cruising speed
+carModule.defineBehavior("currentSpeedCruise")
+    .currentSpeed()
+    .returns(70);
+// property returns 120 when going fast
+carModule.defineBehavior("currentSpeedFast")
+    .currentSpeed()
+    .returns(120);
+
+// define a more complex behavior based on the behaviors we already defined
+carModule.defineBehavior("accelerate")
+    .startEngineSuccess()
+    .currentSpeedSlow()
+    .currentSpeedCruise()
+    .currentSpeedFast();
+
+/*****************************************************
+ * A stub that replaces the functionality for testing
+ /****************************************************/
+
+// normally this is what happens
+var carModule = require("carModule");
+
+// create a stub that mocks the `startEngineSuccess` behavior
+// maybe replace the normal module with your stub using something like Mockery:
+// https://www.npmjs.com/package/mockery
+var carModule = carModule.getStub("startEngineSuccess");
+
+/*****************************************************
+ * A stub that replaces the functionality for testing
+ /****************************************************/
+
+// define which behaviors should be tested for the module
+carModule.defineTest("startEngineSuccess", "start the car's engine");
+carModule.defineTest("startEngineNoKey", "fails to start the engine without a key");
+carModule.defineTest("accelerate", "start the engine and current speed gets faster");
+
+// your instance of the car module
+var myFerrari = {
+    startEngine = function(key) {
+        if (key !== "key") throw new Error ("no key provided");
+        return true;
+    },
+    currentSpeed: 0
+};
+
+// maybe your module would do something like this
+module.exports = myFerrari;
+
+// run all the tests against your module using the 'describe' and 'it' functions from Mocha
+describe ("my ferrari", function() {
+    mod.runAllTests(myFerrari, it);
+});
 ```
 
 ## Required: JavaScript ES6
