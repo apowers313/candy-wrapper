@@ -691,6 +691,43 @@ describe("module", function() {
         });
     });
 
+    describe("getTest", function() {
+        it("can find a defined function", function() {
+            var mod = new Module();
+
+            mod.defineBehavior("testBehavior1");
+            mod.defineBehavior("testBehavior2");
+            mod.defineBehavior("testBehavior3");
+            mod.defineBehavior("testBehavior4");
+            mod.defineBehavior("testBehavior5");
+            mod.defineTest("testBehavior1");
+            mod.defineTest("testBehavior2");
+            mod.defineTest("testBehavior3");
+            mod.defineTest("testBehavior4");
+            mod.defineTest("testBehavior5");
+            var fn;
+
+            // pass
+            fn = mod.getTest("testBehavior1", {});
+            assert.isFunction(fn);
+
+            // pass
+            fn = mod.getTest("testBehavior1", {});
+            assert.isFunction(fn);
+
+            // pass
+            fn = mod.getTest("testBehavior1", {});
+            assert.isFunction(fn);
+
+            // not found
+            fn = mod.getTest("asdfqwer", {});
+            assert.isUndefined(fn);
+
+        });
+
+        it("can run the returned function");
+    });
+
     describe("test", function() {
         it("throws if interace isn't defined", function() {
             var mod = new Module();
