@@ -230,7 +230,7 @@ var carModule = require("carModule");
 var carModule = carModule.getStub("startEngineSuccess");
 
 /*****************************************************
- * A stub that replaces the functionality for testing
+ * A module that will have it's behavior tested
  /****************************************************/
 
 // define which behaviors should be tested for the module
